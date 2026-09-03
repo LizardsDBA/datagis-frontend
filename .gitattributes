@@ -1,0 +1,6 @@
+# Repo agora vive só no WSL/Linux — tudo em LF, sem exceção de plataforma.
+* text=auto eol=lf
+
+*.png  binary
+*.jpg  binary
+*.svg  text eol=lf
