@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onUnmounted } from 'vue'
+import CadastroFontes from './components/CadastroFontes.vue'
 
-// Tela minima da fatia 1 (CLAUDE.md §5.2): so dispara a ingestao e mostra o
-// resultado. Sem login, sem roteamento - isso vem em fatias futuras.
+// Duas abas por enquanto, sem router: Ingestao e Fontes. Sem login ainda.
+const aba = ref('ingestao') // ingestao | fontes
+
 const estado = ref('ocioso') // ocioso | carregando | sucesso | erro
 const resultado = ref(null)
 const erroMsg = ref(null)
@@ -53,70 +55,94 @@ onUnmounted(pararCronometro)
     <div class="cartao">
       <header class="cabecalho">
         <span class="marca">DataGis</span>
-        <h1>Ingestão de dados — CAR (Paraná)</h1>
-        <p class="subtitulo">
-          Fatia 1: busca o perímetro dos imóveis rurais no WFS do SICAR e grava cada
-          registro como está, sem tratar, na zona bruta.
-        </p>
+        <h1>Ingestão e cadastro de fontes</h1>
       </header>
 
-      <button
-        class="botao-principal"
-        :disabled="estado === 'carregando'"
-        @click="ingerirCarPr"
-      >
-        <span v-if="estado === 'carregando'" class="spinner" aria-hidden="true"></span>
-        {{ estado === 'carregando' ? `Ingerindo… (${segundosDecorridos}s)` : 'Ingerir CAR/PR' }}
-      </button>
-      <p v-if="estado === 'carregando'" class="dica">
-        Buscando no CAR e gravando registro a registro — pode levar de 10 a 20s.
-      </p>
-
-      <transition name="fade" mode="out-in">
-        <div
-          v-if="estado === 'sucesso' && resultado.status === 'SEM_MUDANCA'"
-          key="sem-mudanca"
-          class="resultado resultado--neutro"
+      <nav class="abas">
+        <button
+          class="aba-botao"
+          :class="{ 'aba-botao--ativa': aba === 'ingestao' }"
+          @click="aba = 'ingestao'"
         >
-          <p class="resultado-titulo">Nada mudou desde a última vez</p>
-          <p>
-            O CAR/PR está igual ao lote anterior — nenhum registro novo foi gravado.
-          </p>
-          <dl>
-            <div class="linha">
-              <dt>Lote (verificação)</dt>
-              <dd>#{{ resultado.loteIngestaoId }}</dd>
-            </div>
-            <div class="linha">
-              <dt>Horário</dt>
-              <dd>{{ horarioResultado }}</dd>
-            </div>
-          </dl>
-        </div>
+          Ingestão CAR
+        </button>
+        <button
+          class="aba-botao"
+          :class="{ 'aba-botao--ativa': aba === 'fontes' }"
+          @click="aba = 'fontes'"
+        >
+          Fontes de dados
+        </button>
+      </nav>
 
-        <div v-else-if="estado === 'sucesso'" key="sucesso" class="resultado resultado--ok">
-          <p class="resultado-titulo">Ingestão concluída</p>
-          <dl>
-            <div class="linha">
-              <dt>Lote</dt>
-              <dd>#{{ resultado.loteIngestaoId }}</dd>
-            </div>
-            <div class="linha">
-              <dt>Registros gravados</dt>
-              <dd>{{ resultado.quantidadeRegistros.toLocaleString('pt-BR') }}</dd>
-            </div>
-            <div class="linha">
-              <dt>Horário</dt>
-              <dd>{{ horarioResultado }}</dd>
-            </div>
-          </dl>
-        </div>
+      <section v-if="aba === 'ingestao'">
+        <p class="subtitulo">
+          Busca o perímetro dos imóveis rurais no WFS do SICAR e grava cada registro
+          como está, sem tratar, na zona bruta.
+        </p>
 
-        <div v-else-if="estado === 'erro'" key="erro" class="resultado resultado--erro">
-          <p class="resultado-titulo">Falha na ingestão</p>
-          <p>{{ erroMsg }}</p>
-        </div>
-      </transition>
+        <button
+          class="botao-principal"
+          :disabled="estado === 'carregando'"
+          @click="ingerirCarPr"
+        >
+          <span v-if="estado === 'carregando'" class="spinner" aria-hidden="true"></span>
+          {{ estado === 'carregando' ? `Ingerindo… (${segundosDecorridos}s)` : 'Ingerir CAR/PR' }}
+        </button>
+        <p v-if="estado === 'carregando'" class="dica">
+          Buscando no CAR e gravando registro a registro — pode levar de 10 a 20s.
+        </p>
+
+        <transition name="fade" mode="out-in">
+          <div
+            v-if="estado === 'sucesso' && resultado.status === 'SEM_MUDANCA'"
+            key="sem-mudanca"
+            class="resultado resultado--neutro"
+          >
+            <p class="resultado-titulo">Nada mudou desde a última vez</p>
+            <p>
+              O CAR/PR está igual ao lote anterior — nenhum registro novo foi gravado.
+            </p>
+            <dl>
+              <div class="linha">
+                <dt>Lote (verificação)</dt>
+                <dd>#{{ resultado.loteIngestaoId }}</dd>
+              </div>
+              <div class="linha">
+                <dt>Horário</dt>
+                <dd>{{ horarioResultado }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div v-else-if="estado === 'sucesso'" key="sucesso" class="resultado resultado--ok">
+            <p class="resultado-titulo">Ingestão concluída</p>
+            <dl>
+              <div class="linha">
+                <dt>Lote</dt>
+                <dd>#{{ resultado.loteIngestaoId }}</dd>
+              </div>
+              <div class="linha">
+                <dt>Registros gravados</dt>
+                <dd>{{ resultado.quantidadeRegistros.toLocaleString('pt-BR') }}</dd>
+              </div>
+              <div class="linha">
+                <dt>Horário</dt>
+                <dd>{{ horarioResultado }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div v-else-if="estado === 'erro'" key="erro" class="resultado resultado--erro">
+            <p class="resultado-titulo">Falha na ingestão</p>
+            <p>{{ erroMsg }}</p>
+          </div>
+        </transition>
+      </section>
+
+      <section v-else>
+        <CadastroFontes />
+      </section>
     </div>
   </div>
 </template>
@@ -139,12 +165,35 @@ onUnmounted(pararCronometro)
 
 .cartao {
   width: 100%;
-  max-width: 30rem;
+  max-width: 34rem;
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
   padding: 2rem;
   box-sizing: border-box;
+}
+
+.abas {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.aba-botao {
+  padding: 0.5rem 0.25rem;
+  font-size: 0.9rem;
+  color: #777;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.aba-botao--ativa {
+  color: #2e7d32;
+  border-bottom-color: #2e7d32;
+  font-weight: 600;
 }
 
 .cabecalho {
@@ -174,7 +223,7 @@ onUnmounted(pararCronometro)
 .subtitulo {
   font-size: 0.9rem;
   color: #666;
-  margin: 0;
+  margin: 0 0 1rem;
   line-height: 1.4;
 }
 
