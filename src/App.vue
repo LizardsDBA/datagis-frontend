@@ -27,7 +27,7 @@ async function ingerirCarPr() {
 
 <template>
   <main>
-    <h1>GeoRural DataHub</h1>
+    <h1>DataGis</h1>
     <p>Fatia 1 — ingestão bruta do CAR (Paraná)</p>
 
     <button :disabled="carregando" @click="ingerirCarPr">
