@@ -1,11 +1,15 @@
 <script setup>
 import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import ConstrutorCron from './ConstrutorCron.vue'
 
 const fontes = ref([])
 const carregandoLista = ref(false)
 const enviando = ref(false)
 const erro = ref(null)
 const sucesso = ref(false)
+
+// null = cadastrando fonte nova; numero = editando a fonte com esse id.
+const editandoId = ref(null)
 
 const formVazio = () => ({
   nome: '',
@@ -14,6 +18,8 @@ const formVazio = () => ({
   urlOrigem: '',
   cronExpressao: '',
   formatoEsperado: '',
+  campoGeometriaLat: '',
+  campoGeometriaLon: '',
   ativo: true,
 })
 
@@ -42,13 +48,39 @@ async function carregarFontes() {
   }
 }
 
-async function cadastrar() {
+function editar(fonte) {
+  editandoId.value = fonte.id
+  form.value = {
+    nome: fonte.nome,
+    orgao: fonte.orgao || '',
+    tipoAquisicao: fonte.tipoAquisicao,
+    urlOrigem: fonte.urlOrigem || '',
+    cronExpressao: fonte.cronExpressao || '',
+    formatoEsperado: fonte.formatoEsperado || '',
+    campoGeometriaLat: fonte.campoGeometriaLat || '',
+    campoGeometriaLon: fonte.campoGeometriaLon || '',
+    ativo: fonte.ativo,
+  }
+  sucesso.value = false
+  erro.value = null
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function cancelarEdicao() {
+  editandoId.value = null
+  form.value = formVazio()
+  erro.value = null
+}
+
+async function salvar() {
   enviando.value = true
   erro.value = null
   sucesso.value = false
   try {
-    const resposta = await fetch('/api/fontes', {
-      method: 'POST',
+    const url = editandoId.value ? `/api/fontes/${editandoId.value}` : '/api/fontes'
+    const metodo = editandoId.value ? 'PUT' : 'POST'
+    const resposta = await fetch(url, {
+      method: metodo,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value),
     })
@@ -57,6 +89,7 @@ async function cadastrar() {
       throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)
     }
     sucesso.value = true
+    editandoId.value = null
     form.value = formVazio()
     await carregarFontes()
   } catch (e) {
@@ -113,8 +146,8 @@ onUnmounted(() => {
     </p>
 
     <section class="cartao">
-      <h2 class="cartao-titulo">Nova fonte</h2>
-      <form class="formulario" @submit.prevent="cadastrar">
+      <h2 class="cartao-titulo">{{ editandoId ? 'Editar fonte' : 'Nova fonte' }}</h2>
+      <form class="formulario" @submit.prevent="salvar">
         <label>
           Nome
           <input v-model="form.nome" required placeholder="Ex.: IBAMA - Embargos" />
@@ -145,19 +178,34 @@ onUnmounted(() => {
             <option value="JSON">JSON</option>
           </select>
         </label>
+        <template v-if="form.formatoEsperado === 'CSV'">
+          <label>
+            Coluna de latitude (se tiver coordenada)
+            <input v-model="form.campoGeometriaLat" placeholder="Ex.: lat" />
+          </label>
+          <label>
+            Coluna de longitude (se tiver coordenada)
+            <input v-model="form.campoGeometriaLon" placeholder="Ex.: lon" />
+          </label>
+        </template>
         <label>
-          Expressão cron (agendamento futuro)
-          <input v-model="form.cronExpressao" placeholder="Ex.: 0 0 3 * * ? (opcional por agora)" />
+          Agendamento (cron — ainda não é executado automaticamente)
+          <ConstrutorCron v-model="form.cronExpressao" />
         </label>
         <label class="checkbox">
           <input v-model="form.ativo" type="checkbox" />
           Ativa
         </label>
 
-        <button type="submit" class="botao-principal" :disabled="enviando">
-          {{ enviando ? 'Cadastrando…' : 'Cadastrar fonte' }}
-        </button>
-        <p v-if="sucesso" class="mensagem-ok">Fonte cadastrada.</p>
+        <div class="acoes-formulario">
+          <button type="submit" class="botao-principal" :disabled="enviando">
+            {{ enviando ? 'Salvando…' : (editandoId ? 'Salvar alterações' : 'Cadastrar fonte') }}
+          </button>
+          <button v-if="editandoId" type="button" class="botao-secundario" @click="cancelarEdicao">
+            Cancelar
+          </button>
+        </div>
+        <p v-if="sucesso" class="mensagem-ok">Fonte salva.</p>
         <p v-if="erro" class="mensagem-erro">{{ erro }}</p>
       </form>
     </section>
@@ -194,11 +242,19 @@ onUnmounted(() => {
                 </td>
                 <td>{{ formatarData(fonte.ultimaExecucaoEm) }}</td>
                 <td>{{ formatarData(fonte.dataAdd) }}</td>
-                <td>
+                <td class="celula-acoes">
+                  <button class="botao-editar" title="Editar fonte" @click="editar(fonte)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </button>
                   <button
                     class="botao-play"
-                    :disabled="estadoDe(fonte.id).estado === 'executando'"
-                    :title="'Executar ingestão de ' + fonte.nome"
+                    :disabled="fonte.tipoAquisicao === 'UPLOAD_MANUAL' || estadoDe(fonte.id).estado === 'executando'"
+                    :title="fonte.tipoAquisicao === 'UPLOAD_MANUAL'
+                      ? 'Fonte de upload manual — sem execução automática'
+                      : 'Executar ingestão de ' + fonte.nome"
                     @click="executar(fonte)"
                   >
                     <span v-if="estadoDe(fonte.id).estado === 'executando'" class="spinner" aria-hidden="true"></span>
@@ -277,7 +333,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-width: 26rem;
+  max-width: 28rem;
 }
 
 label {
@@ -303,6 +359,11 @@ select {
   font-family: inherit;
 }
 
+.acoes-formulario {
+  display: flex;
+  gap: 0.6rem;
+}
+
 .botao-principal {
   padding: 0.65rem 1rem;
   font-size: 0.95rem;
@@ -317,6 +378,17 @@ select {
 .botao-principal:disabled {
   opacity: 0.7;
   cursor: default;
+}
+
+.botao-secundario {
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #555;
+  background: #f1f3f4;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
 .mensagem-ok {
@@ -363,6 +435,29 @@ select {
 .pill--neutro {
   background: #eef1f5;
   color: #667;
+}
+
+.celula-acoes {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.botao-editar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid #d5d9dd;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+}
+
+.botao-editar svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .botao-play {
