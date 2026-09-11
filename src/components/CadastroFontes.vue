@@ -125,6 +125,52 @@ async function executar(fonte) {
   }
 }
 
+// Upload manual (ex.: .zip de Shapefile) — um input de arquivo escondido, compartilhado
+// entre as linhas; abre pelo botão da fonte e dispara o envio assim que escolher o arquivo.
+const inputArquivoRef = ref(null)
+const fonteParaUpload = ref(null)
+
+function abrirSeletorArquivo(fonte) {
+  fonteParaUpload.value = fonte
+  inputArquivoRef.value?.click()
+}
+
+async function arquivoSelecionado(event) {
+  const arquivo = event.target.files?.[0]
+  event.target.value = '' // permite escolher o mesmo arquivo de novo numa proxima vez
+  if (!arquivo || !fonteParaUpload.value) return
+  await enviarUpload(fonteParaUpload.value, arquivo)
+  fonteParaUpload.value = null
+}
+
+async function enviarUpload(fonte, arquivo) {
+  const est = estadoDe(fonte.id)
+  est.estado = 'executando'
+  est.resultado = null
+  est.erro = null
+  est.segundos = 0
+  est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
+
+  try {
+    const formData = new FormData()
+    formData.append('arquivo', arquivo)
+    const resposta = await fetch(`/api/fontes/${fonte.id}/upload`, { method: 'POST', body: formData })
+    const corpo = await resposta.json().catch(() => null)
+    if (!resposta.ok) {
+      throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)
+    }
+    est.resultado = corpo
+    est.estado = 'sucesso'
+    await carregarFontes()
+  } catch (e) {
+    est.erro = e.message
+    est.estado = 'erro'
+  } finally {
+    clearInterval(est.cronometro)
+    est.cronometro = null
+  }
+}
+
 function formatarData(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('pt-BR')
@@ -250,11 +296,24 @@ onUnmounted(() => {
                     </svg>
                   </button>
                   <button
+                    v-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
                     class="botao-play"
-                    :disabled="fonte.tipoAquisicao === 'UPLOAD_MANUAL' || estadoDe(fonte.id).estado === 'executando'"
-                    :title="fonte.tipoAquisicao === 'UPLOAD_MANUAL'
-                      ? 'Fonte de upload manual — sem execução automática'
-                      : 'Executar ingestão de ' + fonte.nome"
+                    :disabled="estadoDe(fonte.id).estado === 'executando'"
+                    title="Enviar arquivo (.zip) e processar"
+                    @click="abrirSeletorArquivo(fonte)"
+                  >
+                    <span v-if="estadoDe(fonte.id).estado === 'executando'" class="spinner" aria-hidden="true"></span>
+                    <svg v-else class="icone-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M12 3v12" stroke-linecap="round" stroke-linejoin="round" />
+                      <path d="M7 8l5-5 5 5" stroke-linecap="round" stroke-linejoin="round" />
+                      <path d="M5 21h14" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                  <button
+                    v-else
+                    class="botao-play"
+                    :disabled="estadoDe(fonte.id).estado === 'executando'"
+                    :title="'Executar ingestão de ' + fonte.nome"
                     @click="executar(fonte)"
                   >
                     <span v-if="estadoDe(fonte.id).estado === 'executando'" class="spinner" aria-hidden="true"></span>
@@ -289,6 +348,14 @@ onUnmounted(() => {
         </table>
       </div>
     </section>
+
+    <input
+      ref="inputArquivoRef"
+      type="file"
+      accept=".zip"
+      style="display: none"
+      @change="arquivoSelecionado"
+    />
   </div>
 </template>
 
