@@ -26,14 +26,79 @@ const formVazio = () => ({
 const form = ref(formVazio())
 
 // Estado de execucao por fonte (chave = id) — mais de uma linha pode, em tese, estar
-// rodando ao mesmo tempo, entao cada uma tem seu proprio estado/cronometro.
+// rodando ao mesmo tempo, entao cada uma tem seu proprio estado/cronometro/sondagem.
 const execucoes = reactive({})
+
+// /executar e /upload sao sincronos — a resposta HTTP so volta quando a ingestao
+// inteira termina (achado ao vivo com o upload de 3,3GB do APPS: ficou minutos
+// "pendurado" sem nenhum feedback alem do cronometro de segundos). Enquanto isso,
+// sondamos /progresso em paralelo pra saber em que fase o backend esta.
+const FASES_LABEL = {
+  INICIANDO: 'Iniciando…',
+  BUSCANDO_DADOS: 'Buscando dados na fonte…',
+  DESCOMPACTANDO: 'Descompactando arquivo…',
+  LENDO_REGISTROS: 'Lendo registros…',
+  GRAVANDO: 'Gravando registros…',
+  CONCLUIDO: 'Concluído',
+  ERRO: 'Erro',
+}
+const INTERVALO_SONDAGEM_MS = 2000
 
 function estadoDe(id) {
   if (!execucoes[id]) {
-    execucoes[id] = { estado: 'ocioso', resultado: null, erro: null, segundos: 0, cronometro: null }
+    execucoes[id] = {
+      estado: 'ocioso',
+      resultado: null,
+      erro: null,
+      segundos: 0,
+      cronometro: null,
+      progressoUploadPct: null,
+      fase: null,
+      registrosProcessados: 0,
+      totalEstimado: null,
+      percentual: null,
+      detalhe: null,
+      sondagem: null,
+    }
   }
   return execucoes[id]
+}
+
+function zerarProgresso(est) {
+  est.progressoUploadPct = null
+  est.fase = null
+  est.registrosProcessados = 0
+  est.totalEstimado = null
+  est.percentual = null
+  est.detalhe = null
+}
+
+function iniciarSondagemDeProgresso(fonte) {
+  const est = estadoDe(fonte.id)
+  if (est.sondagem) return
+  est.sondagem = setInterval(async () => {
+    try {
+      const resposta = await fetch(`/api/fontes/${fonte.id}/progresso`)
+      if (!resposta.ok) return
+      const corpo = await resposta.json()
+      if (!corpo.fase) return
+      est.fase = corpo.fase
+      est.registrosProcessados = corpo.registrosProcessados
+      est.totalEstimado = corpo.totalEstimado
+      est.percentual = corpo.percentual
+      est.detalhe = corpo.detalhe
+    } catch (e) {
+      // Sondagem e so cosmetica - uma falha aqui nao deve interromper a execucao real.
+    }
+  }, INTERVALO_SONDAGEM_MS)
+}
+
+function pararSondagemDeProgresso(fonte) {
+  const est = estadoDe(fonte.id)
+  if (est.sondagem) {
+    clearInterval(est.sondagem)
+    est.sondagem = null
+  }
 }
 
 async function carregarFontes() {
@@ -105,7 +170,9 @@ async function executar(fonte) {
   est.resultado = null
   est.erro = null
   est.segundos = 0
+  zerarProgresso(est)
   est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
+  iniciarSondagemDeProgresso(fonte)
 
   try {
     const resposta = await fetch(`/api/fontes/${fonte.id}/executar`, { method: 'POST' })
@@ -115,13 +182,17 @@ async function executar(fonte) {
     }
     est.resultado = corpo
     est.estado = 'sucesso'
-    await carregarFontes()
   } catch (e) {
     est.erro = e.message
     est.estado = 'erro'
   } finally {
     clearInterval(est.cronometro)
     est.cronometro = null
+    pararSondagemDeProgresso(fonte)
+    // No sucesso E no erro — sem isso, a duração/status/mensagem que o backend já
+    // persistiu (mesmo quando a execução falha) nunca aparecem na tabela; a linha
+    // ficava com "—" e um texto genérico de erro em vez do que aconteceu de verdade.
+    await carregarFontes()
   }
 }
 
@@ -143,32 +214,71 @@ async function arquivoSelecionado(event) {
   fonteParaUpload.value = null
 }
 
-async function enviarUpload(fonte, arquivo) {
+// XMLHttpRequest, não fetch — só o XHR expõe evento de progresso de ENVIO
+// (upload.onprogress), o que dá o % real de bytes já transferidos ao servidor sem
+// nenhum apoio do backend (fetch não tem esse evento pra upload).
+function enviarUpload(fonte, arquivo) {
   const est = estadoDe(fonte.id)
   est.estado = 'executando'
   est.resultado = null
   est.erro = null
   est.segundos = 0
+  zerarProgresso(est)
+  est.progressoUploadPct = 0
   est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
 
-  try {
+  return new Promise((resolve) => {
     const formData = new FormData()
     formData.append('arquivo', arquivo)
-    const resposta = await fetch(`/api/fontes/${fonte.id}/upload`, { method: 'POST', body: formData })
-    const corpo = await resposta.json().catch(() => null)
-    if (!resposta.ok) {
-      throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `/api/fontes/${fonte.id}/upload`)
+
+    xhr.upload.onprogress = (evento) => {
+      if (!evento.lengthComputable) return
+      est.progressoUploadPct = Math.round((evento.loaded / evento.total) * 100)
+      // So faz sentido sondar a fase do backend (descompactando/gravando) depois que o
+      // navegador termina de mandar os bytes - antes disso o servidor nem comecou.
+      if (est.progressoUploadPct >= 100) {
+        iniciarSondagemDeProgresso(fonte)
+      }
     }
-    est.resultado = corpo
-    est.estado = 'sucesso'
-    await carregarFontes()
-  } catch (e) {
-    est.erro = e.message
-    est.estado = 'erro'
-  } finally {
-    clearInterval(est.cronometro)
-    est.cronometro = null
-  }
+
+    const finalizar = async (sucesso, resultadoOuErro) => {
+      clearInterval(est.cronometro)
+      est.cronometro = null
+      pararSondagemDeProgresso(fonte)
+      if (sucesso) {
+        est.resultado = resultadoOuErro
+        est.estado = 'sucesso'
+      } else {
+        est.erro = resultadoOuErro
+        est.estado = 'erro'
+      }
+      // No sucesso E no erro — mesmo motivo do executar(): sem isso a duração/status/
+      // mensagem que o backend já persistiu nunca aparecem na tabela.
+      await carregarFontes()
+      resolve()
+    }
+
+    xhr.onload = () => {
+      let corpo = null
+      try {
+        corpo = JSON.parse(xhr.responseText)
+      } catch (e) {
+        // resposta vazia ou não-JSON - trata como erro genérico abaixo.
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        finalizar(true, corpo)
+      } else {
+        finalizar(false, corpo?.erro || `O servidor respondeu HTTP ${xhr.status}`)
+      }
+    }
+
+    xhr.onerror = () => finalizar(false, 'Falha de rede ao enviar o arquivo.')
+
+    xhr.send(formData)
+  })
 }
 
 function formatarData(iso) {
@@ -176,9 +286,21 @@ function formatarData(iso) {
   return new Date(iso).toLocaleString('pt-BR')
 }
 
+// Tempo da ÚLTIMA execução registrada no backend (persistido em fonte_dado, sobrevive
+// a reload de página) — diferente do cronômetro ao vivo em `execucoes`, que só existe
+// enquanto a aba está aberta.
+function formatarDuracao(ms) {
+  if (ms == null) return ''
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1).replace('.', ',')}s`
+}
+
 onMounted(carregarFontes)
 onUnmounted(() => {
-  Object.values(execucoes).forEach((e) => e.cronometro && clearInterval(e.cronometro))
+  Object.values(execucoes).forEach((e) => {
+    if (e.cronometro) clearInterval(e.cronometro)
+    if (e.sondagem) clearInterval(e.sondagem)
+  })
 })
 </script>
 
@@ -286,7 +408,22 @@ onUnmounted(() => {
                     {{ fonte.ativo ? 'Ativa' : 'Inativa' }}
                   </span>
                 </td>
-                <td>{{ formatarData(fonte.ultimaExecucaoEm) }}</td>
+                <td class="celula-ultima-execucao">
+                  <div>{{ formatarData(fonte.ultimaExecucaoEm) }}</div>
+                  <div v-if="fonte.ultimaDuracaoMs != null" class="linha-duracao">
+                    <span>{{ formatarDuracao(fonte.ultimaDuracaoMs) }}</span>
+                    <span class="pill" :class="fonte.ultimoStatusExecucao === 'ERRO' ? 'pill--erro' : 'pill--ok'">
+                      {{ fonte.ultimoStatusExecucao === 'ERRO' ? 'Erro' : 'OK' }}
+                    </span>
+                  </div>
+                  <div
+                    v-if="fonte.ultimoStatusExecucao === 'ERRO' && fonte.ultimoErroMensagem"
+                    class="mensagem-erro-fonte"
+                    :title="fonte.ultimoErroMensagem"
+                  >
+                    {{ fonte.ultimoErroMensagem }}
+                  </div>
+                </td>
                 <td>{{ formatarData(fonte.dataAdd) }}</td>
                 <td class="celula-acoes">
                   <button class="botao-editar" title="Editar fonte" @click="editar(fonte)">
@@ -326,7 +463,29 @@ onUnmounted(() => {
               <tr v-if="estadoDe(fonte.id).estado !== 'ocioso'" class="linha-resultado">
                 <td colspan="8">
                   <div v-if="estadoDe(fonte.id).estado === 'executando'" class="resultado resultado--neutro">
-                    Executando… ({{ estadoDe(fonte.id).segundos }}s)
+                    <template v-if="estadoDe(fonte.id).progressoUploadPct !== null && estadoDe(fonte.id).progressoUploadPct < 100">
+                      <div class="linha-fase">Enviando arquivo… {{ estadoDe(fonte.id).progressoUploadPct }}%</div>
+                      <div class="barra-progresso">
+                        <div class="barra-progresso-preenchida" :style="{ width: estadoDe(fonte.id).progressoUploadPct + '%' }"></div>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="linha-fase">
+                        {{ FASES_LABEL[estadoDe(fonte.id).fase] || 'Executando…' }} ({{ estadoDe(fonte.id).segundos }}s)
+                      </div>
+                      <div v-if="estadoDe(fonte.id).detalhe" class="detalhe-progresso">{{ estadoDe(fonte.id).detalhe }}</div>
+                      <div v-if="estadoDe(fonte.id).percentual !== null" class="barra-progresso">
+                        <div class="barra-progresso-preenchida" :style="{ width: estadoDe(fonte.id).percentual + '%' }"></div>
+                      </div>
+                      <div v-if="estadoDe(fonte.id).totalEstimado" class="contagem-progresso">
+                        {{ estadoDe(fonte.id).registrosProcessados.toLocaleString('pt-BR') }} /
+                        {{ estadoDe(fonte.id).totalEstimado.toLocaleString('pt-BR') }}
+                        <template v-if="estadoDe(fonte.id).percentual !== null">({{ estadoDe(fonte.id).percentual }}%)</template>
+                      </div>
+                      <div v-else-if="estadoDe(fonte.id).registrosProcessados" class="contagem-progresso">
+                        {{ estadoDe(fonte.id).registrosProcessados.toLocaleString('pt-BR') }} registros processados
+                      </div>
+                    </template>
                   </div>
                   <div
                     v-else-if="estadoDe(fonte.id).estado === 'sucesso' && estadoDe(fonte.id).resultado.status === 'SEM_MUDANCA'"
@@ -504,6 +663,36 @@ select {
   color: #667;
 }
 
+.pill--erro {
+  background: #fdecea;
+  color: #a12a22;
+}
+
+.celula-ultima-execucao {
+  white-space: normal;
+  max-width: 220px;
+}
+
+.linha-duracao {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.mensagem-erro-fonte {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: #a12a22;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .celula-acoes {
   display: flex;
   gap: 0.4rem;
@@ -587,5 +776,36 @@ select {
 .resultado--erro {
   background: #fdecea;
   color: #a12a22;
+}
+
+.linha-fase {
+  font-weight: 600;
+}
+
+.detalhe-progresso {
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.barra-progresso {
+  margin-top: 0.4rem;
+  height: 6px;
+  border-radius: 999px;
+  background: #dfe4ea;
+  overflow: hidden;
+}
+
+.barra-progresso-preenchida {
+  height: 100%;
+  background: #2e7d32;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.contagem-progresso {
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: #556;
 }
 </style>
