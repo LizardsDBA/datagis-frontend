@@ -1,6 +1,11 @@
 <script setup>
 import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import ConstrutorCron from './ConstrutorCron.vue'
+import ModalMapeamentoColunas from './ModalMapeamentoColunas.vue'
+
+const router = useRouter()
+const fonteParaMapeamento = ref(null)
 
 const fontes = ref([])
 const carregandoLista = ref(false)
@@ -432,6 +437,14 @@ onUnmounted(() => {
                       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
                     </svg>
                   </button>
+                  <button class="botao-mapeamento" title="Mapeamento de colunas (Bronze → Silver)" @click="fonteParaMapeamento = fonte">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="4" y1="9" x2="20" y2="9" />
+                      <line x1="4" y1="15" x2="20" y2="15" />
+                      <line x1="10" y1="3" x2="8" y2="21" />
+                      <line x1="16" y1="3" x2="14" y2="21" />
+                    </svg>
+                  </button>
                   <button
                     v-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
                     class="botao-play"
@@ -493,6 +506,54 @@ onUnmounted(() => {
                   >
                     Nada mudou desde a última vez — lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }}, sem registros novos.
                   </div>
+                  <div
+                    v-else-if="estadoDe(fonte.id).estado === 'sucesso' && estadoDe(fonte.id).resultado.status === 'RETIDO_QUARENTENA'"
+                    class="resultado resultado--alerta"
+                  >
+                    <div class="resultado-conteudo">
+                      <div>
+                        ⚠️ <strong>Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} retido na Quarentena!</strong>
+                        Inconsistências foram detectadas no lote. Pela regra de integridade total (All-or-Nothing),
+                        <strong>nenhum registro foi promovido para a Silver</strong> até que um analista valide a carga.
+                      </div>
+                      <div class="resultado-botoes">
+                        <button
+                          type="button"
+                          class="btn-resultado-acao btn-quarentena"
+                          @click="router.push({ path: '/quarentena', query: { loteId: estadoDe(fonte.id).resultado.loteIngestaoId } })"
+                        >
+                          Inspecionar na Quarentena
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-resultado-acao btn-pipeline"
+                          @click="router.push('/lotes')"
+                        >
+                          Ver no Pipeline
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    v-else-if="estadoDe(fonte.id).estado === 'sucesso' && estadoDe(fonte.id).resultado.status === 'PROMOVIDO_SILVER'"
+                    class="resultado resultado--ok"
+                  >
+                    <div class="resultado-conteudo">
+                      <div>
+                        ✓ <strong>Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} promovido para a Silver!</strong>
+                        (100% íntegro — {{ estadoDe(fonte.id).resultado.quantidadeRegistros?.toLocaleString('pt-BR') }} registros gravados com sucesso).
+                      </div>
+                      <div class="resultado-botoes">
+                        <button
+                          type="button"
+                          class="btn-resultado-acao btn-pipeline"
+                          @click="router.push('/lotes')"
+                        >
+                          Ver no Pipeline
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   <div v-else-if="estadoDe(fonte.id).estado === 'sucesso'" class="resultado resultado--ok">
                     Concluído — lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }},
                     {{ estadoDe(fonte.id).resultado.quantidadeRegistros.toLocaleString('pt-BR') }} registros gravados.
@@ -514,6 +575,12 @@ onUnmounted(() => {
       accept=".zip"
       style="display: none"
       @change="arquivoSelecionado"
+    />
+
+    <!-- Modal de Mapeamentos de Colunas -->
+    <ModalMapeamentoColunas
+      :fonte="fonteParaMapeamento"
+      @fechar="fonteParaMapeamento = null"
     />
   </div>
 </template>
@@ -766,6 +833,77 @@ select {
 .resultado--ok {
   background: #e8f5e9;
   color: #2e7d32;
+}
+
+.resultado--alerta {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.resultado-conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.resultado-botoes {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.btn-resultado-acao {
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.12s;
+}
+
+.btn-quarentena {
+  background: #b45309;
+  color: #ffffff;
+}
+
+.btn-quarentena:hover {
+  background: #92400e;
+}
+
+.btn-pipeline {
+  background: #ffffff;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.btn-pipeline:hover {
+  background: #f1f5f9;
+}
+
+.botao-mapeamento {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0284c7;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.botao-mapeamento:hover {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+}
+
+.botao-mapeamento svg {
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
 .resultado--neutro {
