@@ -1,12 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import CadastroFontes from '../components/CadastroFontes.vue'
+import QuarentenaView from '../components/QuarentenaView.vue'
+import LotesView from '../components/LotesView.vue'
 
-// So uma rota de verdade por enquanto (§ decisao da equipe: mostrar so o que ja
-// existe no menu, nao itens "em breve"). Novas paginas (Painel, Catalogo, Execucoes...)
-// entram aqui conforme forem construidas.
+// Rotas ativas do DataGIS:
+// - /fontes: Cadastro e execução de fontes
+// - /lotes: Gestão de lotes, pipeline e liberação All-or-Nothing
+// - /quarentena: Triagem, auditoria e resolução de inconsistências (Fase 3)
 const routes = [
   { path: '/', redirect: '/fontes' },
   { path: '/fontes', name: 'fontes', component: CadastroFontes },
+  { path: '/lotes', name: 'lotes', component: LotesView },
+  { path: '/quarentena', name: 'quarentena', component: QuarentenaView },
 ]
 
 export default createRouter({

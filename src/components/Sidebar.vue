@@ -1,7 +1,22 @@
 <script setup>
 // So o item que ja existe de verdade entra aqui — nada de "em breve" (decisao da
-// equipe). Painel/Catalogo/Execucoes/Qualidade/Versoes entram quando forem construidos.
-const itens = [{ rota: '/fontes', rotulo: 'Cadastro de Fontes' }]
+const itens = [
+  {
+    rota: '/fontes',
+    rotulo: 'Cadastro de Fontes',
+    icone: 'fontes',
+  },
+  {
+    rota: '/lotes',
+    rotulo: 'Lotes & Pipeline',
+    icone: 'lotes',
+  },
+  {
+    rota: '/quarentena',
+    rotulo: 'Quarentena & Qualidade',
+    icone: 'quarentena',
+  },
+]
 </script>
 
 <template>
@@ -19,10 +34,23 @@ const itens = [{ rota: '/fontes', rotulo: 'Cadastro de Fontes' }]
         class="item-menu"
         active-class="item-menu--ativo"
       >
-        <svg class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- Ícone para Fontes -->
+        <svg v-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <ellipse cx="12" cy="5" rx="8" ry="3" />
           <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
           <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+        </svg>
+        <!-- Ícone para Lotes & Pipeline -->
+        <svg v-else-if="item.icone === 'lotes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 2 7 12 12 22 7 12 2" />
+          <polyline points="2 17 12 22 22 17" />
+          <polyline points="2 12 12 17 22 12" />
+        </svg>
+        <!-- Ícone para Quarentena / Qualidade -->
+        <svg v-else-if="item.icone === 'quarentena'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
         </svg>
         {{ item.rotulo }}
       </router-link>
