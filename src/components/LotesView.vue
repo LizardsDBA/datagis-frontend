@@ -40,7 +40,8 @@ const lotesFiltrados = computed(() => {
       const termo = filtroBusca.value.toLowerCase()
       const matchId = String(l.id).includes(termo)
       const matchFonte = (l.fonteDadoNome || '').toLowerCase().includes(termo)
-      return matchId || matchFonte
+      const matchOrigem = (l.origemReferencia || '').toLowerCase().includes(termo)
+      return matchId || matchFonte || matchOrigem
     }
     return true
   })
@@ -82,7 +83,7 @@ function abrirModalLiberacao(lote) {
 }
 
 function fecharModalLiberacao() {
-  if (faseLiberacao.value === 'PROCESSANDO') return // Previne fechar no meio da transação atômica
+  if (faseLiberacao.value === 'PROCESSANDO') return
   if (timerProgresso) {
     clearInterval(timerProgresso)
     timerProgresso = null
@@ -101,7 +102,6 @@ async function confirmarLiberacao() {
   etapaAtual.value = 1
   mensagemErroLiberacao.value = ''
 
-  // Simulação realista do avanço por etapas durante a transição
   const inicio = Date.now()
   timerProgresso = setInterval(() => {
     const decorrido = Date.now() - inicio
@@ -126,17 +126,14 @@ async function confirmarLiberacao() {
     etapaAtual.value = 4
     faseLiberacao.value = 'SUCESSO'
 
-    // Atualização otimista imediata na tabela
     const item = lotes.value.find(l => l.id === loteIdAlvo)
     if (item) {
       item.status = 'PROMOVIDO_SILVER'
     }
     sucesso.value = `Lote #${loteIdAlvo} liberado com sucesso para a camada Silver!`
 
-    // Recarrega em background para sincronizar métricas
     carregarLotes()
 
-    // Fecha o modal suavemente após 1.8 segundos
     setTimeout(() => {
       if (faseLiberacao.value === 'SUCESSO' && loteParaLiberar.value?.id === loteIdAlvo) {
         fecharModalLiberacao()
@@ -192,24 +189,25 @@ onMounted(() => {
     <!-- Cabeçalho Principal -->
     <header class="topo-pagina">
       <div>
-        <p class="etiqueta">PIPELINE AUTOMÁTICO</p>
+        <p class="etiqueta">PIPELINE & TRANSIÇÃO</p>
         <h1 class="titulo">Lotes de Ingestão & Pipeline</h1>
         <p class="subtitulo">
-          Monitoramento do pipeline de transição Bronze → Silver e aplicação da regra de integridade total (All-or-Nothing).
+          Monitoramento do fluxo Bronze → Silver e governança da integridade total (All-or-Nothing).
         </p>
       </div>
-      <button class="btn-atualizar" @click="carregarLotes" :disabled="carregando">
+
+      <button class="btn-atualizar" @click="carregarLotes" :disabled="carregando" title="Recarregar lotes de ingestão">
         <svg class="icone-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 2v6h-6" />
           <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
           <path d="M3 22v-6h6" />
           <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
         </svg>
-        Atualizar
+        <span>Atualizar</span>
       </button>
     </header>
 
-    <!-- Cards de Métricas -->
+    <!-- Grid de Métricas Responsivo -->
     <section class="grid-metricas">
       <div class="card-metrica">
         <span class="metrica-label">Total de Lotes</span>
@@ -220,7 +218,7 @@ onMounted(() => {
       <div class="card-metrica card-metrica--promovido">
         <span class="metrica-label">Promovidos para Silver</span>
         <span class="metrica-valor">{{ metricas.promovidos }}</span>
-        <span class="metrica-sub">100% íntegros e validados</span>
+        <span class="metrica-sub">100% íntegros e persistidos</span>
       </div>
 
       <div class="card-metrica card-metrica--retido">
@@ -238,18 +236,22 @@ onMounted(() => {
       <div class="card-metrica card-metrica--neutro">
         <span class="metrica-label">Sem Alterações</span>
         <span class="metrica-valor">{{ metricas.semMudanca }}</span>
-        <span class="metrica-sub">Hash inalterado</span>
+        <span class="metrica-sub">Hash de dados inalterado</span>
       </div>
     </section>
 
-    <!-- Mensagens de Alerta -->
-    <div v-if="erro" class="alerta alerta--erro">{{ erro }}</div>
-    <div v-if="sucesso" class="alerta alerta--sucesso">{{ sucesso }}</div>
+    <!-- Alertas Globais -->
+    <div v-if="erro" class="alerta alerta--erro">
+      <span>✕ {{ erro }}</span>
+    </div>
+    <div v-if="sucesso" class="alerta alerta--sucesso">
+      <span>✓ {{ sucesso }}</span>
+    </div>
 
-    <!-- Barra de Filtros -->
+    <!-- Barra de Filtros e Busca -->
     <section class="barra-filtros">
       <div class="grupo-campo">
-        <label class="rotulo-filtro">Status do Lote:</label>
+        <label class="rotulo-filtro">Filtrar por Status:</label>
         <select v-model="filtroStatus" class="select-filtro">
           <option value="TODOS">Todos os Status</option>
           <option value="PROMOVIDO_SILVER">Promovido para Silver</option>
@@ -260,13 +262,19 @@ onMounted(() => {
       </div>
 
       <div class="grupo-campo grupo-campo--busca">
-        <label class="rotulo-filtro">Buscar por Lote ou Fonte:</label>
-        <input
-          v-model="filtroBusca"
-          type="text"
-          placeholder="Ex: #12 ou IBAMA..."
-          class="input-busca"
-        />
+        <label class="rotulo-filtro">Buscar Lote, Fonte ou Arquivo:</label>
+        <div class="input-busca-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icone-busca">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            v-model="filtroBusca"
+            type="text"
+            placeholder="Ex: #12, IBAMA, imoveis.zip..."
+            class="input-busca"
+          />
+        </div>
       </div>
     </section>
 
@@ -274,118 +282,154 @@ onMounted(() => {
     <section class="tabela-container">
       <div v-if="carregando" class="estado-carregando">
         <div class="spinner"></div>
-        <span>Carregando histórico de lotes...</span>
+        <span>Carregando histórico de lotes e transições...</span>
       </div>
 
       <div v-else-if="lotesFiltrados.length === 0" class="estado-vazio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+        </svg>
         <h3>Nenhum lote encontrado</h3>
-        <p>Nenhuma ingestão corresponde aos filtros aplicados.</p>
+        <p>Nenhuma execução corresponde aos filtros aplicados.</p>
       </div>
 
-      <table v-else class="tabela-dados">
-        <thead>
-          <tr>
-            <th>Lote ID</th>
-            <th>Fonte de Dados</th>
-            <th>Registros</th>
-            <th>Data de Execução</th>
-            <th>Status da Transição</th>
-            <th class="col-acao">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="lote in lotesFiltrados" :key="lote.id" class="linha-tabela">
-            <td class="col-id">
-              <span class="badge-lote-id">#{{ lote.id }}</span>
-            </td>
-            <td>
-              <div class="fonte-nome">{{ lote.fonteDadoNome }}</div>
-              <small class="texto-apagado">Fonte #{{ lote.fonteDadoId }}</small>
-            </td>
-            <td>
-              <strong>{{ (lote.quantidadeRegistros || 0).toLocaleString('pt-BR') }}</strong>
-            </td>
-            <td>
-              {{ formatarData(lote.dataExecucao) }}
-            </td>
-            <td>
-              <div class="status-wrapper">
-                <span
-                  class="badge-status"
-                  :class="{
-                    'badge--promovido': lote.status === 'PROMOVIDO_SILVER',
-                    'badge--retido': lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'),
-                    'badge--processando': loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO',
-                    'badge--descartado': lote.status === 'DESCARTADO',
-                    'badge--neutro': lote.status === 'SEM_MUDANCA' || !lote.status,
-                  }"
-                >
+      <div v-else class="tabela-responsiva-wrapper">
+        <table class="tabela-dados">
+          <thead>
+            <tr>
+              <th class="col-id">Lote ID</th>
+              <th>Fonte de Origem & Arquivo</th>
+              <th>Registros</th>
+              <th>Data de Execução</th>
+              <th>Status da Transição</th>
+              <th class="col-acao-th">Ações do Pipeline</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="lote in lotesFiltrados" :key="lote.id" class="linha-tabela">
+              <!-- Lote ID -->
+              <td class="col-id">
+                <span class="badge-lote-id">#{{ lote.id }}</span>
+              </td>
+
+              <!-- Fonte de Dados + Origem / Referência exposta -->
+              <td class="col-fonte">
+                <div class="fonte-nome">{{ lote.fonteDadoNome }}</div>
+                <div class="fonte-sub-info">
+                  <span class="texto-apagado">Fonte #{{ lote.fonteDadoId }}</span>
+                  <!-- Informação que antes estava escondida: Expor arquivo ou URL de onde o lote veio -->
+                  <div v-if="lote.origemReferencia" class="origem-ref-badge" :title="lote.origemReferencia">
+                    <span class="origem-icone">📁</span>
+                    <span class="origem-texto">{{ lote.origemReferencia }}</span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Quantidade de Registros -->
+              <td class="col-registros">
+                <strong class="valor-registros">{{ (lote.quantidadeRegistros || 0).toLocaleString('pt-BR') }}</strong>
+                <span class="sub-rotulo">linhas</span>
+              </td>
+
+              <!-- Data de Execução -->
+              <td class="col-data">
+                {{ formatarData(lote.dataExecucao) }}
+              </td>
+
+              <!-- Status com Badges e Regra All-or-Nothing -->
+              <td class="col-status">
+                <div class="status-wrapper">
+                  <span
+                    class="badge-status"
+                    :class="{
+                      'badge--promovido': lote.status === 'PROMOVIDO_SILVER',
+                      'badge--retido': lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'),
+                      'badge--processando': loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO',
+                      'badge--descartado': lote.status === 'DESCARTADO',
+                      'badge--neutro': lote.status === 'SEM_MUDANCA' || !lote.status,
+                    }"
+                  >
+                    <template v-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'">
+                      <span class="spinner-dot"></span> Promovendo para Silver...
+                    </template>
+                    <template v-else>
+                      {{
+                        lote.status === 'PROMOVIDO_SILVER' ? 'Promovido para Silver' :
+                        lote.status === 'RETIDO_QUARENTENA' ? 'Retido na Quarentena' :
+                        lote.status === 'DESCARTADO' ? 'Descartado' :
+                        lote.status === 'SEM_MUDANCA' ? 'Sem Mudança' : lote.status
+                      }}
+                    </template>
+                  </span>
+
+                  <span v-if="lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO')" class="regra-aviso">
+                    Integridade lote: 0 registros em Silver
+                  </span>
+                  <span v-else-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'" class="regra-aviso texto-azul">
+                    Gravando registros atômicos na Silver...
+                  </span>
+                </div>
+              </td>
+
+              <!-- Ações -->
+              <td class="col-acao-td">
+                <div v-if="lote.status === 'RETIDO_QUARENTENA'" class="acoes-retido">
                   <template v-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'">
-                    <span class="spinner-dot"></span> Promovendo para Silver...
+                    <button class="btn-acao btn-liberar btn--em-progresso" disabled>
+                      <span class="spinner-pequeno"></span> Promovendo ({{ progressoPercentual }}%)...
+                    </button>
                   </template>
                   <template v-else>
-                    {{
-                      lote.status === 'PROMOVIDO_SILVER' ? 'Promovido para Silver' :
-                      lote.status === 'RETIDO_QUARENTENA' ? 'Retido na Quarentena' :
-                      lote.status === 'DESCARTADO' ? 'Descartado' :
-                      lote.status === 'SEM_MUDANCA' ? 'Sem Mudança' : lote.status
-                    }}
+                    <button
+                      class="btn-acao btn-ver-erros"
+                      title="Inspecionar inconsistências deste lote na Quarentena"
+                      @click="verNaQuarentena(lote.id)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      <span>Inspecionar Erros</span>
+                    </button>
+                    <button
+                      class="btn-acao btn-liberar"
+                      title="Liberar lote para Silver após validação do analista"
+                      :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
+                      @click="abrirModalLiberacao(lote)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        <path d="M9 12l2 2 4-4" />
+                      </svg>
+                      <span>Liberar para Silver</span>
+                    </button>
+                    <button
+                      class="btn-acao btn-descartar"
+                      title="Descartar lote e não promover nenhum registro"
+                      :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
+                      @click="abrirModalDescarte(lote)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                      <span>Descartar</span>
+                    </button>
                   </template>
-                </span>
-                <span v-if="lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO')" class="regra-aviso">
-                  Integridade lote: 0 registros em Silver
-                </span>
-                <span v-else-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'" class="regra-aviso texto-azul">
-                  Gravando registros atômicos na Silver...
-                </span>
-              </div>
-            </td>
-            <td class="col-acao">
-              <!-- Ações para Lote Retido na Quarentena -->
-              <div v-if="lote.status === 'RETIDO_QUARENTENA'" class="acoes-retido">
-                <template v-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'">
-                  <button class="btn-acao btn-liberar btn--em-progresso" disabled>
-                    <span class="spinner-pequeno"></span> Promovendo ({{ progressoPercentual }}%)...
-                  </button>
-                </template>
-                <template v-else>
-                  <button
-                    class="btn-acao btn-ver-erros"
-                    title="Inspecionar inconsistências deste lote na Quarentena"
-                    @click="verNaQuarentena(lote.id)"
-                  >
-                    Inspecionar Erros
-                  </button>
-                  <button
-                    class="btn-acao btn-liberar"
-                    title="Liberar lote para Silver após validação do analista"
-                    :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
-                    @click="abrirModalLiberacao(lote)"
-                  >
-                    Liberar para Silver
-                  </button>
-                  <button
-                    class="btn-acao btn-descartar"
-                    title="Descartar lote e não promover nenhum registro"
-                    :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
-                    @click="abrirModalDescarte(lote)"
-                  >
-                    Descartar
-                  </button>
-                </template>
-              </div>
+                </div>
 
-              <!-- Ação para Lote Promovido -->
-              <span v-else-if="lote.status === 'PROMOVIDO_SILVER'" class="texto-concluido">
-                ✓ Disponível na Silver
-              </span>
+                <div v-else-if="lote.status === 'PROMOVIDO_SILVER'" class="texto-concluido">
+                  <span class="icone-check">✓</span>
+                  <span>Disponível na Silver</span>
+                </div>
 
-              <!-- Outros -->
-              <span v-else class="texto-apagado">—</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <span v-else class="texto-apagado">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <!-- Modal de Liberação de Lote com Barra de Progresso e Stepper -->
@@ -414,7 +458,7 @@ onMounted(() => {
                 </svg>
               </div>
               <div class="info-texto">
-                <h4>Promoção de Dados Válidos</h4>
+                <h4>Promoção Atômica de Dados</h4>
                 <p>
                   Esta ação reprocessará as regras de validação, efetuará a conversão para <code>MDSYS.SDO_GEOMETRY</code> (SRID 4674) e persistirá todos os registros aprovados na tabela <strong>SILVER.IMOVEL_RURAL</strong>.
                 </p>
@@ -430,7 +474,7 @@ onMounted(() => {
                 <span class="resumo-valor">#{{ loteParaLiberar.id }}</span>
               </div>
               <div class="resumo-item">
-                <span class="resumo-rotulo">Registros</span>
+                <span class="resumo-rotulo">Total de Registros</span>
                 <span class="resumo-valor">{{ (loteParaLiberar.quantidadeRegistros || 0).toLocaleString('pt-BR') }}</span>
               </div>
               <div class="resumo-item">
@@ -476,7 +520,6 @@ onMounted(() => {
 
             <!-- Stepper de Etapas -->
             <div class="stepper-pipeline">
-              <!-- Etapa 1 -->
               <div class="step-item" :class="{ 'step-ativo': etapaAtual === 1, 'step-concluido': etapaAtual > 1 }">
                 <div class="step-circulo">
                   <span v-if="etapaAtual > 1">✓</span>
@@ -489,7 +532,6 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Etapa 2 -->
               <div class="step-item" :class="{ 'step-ativo': etapaAtual === 2, 'step-concluido': etapaAtual > 2 }">
                 <div class="step-circulo">
                   <span v-if="etapaAtual > 2">✓</span>
@@ -502,7 +544,6 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Etapa 3 -->
               <div class="step-item" :class="{ 'step-ativo': etapaAtual === 3, 'step-concluido': etapaAtual > 3 }">
                 <div class="step-circulo">
                   <span v-if="etapaAtual > 3">✓</span>
@@ -515,7 +556,6 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Etapa 4 -->
               <div class="step-item" :class="{ 'step-ativo': etapaAtual === 4, 'step-concluido': etapaAtual >= 4 }">
                 <div class="step-circulo">
                   <span v-if="etapaAtual >= 4">✓</span>
@@ -531,7 +571,7 @@ onMounted(() => {
 
           <footer class="modal-footer">
             <span class="texto-aviso-processando">
-              <span class="spinner-pequeno"></span> Executando transação no Oracle Database...
+              <span class="spinner-pequeno"></span> Executando transação atômica no Oracle Database...
             </span>
           </footer>
         </template>
@@ -555,7 +595,7 @@ onMounted(() => {
             </div>
             <h3>Dados Disponíveis na Silver</h3>
             <p class="sub-sucesso">
-              Todos os registros válidos do lote foram promovidos para a camada Silver e estão prontos para consulta.
+              Todos os registros válidos do lote foram promovidos para a camada Silver e estão disponíveis para cruzamentos geoespaciais.
             </p>
             <div class="barra-trilho">
               <div class="barra-preenchimento barra--100"></div>
@@ -606,7 +646,7 @@ onMounted(() => {
       <div class="modal-dialog">
         <header class="modal-header">
           <div>
-            <span class="modal-etiqueta">REJEIÇÃO DE LOTE</span>
+            <span class="modal-etiqueta etiqueta-vermelha">REJEIÇÃO DE LOTE</span>
             <h2 class="modal-titulo">Descartar Lote #{{ loteParaDescartar.id }}</h2>
             <p class="modal-sub">
               Fonte: {{ loteParaDescartar.fonteDadoNome }} ({{ loteParaDescartar.quantidadeRegistros }} registros)
@@ -629,12 +669,13 @@ onMounted(() => {
           </div>
 
           <div class="campo-motivo">
-            <label>Justificativa do Descarte *</label>
+            <label class="rotulo-motivo">Justificativa do Descarte *</label>
             <textarea
               v-model="motivoDescarte"
               rows="4"
               placeholder="Descreva o motivo da rejeição do lote (ex: arquivo corrompido, coordenadas inválidas recorrentes, base desatualizada)..."
               required
+              class="textarea-motivo"
             ></textarea>
           </div>
         </div>
@@ -654,49 +695,52 @@ onMounted(() => {
 .pagina-lotes {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-}
-
-.etiqueta {
-  margin: 0 0 0.35rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #2e7d32;
+  gap: 1.75rem;
 }
 
 .topo-pagina {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 1rem;
+}
+
+.etiqueta {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #15803d;
 }
 
 .titulo {
-  margin: 0 0 0.25rem;
-  font-size: 1.5rem;
-  color: #1a1a1a;
+  font-size: 1.65rem;
+  color: #0f172a;
+  letter-spacing: -0.02em;
 }
 
 .subtitulo {
-  margin: 0;
-  font-size: 0.88rem;
-  color: #6b7280;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: #64748b;
+  max-width: 48rem;
 }
 
 .btn-atualizar {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
+  gap: 0.45rem;
   background: #ffffff;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  color: #334155;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #334155;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .btn-atualizar:hover:not(:disabled) {
@@ -705,11 +749,11 @@ onMounted(() => {
 }
 
 .icone-btn {
-  width: 0.95rem;
-  height: 0.95rem;
+  width: 1rem;
+  height: 1rem;
 }
 
-/* Grid de Métricas */
+/* Grid de Métricas Responsivo */
 .grid-metricas {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -719,29 +763,30 @@ onMounted(() => {
 .card-metrica {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 1.1rem;
+  border-radius: 12px;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .metrica-label {
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.74rem;
+  font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .metrica-valor {
-  font-size: 1.7rem;
+  font-size: 1.85rem;
   font-weight: 800;
   color: #0f172a;
 }
 
 .metrica-sub {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: #94a3b8;
 }
 
@@ -763,20 +808,20 @@ onMounted(() => {
 
 /* Alertas */
 .alerta {
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1.15rem;
   border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 
 .alerta--erro {
-  background: #fef2f2;
+  background: #fee2e2;
   color: #991b1b;
   border: 1px solid #fecaca;
 }
 
 .alerta--sucesso {
-  background: #f0fdf4;
+  background: #dcfce7;
   color: #166534;
   border: 1px solid #bbf7d0;
 }
@@ -788,9 +833,10 @@ onMounted(() => {
   gap: 1rem;
   background: #ffffff;
   padding: 1rem 1.25rem;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   align-items: flex-end;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .grupo-campo {
@@ -801,53 +847,91 @@ onMounted(() => {
 
 .rotulo-filtro {
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #475569;
 }
 
-.select-filtro,
-.input-busca {
-  padding: 0.55rem 0.75rem;
-  border-radius: 6px;
+.select-filtro {
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
   border: 1px solid #cbd5e1;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   outline: none;
   background: #ffffff;
+  color: #1e293b;
+}
+
+.select-filtro:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
 }
 
 .grupo-campo--busca {
   flex: 1;
-  min-width: 240px;
+  min-width: 260px;
 }
 
-/* Tabela */
+.input-busca-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.icone-busca {
+  position: absolute;
+  left: 0.75rem;
+  width: 1rem;
+  height: 1rem;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.input-busca {
+  width: 100%;
+  padding: 0.6rem 0.85rem 0.6rem 2.2rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.86rem;
+  outline: none;
+  background: #ffffff;
+  color: #1e293b;
+}
+
+.input-busca:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+/* Tabela de Lotes */
 .tabela-container {
   background: #ffffff;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .tabela-dados {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   text-align: left;
 }
 
 .tabela-dados th {
   background: #f8fafc;
-  padding: 0.75rem 1rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+  padding: 0.85rem 1rem;
+  font-size: 0.74rem;
+  font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
 }
 
 .tabela-dados td {
-  padding: 0.85rem 1rem;
+  padding: 1rem;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
 }
@@ -857,26 +941,79 @@ onMounted(() => {
 }
 
 .col-id {
-  width: 80px;
+  width: 90px;
+  white-space: nowrap;
 }
 
 .badge-lote-id {
-  font-weight: 700;
-  font-size: 0.8rem;
+  font-family: var(--fonte-mono);
+  font-weight: 800;
+  font-size: 0.82rem;
   color: #0284c7;
   background: #e0f2fe;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+}
+
+.col-fonte {
+  min-width: 240px;
 }
 
 .fonte-nome {
-  font-weight: 600;
-  color: #1e293b;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.texto-apagado {
+.fonte-sub-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.15rem;
+}
+
+.origem-ref-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  color: #475569;
+  max-width: 320px;
+}
+
+.origem-texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--fonte-mono);
+}
+
+.col-registros {
+  white-space: nowrap;
+}
+
+.valor-registros {
+  font-size: 0.95rem;
+  color: #0f172a;
+  display: block;
+}
+
+.sub-rotulo {
+  font-size: 0.72rem;
   color: #94a3b8;
-  font-size: 0.75rem;
+}
+
+.col-data {
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.col-status {
+  min-width: 220px;
 }
 
 .status-wrapper {
@@ -886,60 +1023,105 @@ onMounted(() => {
 }
 
 .badge-status {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   width: fit-content;
   font-size: 0.74rem;
   font-weight: 700;
-  padding: 0.25rem 0.6rem;
-  border-radius: 4px;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  white-space: nowrap;
 }
 
 .badge--promovido {
   background: #dcfce7;
   color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
 .badge--retido {
   background: #fef3c7;
   color: #b45309;
+  border: 1px solid #fde68a;
 }
 
 .badge--descartado {
   background: #fee2e2;
   color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 .badge--neutro {
   background: #f1f5f9;
   color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.badge--processando {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
 }
 
 .regra-aviso {
-  font-size: 0.72rem;
-  color: #d97706;
-  font-weight: 500;
+  font-size: 0.73rem;
+  color: #b45309;
+  font-weight: 600;
+}
+
+.texto-azul {
+  color: #0284c7;
 }
 
 .texto-concluido {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.82rem;
   color: #15803d;
-  font-weight: 600;
+  font-weight: 700;
+  background: #f0fdf4;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid #dcfce7;
+}
+
+.col-acao-th {
+  text-align: right;
+  min-width: 260px;
+}
+
+.col-acao-td {
+  text-align: right;
+  min-width: 260px;
 }
 
 .acoes-retido {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 0.4rem;
   flex-wrap: wrap;
 }
 
 .btn-acao {
-  padding: 0.35rem 0.65rem;
-  border-radius: 5px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.12s;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-acao svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .btn-ver-erros {
@@ -953,269 +1135,206 @@ onMounted(() => {
 }
 
 .btn-liberar {
-  background: #2e7d32;
-  color: #fff;
+  background: #15803d;
+  color: #ffffff;
 }
 
 .btn-liberar:hover:not(:disabled) {
-  background: #256628;
+  background: #166534;
 }
 
 .btn-descartar {
-  background: #fee2e2;
-  color: #991b1b;
+  background: #ffffff;
+  color: #dc2626;
   border-color: #fecaca;
 }
 
 .btn-descartar:hover:not(:disabled) {
-  background: #fecaca;
+  background: #fee2e2;
+}
+
+.btn--em-progresso {
+  background: #0284c7;
+  color: #ffffff;
+  cursor: wait;
+}
+
+.spinner-pequeno {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: girar 0.65s linear infinite;
+  display: inline-block;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #e2e8f0;
+  border-top-color: #15803d;
+  border-radius: 50%;
+  animation: girar 0.65s linear infinite;
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
 }
 
 .estado-carregando,
 .estado-vazio {
-  padding: 3rem;
-  text-align: center;
-  color: #64748b;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: center;
+  padding: 3.5rem 1rem;
+  color: #64748b;
+  gap: 0.6rem;
+  text-align: center;
 }
 
-.spinner {
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 3px solid #cbd5e1;
-  border-top-color: #2e7d32;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+.estado-vazio svg {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #94a3b8;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Modal */
+/* Modais */
 .modal-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
   padding: 1rem;
-  box-sizing: border-box;
 }
 
 .modal-dialog {
   background: #ffffff;
   border-radius: 14px;
   width: 100%;
-  max-width: 540px;
+  max-width: 620px;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
 }
 
 .modal-header {
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #eef0f2;
+  border-bottom: 1px solid #f1f5f9;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   background: #fafbfc;
 }
 
+.modal-header--sucesso {
+  background: #f0fdf4;
+}
+
 .modal-etiqueta {
   font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: #dc2626;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.etiqueta-verde {
+  color: #15803d;
+}
+
+.etiqueta-azul {
+  color: #0284c7;
+}
+
+.etiqueta-vermelha {
+  color: #dc2626;
 }
 
 .modal-titulo {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
   margin: 0.2rem 0;
-  font-size: 1.2rem;
-  color: #1a1a1a;
 }
 
 .modal-sub {
-  margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   color: #64748b;
+  margin: 0;
 }
 
 .btn-fechar {
   background: transparent;
   border: none;
-  font-size: 1.2rem;
-  color: #64748b;
+  font-size: 1.25rem;
+  color: #94a3b8;
   cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.btn-fechar:hover {
+  color: #0f172a;
 }
 
 .modal-body {
   padding: 1.5rem;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
-.aviso-descarte {
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  padding: 0.85rem 1rem;
-  border-radius: 8px;
-  display: flex;
-  gap: 0.75rem;
-  color: #9f1239;
-  font-size: 0.82rem;
-}
-
-.aviso-descarte svg {
-  width: 1.5rem;
-  height: 1.5rem;
-  flex-shrink: 0;
-}
-
-.campo-motivo {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.campo-motivo label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #334155;
-}
-
-.campo-motivo textarea {
-  padding: 0.65rem;
-  font-size: 0.85rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  resize: vertical;
-  outline: none;
-}
-
-.campo-motivo textarea:focus {
-  border-color: #dc2626;
-}
-
-.modal-footer {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #eef0f2;
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  background: #fafbfc;
-}
-
-.btn-cancelar {
-  padding: 0.5rem 1rem;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
-}
-
-.btn-confirmar-descarte {
-  padding: 0.5rem 1.25rem;
-  background: #dc2626;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #ffffff;
-  cursor: pointer;
-}
-
-.btn-confirmar-descarte:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Modal de Liberação & Progresso */
-.modal-dialog--liberacao {
-  max-width: 560px;
-  width: 92%;
-}
-
-.etiqueta-verde {
-  color: #16a34a !important;
-}
-
-.etiqueta-azul {
-  color: #2563eb !important;
-}
-
-.etiqueta-vermelha {
-  color: #dc2626 !important;
-}
-
 .card-info-liberacao {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 10px;
-  padding: 1rem 1.1rem;
   display: flex;
   gap: 0.85rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 1rem 1.15rem;
 }
 
 .icone-info-wrapper {
-  width: 2.2rem;
-  height: 2.2rem;
-  border-radius: 50%;
-  background: #dcfce7;
-  color: #16a34a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: #15803d;
   flex-shrink: 0;
 }
 
 .icone-info-wrapper svg {
-  width: 1.3rem;
-  height: 1.3rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .info-texto h4 {
-  margin: 0 0 0.3rem;
   font-size: 0.92rem;
+  font-weight: 700;
   color: #166534;
+  margin-bottom: 0.25rem;
 }
 
 .info-texto p {
-  margin: 0 0 0.4rem;
   font-size: 0.82rem;
-  color: #374151;
-  line-height: 1.35;
+  color: #1e293b;
+  line-height: 1.4;
 }
 
 .destaque-quarentena {
+  margin-top: 0.4rem;
   font-weight: 600;
-  color: #15803d !important;
-  margin-bottom: 0 !important;
+  color: #15803d;
 }
 
 .resumo-lote {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
+  gap: 0.85rem;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -1225,218 +1344,183 @@ onMounted(() => {
 .resumo-item {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.15rem;
 }
 
 .resumo-rotulo {
   font-size: 0.72rem;
-  color: #64748b;
+  font-weight: 700;
   text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  color: #64748b;
 }
 
 .resumo-valor {
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 800;
   color: #0f172a;
 }
 
-.btn-confirmar-liberar {
-  padding: 0.55rem 1.35rem;
-  background: #16a34a;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #ffffff;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.btn-confirmar-liberar:hover {
-  background: #15803d;
-}
-
-/* Barra de Progresso */
-.progresso-wrapper {
+/* Stepper de Liberação */
+.stepper-pipeline {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
+  gap: 0.85rem;
 }
 
-.progresso-topo {
+.step-item {
   display: flex;
-  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.step-ativo {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.step-concluido {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.step-circulo {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  display: flex;
   align-items: center;
-  font-size: 0.82rem;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+  background: #e2e8f0;
+  color: #475569;
 }
 
-.progresso-label {
-  font-weight: 600;
-  color: #334155;
+.step-concluido .step-circulo {
+  background: #15803d;
+  color: #ffffff;
 }
 
-.progresso-porcentagem {
+.step-ativo .step-circulo {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.step-conteudo h5 {
+  font-size: 0.84rem;
   font-weight: 700;
-  color: #2563eb;
-  font-size: 0.92rem;
+  color: #0f172a;
+  margin: 0;
+}
+
+.step-conteudo p {
+  font-size: 0.74rem;
+  color: #64748b;
+  margin: 0.15rem 0 0;
 }
 
 .barra-trilho {
-  width: 100%;
-  height: 10px;
+  height: 8px;
   background: #e2e8f0;
-  border-radius: 999px;
+  border-radius: 9999px;
   overflow: hidden;
   position: relative;
 }
 
 .barra-preenchimento {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
-  border-radius: 999px;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.barra-brilho {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  background: linear-gradient(90deg, #0284c7, #15803d);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
 }
 
 .barra--100 {
-  background: #10b981 !important;
-  width: 100% !important;
+  width: 100%;
+  background: #15803d;
 }
 
-/* Stepper de Etapas */
-.stepper-pipeline {
+.progresso-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.35rem;
+}
+
+.progresso-topo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
   background: #fafbfc;
-  border: 1px solid #eef0f2;
-  border-radius: 10px;
-  padding: 1rem 1.25rem;
-}
-
-.step-item {
+  border-top: 1px solid #f1f5f9;
   display: flex;
-  align-items: flex-start;
-  gap: 0.8rem;
-  opacity: 0.45;
-  transition: all 0.25s ease;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.step-item.step-ativo,
-.step-item.step-concluido {
-  opacity: 1;
+.btn-cancelar {
+  padding: 0.6rem 1.1rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.step-circulo {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #e2e8f0;
-  color: #64748b;
-  font-size: 0.75rem;
+.btn-confirmar-liberar {
+  padding: 0.6rem 1.3rem;
+  font-size: 0.86rem;
   font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 1px;
+  color: #ffffff;
+  background: #15803d;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.step-ativo .step-circulo {
-  background: #dbeafe;
-  color: #2563eb;
-  border: 1.5px solid #3b82f6;
+.btn-confirmar-liberar:hover {
+  background: #166534;
 }
 
-.step-concluido .step-circulo {
-  background: #dcfce7;
-  color: #16a34a;
-}
-
-.step-circulo-vazio {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #e2e8f0;
-  color: #64748b;
-  font-size: 0.75rem;
+.btn-concluir {
+  padding: 0.6rem 1.5rem;
+  font-size: 0.88rem;
   font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  color: #ffffff;
+  background: #15803d;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.step-spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid #3b82f6;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.75s linear infinite;
-}
-
-.step-conteudo h5 {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #1e293b;
-}
-
-.step-conteudo p {
-  margin: 0.15rem 0 0;
-  font-size: 0.74rem;
-  color: #64748b;
-}
-
-.texto-aviso-processando {
-  font-size: 0.8rem;
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-/* Sucesso */
 .modal-body--centro {
   text-align: center;
-  padding: 2rem 1.5rem;
+  align-items: center;
+  padding: 2.5rem 1.5rem;
 }
 
 .icone-sucesso-animado {
-  width: 56px;
-  height: 56px;
+  width: 3.5rem;
+  height: 3.5rem;
   border-radius: 50%;
   background: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 0.75rem;
-  box-shadow: 0 0 0 8px rgba(220, 252, 231, 0.5);
+  margin-bottom: 0.5rem;
 }
 
 .icone-sucesso-animado svg {
@@ -1445,70 +1529,88 @@ onMounted(() => {
 }
 
 .sub-sucesso {
-  color: #64748b;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
+  color: #475569;
+  max-width: 28rem;
   margin: 0.25rem 0 1.25rem;
 }
 
-.btn-concluir {
-  padding: 0.55rem 1.5rem;
-  background: #10b981;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 0.15s ease;
+/* Modal Descarte */
+.aviso-descarte {
+  display: flex;
+  gap: 0.85rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 1rem 1.15rem;
+  border-radius: 8px;
+  color: #991b1b;
 }
 
-.btn-concluir:hover {
-  background: #059669;
+.aviso-descarte svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
 }
 
-/* Estados na Tabela */
-.badge--processando {
-  background: #eff6ff !important;
-  color: #1d4ed8 !important;
-  border: 1px solid #bfdbfe !important;
-  display: inline-flex;
-  align-items: center;
+.aviso-descarte p {
+  font-size: 0.82rem;
+  margin-top: 0.2rem;
+}
+
+.campo-motivo {
+  display: flex;
+  flex-direction: column;
   gap: 0.35rem;
 }
 
-.spinner-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #2563eb;
-  animation: pulse-dot 1.2s infinite;
+.rotulo-motivo {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
 }
 
-@keyframes pulse-dot {
-  0% { transform: scale(0.85); opacity: 0.4; }
-  50% { transform: scale(1.25); opacity: 1; }
-  100% { transform: scale(0.85); opacity: 0.4; }
+.textarea-motivo {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  outline: none;
+  color: #1e293b;
 }
 
-.spinner-pequeno {
-  width: 12px;
-  height: 12px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  display: inline-block;
-  vertical-align: middle;
+.textarea-motivo:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
 }
 
-.btn--em-progresso {
-  background: #e0f2fe !important;
-  color: #0369a1 !important;
-  border-color: #bae6fd !important;
-  cursor: wait !important;
+.btn-confirmar-descarte {
+  padding: 0.6rem 1.25rem;
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.86rem;
+  cursor: pointer;
 }
 
-.texto-azul {
-  color: #2563eb !important;
+.btn-confirmar-descarte:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+@media (max-width: 768px) {
+  .topo-pagina {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-atualizar {
+    justify-content: center;
+  }
+
+  .resumo-lote {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
