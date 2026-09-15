@@ -1,12 +1,24 @@
 <script setup>
 import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import ConstrutorCron from './ConstrutorCron.vue'
+import ModalMapeamentoColunas from './ModalMapeamentoColunas.vue'
+
+const router = useRouter()
+const fonteParaMapeamento = ref(null)
 
 const fontes = ref([])
 const carregandoLista = ref(false)
 const enviando = ref(false)
 const erro = ref(null)
 const sucesso = ref(false)
+
+// Controle de expansão de mensagens de erro longas por fonte
+const errosExpandidos = reactive({})
+
+function alternarErroExpandido(fonteId) {
+  errosExpandidos[fonteId] = !errosExpandidos[fonteId]
+}
 
 // null = cadastrando fonte nova; numero = editando a fonte com esse id.
 const editandoId = ref(null)
@@ -25,14 +37,9 @@ const formVazio = () => ({
 
 const form = ref(formVazio())
 
-// Estado de execucao por fonte (chave = id) — mais de uma linha pode, em tese, estar
-// rodando ao mesmo tempo, entao cada uma tem seu proprio estado/cronometro/sondagem.
+// Estado de execucao por fonte (chave = id)
 const execucoes = reactive({})
 
-// /executar e /upload sao sincronos — a resposta HTTP so volta quando a ingestao
-// inteira termina (achado ao vivo com o upload de 3,3GB do APPS: ficou minutos
-// "pendurado" sem nenhum feedback alem do cronometro de segundos). Enquanto isso,
-// sondamos /progresso em paralelo pra saber em que fase o backend esta.
 const FASES_LABEL = {
   INICIANDO: 'Iniciando…',
   BUSCANDO_DADOS: 'Buscando dados na fonte…',
@@ -189,15 +196,10 @@ async function executar(fonte) {
     clearInterval(est.cronometro)
     est.cronometro = null
     pararSondagemDeProgresso(fonte)
-    // No sucesso E no erro — sem isso, a duração/status/mensagem que o backend já
-    // persistiu (mesmo quando a execução falha) nunca aparecem na tabela; a linha
-    // ficava com "—" e um texto genérico de erro em vez do que aconteceu de verdade.
     await carregarFontes()
   }
 }
 
-// Upload manual (ex.: .zip de Shapefile) — um input de arquivo escondido, compartilhado
-// entre as linhas; abre pelo botão da fonte e dispara o envio assim que escolher o arquivo.
 const inputArquivoRef = ref(null)
 const fonteParaUpload = ref(null)
 
@@ -208,15 +210,12 @@ function abrirSeletorArquivo(fonte) {
 
 async function arquivoSelecionado(event) {
   const arquivo = event.target.files?.[0]
-  event.target.value = '' // permite escolher o mesmo arquivo de novo numa proxima vez
+  event.target.value = ''
   if (!arquivo || !fonteParaUpload.value) return
   await enviarUpload(fonteParaUpload.value, arquivo)
   fonteParaUpload.value = null
 }
 
-// XMLHttpRequest, não fetch — só o XHR expõe evento de progresso de ENVIO
-// (upload.onprogress), o que dá o % real de bytes já transferidos ao servidor sem
-// nenhum apoio do backend (fetch não tem esse evento pra upload).
 function enviarUpload(fonte, arquivo) {
   const est = estadoDe(fonte.id)
   est.estado = 'executando'
@@ -237,8 +236,6 @@ function enviarUpload(fonte, arquivo) {
     xhr.upload.onprogress = (evento) => {
       if (!evento.lengthComputable) return
       est.progressoUploadPct = Math.round((evento.loaded / evento.total) * 100)
-      // So faz sentido sondar a fase do backend (descompactando/gravando) depois que o
-      // navegador termina de mandar os bytes - antes disso o servidor nem comecou.
       if (est.progressoUploadPct >= 100) {
         iniciarSondagemDeProgresso(fonte)
       }
@@ -255,8 +252,6 @@ function enviarUpload(fonte, arquivo) {
         est.erro = resultadoOuErro
         est.estado = 'erro'
       }
-      // No sucesso E no erro — mesmo motivo do executar(): sem isso a duração/status/
-      // mensagem que o backend já persistiu nunca aparecem na tabela.
       await carregarFontes()
       resolve()
     }
@@ -265,9 +260,7 @@ function enviarUpload(fonte, arquivo) {
       let corpo = null
       try {
         corpo = JSON.parse(xhr.responseText)
-      } catch (e) {
-        // resposta vazia ou não-JSON - trata como erro genérico abaixo.
-      }
+      } catch (e) {}
       if (xhr.status >= 200 && xhr.status < 300) {
         finalizar(true, corpo)
       } else {
@@ -276,7 +269,6 @@ function enviarUpload(fonte, arquivo) {
     }
 
     xhr.onerror = () => finalizar(false, 'Falha de rede ao enviar o arquivo.')
-
     xhr.send(formData)
   })
 }
@@ -286,9 +278,6 @@ function formatarData(iso) {
   return new Date(iso).toLocaleString('pt-BR')
 }
 
-// Tempo da ÚLTIMA execução registrada no backend (persistido em fonte_dado, sobrevive
-// a reload de página) — diferente do cronômetro ao vivo em `execucoes`, que só existe
-// enquanto a aba está aberta.
 function formatarDuracao(ms) {
   if (ms == null) return ''
   if (ms < 1000) return `${ms}ms`
@@ -305,181 +294,345 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div>
-    <p class="etiqueta">CADASTRO</p>
-    <h1 class="titulo">Fontes de dados</h1>
-    <p class="subtitulo">
-      Fontes cadastradas e disparo manual de ingestão — cada fonte grava na zona bruta
-      (schema-on-read), independente de qual seja.
-    </p>
+  <div class="pagina-fontes">
+    <!-- Cabeçalho Principal -->
+    <header class="topo-pagina">
+      <div>
+        <p class="etiqueta">CADASTRO E INGESTÃO</p>
+        <h1 class="titulo">Fontes de Dados</h1>
+        <p class="subtitulo">
+          Catálogo de fontes de dados geoespaciais e disparo de ingestão para a camada Bronze (schema-on-read).
+        </p>
+      </div>
 
+      <button class="btn-recarregar" @click="carregarFontes" :disabled="carregandoLista" title="Recarregar lista de fontes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 2v6h-6" />
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+          <path d="M3 22v-6h6" />
+          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+        </svg>
+        <span>Atualizar</span>
+      </button>
+    </header>
+
+    <!-- Seção de Formulário de Cadastro / Edição -->
     <section class="cartao">
-      <h2 class="cartao-titulo">{{ editandoId ? 'Editar fonte' : 'Nova fonte' }}</h2>
-      <form class="formulario" @submit.prevent="salvar">
-        <label>
-          Nome
-          <input v-model="form.nome" required placeholder="Ex.: IBAMA - Embargos" />
-        </label>
-        <label>
-          Órgão
-          <input v-model="form.orgao" placeholder="Ex.: IBAMA" />
-        </label>
-        <label>
-          Como os dados chegam
-          <select v-model="form.tipoAquisicao">
-            <option value="UPLOAD_MANUAL">Upload manual</option>
-            <option value="API_REST">API</option>
-            <option value="DOWNLOAD_URL">Download por URL</option>
-          </select>
-        </label>
-        <label v-if="form.tipoAquisicao !== 'UPLOAD_MANUAL'">
-          URL de origem
-          <input v-model="form.urlOrigem" placeholder="https://..." />
-        </label>
-        <label>
-          Formato esperado
-          <select v-model="form.formatoEsperado">
-            <option value="">-</option>
-            <option value="CSV">CSV</option>
-            <option value="GEOJSON">GeoJSON</option>
-            <option value="SHAPEFILE">Shapefile</option>
-            <option value="JSON">JSON</option>
-          </select>
-        </label>
-        <template v-if="form.formatoEsperado === 'CSV'">
-          <label>
-            Coluna de latitude (se tiver coordenada)
-            <input v-model="form.campoGeometriaLat" placeholder="Ex.: lat" />
-          </label>
-          <label>
-            Coluna de longitude (se tiver coordenada)
-            <input v-model="form.campoGeometriaLon" placeholder="Ex.: lon" />
-          </label>
-        </template>
-        <label>
-          Agendamento (cron — ainda não é executado automaticamente)
-          <ConstrutorCron v-model="form.cronExpressao" />
-        </label>
-        <label class="checkbox">
-          <input v-model="form.ativo" type="checkbox" />
-          Ativa
-        </label>
+      <div class="cartao-header">
+        <div class="cartao-header-icone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+        </div>
+        <div>
+          <h2 class="cartao-titulo">{{ editandoId ? 'Editar Fonte #' + editandoId : 'Cadastrar Nova Fonte de Dados' }}</h2>
+          <p class="cartao-sub">Configure os parâmetros de aquisição, URLs de origem e regras de formato.</p>
+        </div>
+      </div>
 
-        <div class="acoes-formulario">
+      <form class="formulario-grid" @submit.prevent="salvar">
+        <div class="campo-grupo">
+          <label class="campo-label">
+            Nome da Fonte *
+            <input v-model="form.nome" required placeholder="Ex.: IBAMA - Embargos Ambientais" class="campo-input" />
+          </label>
+        </div>
+
+        <div class="campo-grupo">
+          <label class="campo-label">
+            Órgão Emissor / Fornecedor
+            <input v-model="form.orgao" placeholder="Ex.: IBAMA, SICAR, ICMBio, IAT" class="campo-input" />
+          </label>
+        </div>
+
+        <div class="campo-grupo">
+          <label class="campo-label">
+            Modalidade de Aquisição *
+            <select v-model="form.tipoAquisicao" class="campo-select">
+              <option value="UPLOAD_MANUAL">Upload manual (.zip, .csv, shapefile)</option>
+              <option value="API_REST">API REST / GeoServer WFS</option>
+              <option value="DOWNLOAD_URL">Download direto por URL</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="campo-grupo" v-if="form.tipoAquisicao !== 'UPLOAD_MANUAL'">
+          <label class="campo-label">
+            URL de Origem (Endpoint / Download) *
+            <input v-model="form.urlOrigem" required placeholder="https://dados.gov.br/api/geospatial..." class="campo-input" />
+          </label>
+        </div>
+
+        <div class="campo-grupo">
+          <label class="campo-label">
+            Formato Esperado
+            <select v-model="form.formatoEsperado" class="campo-select">
+              <option value="">Indefinido / Autodetectar</option>
+              <option value="SHAPEFILE">Shapefile (.zip com shp, shx, dbf, prj)</option>
+              <option value="GEOJSON">GeoJSON</option>
+              <option value="CSV">CSV com coordenadas</option>
+              <option value="JSON">JSON / GeoServices</option>
+            </select>
+          </label>
+        </div>
+
+        <template v-if="form.formatoEsperado === 'CSV'">
+          <div class="campo-grupo">
+            <label class="campo-label">
+              Nome da Coluna de Latitude
+              <input v-model="form.campoGeometriaLat" placeholder="Ex.: latitude, lat, Y" class="campo-input" />
+            </label>
+          </div>
+          <div class="campo-grupo">
+            <label class="campo-label">
+              Nome da Coluna de Longitude
+              <input v-model="form.campoGeometriaLon" placeholder="Ex.: longitude, lon, long, X" class="campo-input" />
+            </label>
+          </div>
+        </template>
+
+        <div class="campo-grupo campo-grupo--full">
+          <label class="campo-label">
+            Agendamento Automático de Execução (Quartz Cron)
+            <ConstrutorCron v-model="form.cronExpressao" />
+          </label>
+        </div>
+
+        <div class="campo-grupo campo-grupo--checkbox">
+          <label class="checkbox-custom">
+            <input v-model="form.ativo" type="checkbox" />
+            <span class="checkbox-box"></span>
+            <span class="checkbox-texto">Fonte ativa para ingestão</span>
+          </label>
+        </div>
+
+        <!-- Mensagens e Ações -->
+        <div class="acoes-formulario campo-grupo--full">
           <button type="submit" class="botao-principal" :disabled="enviando">
-            {{ enviando ? 'Salvando…' : (editandoId ? 'Salvar alterações' : 'Cadastrar fonte') }}
+            <span v-if="enviando" class="spinner-sm"></span>
+            <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
           </button>
+
           <button v-if="editandoId" type="button" class="botao-secundario" @click="cancelarEdicao">
-            Cancelar
+            Cancelar Edição
           </button>
         </div>
-        <p v-if="sucesso" class="mensagem-ok">Fonte salva.</p>
-        <p v-if="erro" class="mensagem-erro">{{ erro }}</p>
+
+        <div v-if="sucesso" class="alerta-sucesso campo-grupo--full">
+          ✓ Fonte salva com sucesso! O catálogo de dados foi atualizado.
+        </div>
+
+        <div v-if="erro" class="alerta-erro campo-grupo--full">
+          ✕ Falha: {{ erro }}
+        </div>
       </form>
     </section>
 
+    <!-- Tabela de Fontes Cadastradas -->
     <section class="cartao">
-      <h2 class="cartao-titulo">Fontes cadastradas</h2>
-      <p v-if="carregandoLista">Carregando…</p>
-      <p v-else-if="!fontes.length">Nenhuma fonte cadastrada ainda.</p>
-      <div v-else class="tabela-scroll">
-        <table class="tabela">
+      <div class="cartao-header cartao-header--tabela">
+        <div>
+          <h2 class="cartao-titulo">Fontes Cadastradas ({{ fontes.length }})</h2>
+          <p class="cartao-sub">Execute a extração dos dados ou envie novos lotes através dos botões de ação.</p>
+        </div>
+      </div>
+
+      <div v-if="carregandoLista" class="estado-carregando">
+        <div class="spinner-grande"></div>
+        <span>Carregando fontes de dados...</span>
+      </div>
+
+      <div v-else-if="!fontes.length" class="estado-vazio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
+        </svg>
+        <p>Nenhuma fonte cadastrada ainda.</p>
+        <small>Preencha o formulário acima para adicionar a primeira fonte.</small>
+      </div>
+
+      <div v-else class="tabela-responsiva-wrapper">
+        <table class="tabela-fontes">
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>Órgão</th>
-              <th>Tipo</th>
+              <th>Fonte / Órgão</th>
+              <th>Modalidade</th>
               <th>Formato</th>
-              <th>Ativa</th>
-              <th>Última execução</th>
+              <th>Status</th>
+              <th>Última Execução</th>
               <th>Cadastrada em</th>
-              <th></th>
+              <th class="col-acoes-titulo">Ações</th>
             </tr>
           </thead>
           <tbody>
             <template v-for="fonte in fontes" :key="fonte.id">
-              <tr>
-                <td>{{ fonte.nome }}</td>
-                <td>{{ fonte.orgao || '-' }}</td>
-                <td>{{ fonte.tipoAquisicao }}</td>
-                <td>{{ fonte.formatoEsperado || '-' }}</td>
+              <tr class="linha-fonte">
+                <!-- Nome & Órgão & URL exposta -->
+                <td class="celula-fonte-principal">
+                  <div class="fonte-nome-linha">
+                    <span class="fonte-id">#{{ fonte.id }}</span>
+                    <strong class="fonte-nome">{{ fonte.nome }}</strong>
+                  </div>
+                  <div class="fonte-orgao-texto">
+                    {{ fonte.orgao ? 'Órgão: ' + fonte.orgao : 'Sem órgão informado' }}
+                  </div>
+                  <!-- Informação que antes estava escondida: URL de origem exposta diretamente -->
+                  <div v-if="fonte.urlOrigem" class="fonte-url-preview" :title="fonte.urlOrigem">
+                    <span class="url-icone">🔗</span>
+                    <span class="url-texto">{{ fonte.urlOrigem }}</span>
+                  </div>
+                </td>
+
+                <!-- Tipo de Aquisição -->
                 <td>
-                  <span class="pill" :class="fonte.ativo ? 'pill--ok' : 'pill--neutro'">
+                  <span class="badge-modalidade" :class="'modalidade--' + fonte.tipoAquisicao.toLowerCase()">
+                    {{
+                      fonte.tipoAquisicao === 'UPLOAD_MANUAL' ? 'Upload Manual' :
+                      fonte.tipoAquisicao === 'API_REST' ? 'API REST' :
+                      fonte.tipoAquisicao === 'DOWNLOAD_URL' ? 'Download URL' : fonte.tipoAquisicao
+                    }}
+                  </span>
+                </td>
+
+                <!-- Formato -->
+                <td>
+                  <span class="badge-formato">{{ fonte.formatoEsperado || 'Autodetectar' }}</span>
+                  <div v-if="fonte.campoGeometriaLat" class="tag-geo-hint">
+                    Coord: {{ fonte.campoGeometriaLat }}, {{ fonte.campoGeometriaLon }}
+                  </div>
+                </td>
+
+                <!-- Ativa / Inativa -->
+                <td>
+                  <span class="badge-tag" :class="fonte.ativo ? 'badge-tag--sucesso' : 'badge-tag--neutro'">
                     {{ fonte.ativo ? 'Ativa' : 'Inativa' }}
                   </span>
                 </td>
+
+                <!-- Última Execução e Detalhes de Erro Completos -->
                 <td class="celula-ultima-execucao">
-                  <div>{{ formatarData(fonte.ultimaExecucaoEm) }}</div>
+                  <div class="data-execucao">{{ formatarData(fonte.ultimaExecucaoEm) }}</div>
+
                   <div v-if="fonte.ultimaDuracaoMs != null" class="linha-duracao">
-                    <span>{{ formatarDuracao(fonte.ultimaDuracaoMs) }}</span>
-                    <span class="pill" :class="fonte.ultimoStatusExecucao === 'ERRO' ? 'pill--erro' : 'pill--ok'">
-                      {{ fonte.ultimoStatusExecucao === 'ERRO' ? 'Erro' : 'OK' }}
+                    <span class="duracao-texto">{{ formatarDuracao(fonte.ultimaDuracaoMs) }}</span>
+                    <span class="badge-tag" :class="fonte.ultimoStatusExecucao === 'ERRO' ? 'badge-tag--erro' : 'badge-tag--sucesso'">
+                      {{ fonte.ultimoStatusExecucao === 'ERRO' ? 'Falha' : 'OK' }}
                     </span>
                   </div>
-                  <div
-                    v-if="fonte.ultimoStatusExecucao === 'ERRO' && fonte.ultimoErroMensagem"
-                    class="mensagem-erro-fonte"
-                    :title="fonte.ultimoErroMensagem"
-                  >
-                    {{ fonte.ultimoErroMensagem }}
+
+                  <!-- Mensagem de erro sem truncamento e com toggle de expansão -->
+                  <div v-if="fonte.ultimoStatusExecucao === 'ERRO' && fonte.ultimoErroMensagem" class="container-erro-fonte">
+                    <p class="mensagem-erro-texto" :class="{ 'erro-expandido': errosExpandidos[fonte.id] }">
+                      {{ fonte.ultimoErroMensagem }}
+                    </p>
+                    <button
+                      v-if="fonte.ultimoErroMensagem.length > 80"
+                      type="button"
+                      class="btn-toggle-erro"
+                      @click="alternarErroExpandido(fonte.id)"
+                    >
+                      {{ errosExpandidos[fonte.id] ? '▲ Ocultar detalhes' : '▼ Ver erro completo' }}
+                    </button>
                   </div>
                 </td>
-                <td>{{ formatarData(fonte.dataAdd) }}</td>
+
+                <!-- Cadastrada em -->
+                <td class="celula-data-add">
+                  {{ formatarData(fonte.dataAdd) }}
+                </td>
+
+                <!-- Ações -->
                 <td class="celula-acoes">
-                  <button class="botao-editar" title="Editar fonte" @click="editar(fonte)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </svg>
-                  </button>
-                  <button
-                    v-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
-                    class="botao-play"
-                    :disabled="estadoDe(fonte.id).estado === 'executando'"
-                    title="Enviar arquivo (.zip) e processar"
-                    @click="abrirSeletorArquivo(fonte)"
-                  >
-                    <span v-if="estadoDe(fonte.id).estado === 'executando'" class="spinner" aria-hidden="true"></span>
-                    <svg v-else class="icone-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                      <path d="M12 3v12" stroke-linecap="round" stroke-linejoin="round" />
-                      <path d="M7 8l5-5 5 5" stroke-linecap="round" stroke-linejoin="round" />
-                      <path d="M5 21h14" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                  </button>
-                  <button
-                    v-else
-                    class="botao-play"
-                    :disabled="estadoDe(fonte.id).estado === 'executando'"
-                    :title="'Executar ingestão de ' + fonte.nome"
-                    @click="executar(fonte)"
-                  >
-                    <span v-if="estadoDe(fonte.id).estado === 'executando'" class="spinner" aria-hidden="true"></span>
-                    <svg v-else class="icone-play" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </button>
+                  <div class="grupo-botoes-acoes">
+                    <button
+                      class="btn-acao-circulo btn-editar"
+                      title="Editar configurações da fonte"
+                      @click="editar(fonte)"
+                      aria-label="Editar fonte"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+
+                    <button
+                      class="btn-acao-circulo btn-mapeamento"
+                      title="Mapeamento De-Para de Colunas (Bronze → Silver)"
+                      @click="fonteParaMapeamento = fonte"
+                      aria-label="Mapeamento de colunas"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="4" y1="9" x2="20" y2="9" />
+                        <line x1="4" y1="15" x2="20" y2="15" />
+                        <line x1="10" y1="3" x2="8" y2="21" />
+                        <line x1="16" y1="3" x2="14" y2="21" />
+                      </svg>
+                    </button>
+
+                    <button
+                      v-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
+                      class="btn-acao-circulo btn-executar"
+                      :disabled="estadoDe(fonte.id).estado === 'executando'"
+                      title="Enviar arquivo (.zip / shapefile / csv) e executar ingestão"
+                      @click="abrirSeletorArquivo(fonte)"
+                      aria-label="Fazer upload de arquivo"
+                    >
+                      <span v-if="estadoDe(fonte.id).estado === 'executando'" class="spinner-sm-branco"></span>
+                      <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="M12 3v12" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M7 8l5-5 5 5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M5 21h14" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </button>
+
+                    <button
+                      v-else
+                      class="btn-acao-circulo btn-executar"
+                      :disabled="estadoDe(fonte.id).estado === 'executando'"
+                      :title="'Disparar ingestão remota de ' + fonte.nome"
+                      @click="executar(fonte)"
+                      aria-label="Executar ingestão"
+                    >
+                      <span v-if="estadoDe(fonte.id).estado === 'executando'" class="spinner-sm-branco"></span>
+                      <svg v-else viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
+
+              <!-- Linha de Feedback de Execução em Andamento / Concluída -->
               <tr v-if="estadoDe(fonte.id).estado !== 'ocioso'" class="linha-resultado">
-                <td colspan="8">
-                  <div v-if="estadoDe(fonte.id).estado === 'executando'" class="resultado resultado--neutro">
+                <td colspan="7">
+                  <div v-if="estadoDe(fonte.id).estado === 'executando'" class="banner-progresso">
                     <template v-if="estadoDe(fonte.id).progressoUploadPct !== null && estadoDe(fonte.id).progressoUploadPct < 100">
-                      <div class="linha-fase">Enviando arquivo… {{ estadoDe(fonte.id).progressoUploadPct }}%</div>
-                      <div class="barra-progresso">
-                        <div class="barra-progresso-preenchida" :style="{ width: estadoDe(fonte.id).progressoUploadPct + '%' }"></div>
+                      <div class="linha-fase">
+                        <span>📤 Enviando arquivo para o servidor...</span>
+                        <strong>{{ estadoDe(fonte.id).progressoUploadPct }}%</strong>
+                      </div>
+                      <div class="trilho-progresso">
+                        <div class="barra-preenchida" :style="{ width: estadoDe(fonte.id).progressoUploadPct + '%' }"></div>
                       </div>
                     </template>
+
                     <template v-else>
                       <div class="linha-fase">
-                        {{ FASES_LABEL[estadoDe(fonte.id).fase] || 'Executando…' }} ({{ estadoDe(fonte.id).segundos }}s)
+                        <span>⚙️ {{ FASES_LABEL[estadoDe(fonte.id).fase] || 'Executando pipeline de ingestão…' }}</span>
+                        <span class="tempo-decorrido">({{ estadoDe(fonte.id).segundos }}s decorridos)</span>
                       </div>
-                      <div v-if="estadoDe(fonte.id).detalhe" class="detalhe-progresso">{{ estadoDe(fonte.id).detalhe }}</div>
-                      <div v-if="estadoDe(fonte.id).percentual !== null" class="barra-progresso">
-                        <div class="barra-progresso-preenchida" :style="{ width: estadoDe(fonte.id).percentual + '%' }"></div>
+                      <div v-if="estadoDe(fonte.id).detalhe" class="detalhe-fase">
+                        {{ estadoDe(fonte.id).detalhe }}
+                      </div>
+                      <div v-if="estadoDe(fonte.id).percentual !== null" class="trilho-progresso">
+                        <div class="barra-preenchida" :style="{ width: estadoDe(fonte.id).percentual + '%' }"></div>
                       </div>
                       <div v-if="estadoDe(fonte.id).totalEstimado" class="contagem-progresso">
                         {{ estadoDe(fonte.id).registrosProcessados.toLocaleString('pt-BR') }} /
-                        {{ estadoDe(fonte.id).totalEstimado.toLocaleString('pt-BR') }}
+                        {{ estadoDe(fonte.id).totalEstimado.toLocaleString('pt-BR') }} registros
                         <template v-if="estadoDe(fonte.id).percentual !== null">({{ estadoDe(fonte.id).percentual }}%)</template>
                       </div>
                       <div v-else-if="estadoDe(fonte.id).registrosProcessados" class="contagem-progresso">
@@ -487,18 +640,74 @@ onUnmounted(() => {
                       </div>
                     </template>
                   </div>
+
                   <div
-                    v-else-if="estadoDe(fonte.id).estado === 'sucesso' && estadoDe(fonte.id).resultado.status === 'SEM_MUDANCA'"
-                    class="resultado resultado--neutro"
+                    v-else-if="estadoDe(fonte.id).estado === 'sucesso' && estadoDe(fonte.id).resultado?.status === 'SEM_MUDANCA'"
+                    class="resultado-banner resultado-banner--neutro"
                   >
-                    Nada mudou desde a última vez — lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }}, sem registros novos.
+                    ℹ️ <strong>Conteúdo inalterado:</strong> Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} verificado — nenhum registro novo encontrado na origem.
                   </div>
-                  <div v-else-if="estadoDe(fonte.id).estado === 'sucesso'" class="resultado resultado--ok">
-                    Concluído — lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }},
-                    {{ estadoDe(fonte.id).resultado.quantidadeRegistros.toLocaleString('pt-BR') }} registros gravados.
+
+                  <div
+                    v-else-if="estadoDe(fonte.id).estado === 'sucesso' && estadoDe(fonte.id).resultado?.status === 'RETIDO_QUARENTENA'"
+                    class="resultado-banner resultado-banner--alerta"
+                  >
+                    <div class="resultado-alerta-corpo">
+                      <div>
+                        ⚠️ <strong>Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} retido na Quarentena!</strong>
+                        <p class="alerta-regra">
+                          Pela regra de integridade total (All-or-Nothing), <strong>nenhum registro foi promovido para a Silver</strong> até que as inconsistências sejam validadas por um analista.
+                        </p>
+                      </div>
+                      <div class="resultado-botoes-atalho">
+                        <button
+                          type="button"
+                          class="btn-atalho btn-atalho--quarentena"
+                          @click="router.push({ path: '/quarentena', query: { loteId: estadoDe(fonte.id).resultado.loteIngestaoId } })"
+                        >
+                          Inspecionar na Quarentena →
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-atalho btn-atalho--pipeline"
+                          @click="router.push('/lotes')"
+                        >
+                          Ver no Pipeline
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div v-else-if="estadoDe(fonte.id).estado === 'erro'" class="resultado resultado--erro">
-                    Falha: {{ estadoDe(fonte.id).erro }}
+
+                  <div
+                    v-else-if="estadoDe(fonte.id).estado === 'sucesso' && estadoDe(fonte.id).resultado?.status === 'PROMOVIDO_SILVER'"
+                    class="resultado-banner resultado-banner--sucesso"
+                  >
+                    <div class="resultado-alerta-corpo">
+                      <div>
+                        ✓ <strong>Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} promovido para a Silver com 100% de integridade!</strong>
+                        <p class="alerta-regra">
+                          {{ estadoDe(fonte.id).resultado.quantidadeRegistros?.toLocaleString('pt-BR') }} registros gravados com sucesso na camada analítica.
+                        </p>
+                      </div>
+                      <div class="resultado-botoes-atalho">
+                        <button
+                          type="button"
+                          class="btn-atalho btn-atalho--pipeline"
+                          @click="router.push('/lotes')"
+                        >
+                          Ver no Pipeline →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-else-if="estadoDe(fonte.id).estado === 'sucesso'" class="resultado-banner resultado-banner--sucesso">
+                    ✓ Concluído com sucesso — Lote #{{ estadoDe(fonte.id).resultado?.loteIngestaoId }},
+                    {{ estadoDe(fonte.id).resultado?.quantidadeRegistros?.toLocaleString('pt-BR') }} registros processados.
+                  </div>
+
+                  <div v-else-if="estadoDe(fonte.id).estado === 'erro'" class="resultado-banner resultado-banner--erro">
+                    ✕ <strong>Falha na execução:</strong> {{ estadoDe(fonte.id).erro }}
                   </div>
                 </td>
               </tr>
@@ -508,304 +717,723 @@ onUnmounted(() => {
       </div>
     </section>
 
+    <!-- Input Oculto de Arquivo -->
     <input
       ref="inputArquivoRef"
       type="file"
-      accept=".zip"
+      accept=".zip,.csv,.json,.geojson"
       style="display: none"
       @change="arquivoSelecionado"
+    />
+
+    <!-- Modal de Mapeamento de Colunas -->
+    <ModalMapeamentoColunas
+      :fonte="fonteParaMapeamento"
+      @fechar="fonteParaMapeamento = null"
     />
   </div>
 </template>
 
 <style scoped>
+.pagina-fontes {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.topo-pagina {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
 .etiqueta {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.25rem;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #2e7d32;
+  color: #15803d;
 }
 
 .titulo {
-  margin: 0 0 0.35rem;
-  font-size: 1.5rem;
-  color: #1a1a1a;
+  font-size: 1.65rem;
+  color: #0f172a;
+  letter-spacing: -0.02em;
 }
 
 .subtitulo {
-  margin: 0 0 1.5rem;
-  font-size: 0.88rem;
-  color: #6b7280;
-  max-width: 42rem;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: #64748b;
+  max-width: 48rem;
 }
 
+.btn-recarregar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.btn-recarregar:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.btn-recarregar svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Cartões Principais */
 .cartao {
-  background: #fff;
-  border: 1px solid #e6e8eb;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.cartao-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
   margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cartao-header-icone {
+  width: 2.4rem;
+  height: 2.4rem;
+  background: #dcfce7;
+  color: #15803d;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cartao-header-icone svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .cartao-titulo {
-  margin: 0 0 1rem;
-  font-size: 1rem;
-  color: #1a1a1a;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.formulario {
+.cartao-sub {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+/* Formulário Responsivo em Grid */
+.formulario-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+.campo-grupo {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  max-width: 28rem;
 }
 
-label {
+.campo-grupo--full {
+  grid-column: span 2;
+}
+
+.campo-label {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.85rem;
-  color: #444;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
 }
 
-label.checkbox {
-  flex-direction: row;
+.campo-input,
+.campo-select {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.campo-input:focus,
+.campo-select:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.checkbox-custom {
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #334155;
+  padding: 0.5rem 0;
 }
 
-input,
-select {
-  padding: 0.5rem;
-  font-size: 0.9rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-family: inherit;
+.checkbox-custom input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #15803d;
+  cursor: pointer;
 }
 
 .acoes-formulario {
   display: flex;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
 }
 
 .botao-principal {
-  padding: 0.65rem 1rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #fff;
-  background: #2e7d32;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: #15803d;
   border: none;
   border-radius: 8px;
   cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.botao-principal:hover:not(:disabled) {
+  background: #166534;
 }
 
 .botao-principal:disabled {
-  opacity: 0.7;
-  cursor: default;
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .botao-secundario {
-  padding: 0.65rem 1rem;
-  font-size: 0.95rem;
+  padding: 0.7rem 1.2rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  color: #555;
-  background: #f1f3f4;
-  border: none;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.mensagem-ok {
-  color: #2e7d32;
+.botao-secundario:hover {
+  background: #e2e8f0;
+}
+
+.alerta-sucesso {
+  padding: 0.75rem 1rem;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
   font-size: 0.85rem;
+  font-weight: 600;
 }
 
-.mensagem-erro {
-  color: #a12a22;
+.alerta-erro {
+  padding: 0.75rem 1rem;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
   font-size: 0.85rem;
+  font-weight: 600;
 }
 
-.tabela-scroll {
-  overflow-x: auto;
-}
-
-.tabela {
+/* Tabela de Fontes */
+.tabela-fontes {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
+  text-align: left;
 }
 
-.tabela th,
-.tabela td {
-  text-align: left;
-  padding: 0.55rem 0.6rem;
-  border-bottom: 1px solid #eee;
+.tabela-fontes th {
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
   white-space: nowrap;
 }
 
-.pill {
+.tabela-fontes td {
+  padding: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.linha-fonte:hover {
+  background: #fcfdfe;
+}
+
+.celula-fonte-principal {
+  min-width: 240px;
+}
+
+.fonte-nome-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.fonte-id {
+  font-family: var(--fonte-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.fonte-nome {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fonte-orgao-texto {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 0.2rem;
+}
+
+/* Informação de URL exposta */
+.fonte-url-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  font-size: 0.74rem;
+  color: #0369a1;
+  background: #f0f9ff;
+  border: 1px solid #e0f2fe;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  max-width: 320px;
+}
+
+.url-texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge-modalidade {
   display: inline-block;
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.modalidade--upload_manual {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.modalidade--api_rest {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.modalidade--download_url {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.badge-formato {
+  font-family: var(--fonte-mono);
+  font-size: 0.74rem;
   font-weight: 600;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
 }
 
-.pill--ok {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.pill--neutro {
-  background: #eef1f5;
-  color: #667;
-}
-
-.pill--erro {
-  background: #fdecea;
-  color: #a12a22;
+.tag-geo-hint {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: 0.25rem;
 }
 
 .celula-ultima-execucao {
-  white-space: normal;
-  max-width: 220px;
+  min-width: 220px;
+}
+
+.data-execucao {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.82rem;
 }
 
 .linha-duracao {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.15rem;
-  font-size: 0.78rem;
-  color: #6b7280;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
 }
 
-.mensagem-erro-fonte {
-  margin-top: 0.2rem;
-  font-size: 0.75rem;
-  color: #a12a22;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.duracao-texto {
+  font-size: 0.76rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.container-erro-fonte {
+  margin-top: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 6px;
+}
+
+.mensagem-erro-texto {
+  font-size: 0.76rem;
+  color: #991b1b;
+  word-break: break-word;
+  line-height: 1.35;
+  margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mensagem-erro-texto.erro-expandido {
+  display: block;
+  overflow: visible;
+}
+
+.btn-toggle-erro {
+  background: transparent;
+  border: none;
+  color: #e11d48;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.25rem 0 0;
+  display: block;
+}
+
+.celula-data-add {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.col-acoes-titulo {
+  text-align: right;
 }
 
 .celula-acoes {
-  display: flex;
-  gap: 0.4rem;
+  text-align: right;
 }
 
-.botao-editar {
-  display: flex;
+.grupo-botoes-acoes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.btn-acao-circulo {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  border: 1px solid #d5d9dd;
-  background: #fff;
-  color: #555;
   cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
 }
 
-.botao-editar svg {
-  width: 0.85rem;
-  height: 0.85rem;
+.btn-acao-circulo svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
-.botao-play {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
+.btn-editar {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.btn-editar:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.btn-mapeamento {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0284c7;
+}
+
+.btn-mapeamento:hover {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+}
+
+.btn-executar {
+  background: #15803d;
+  color: #ffffff;
+}
+
+.btn-executar:hover:not(:disabled) {
+  background: #166534;
+}
+
+.btn-executar:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.spinner-sm-branco {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
   border-radius: 50%;
-  border: none;
-  background: #2e7d32;
-  color: #fff;
-  cursor: pointer;
+  animation: girar 0.65s linear infinite;
 }
 
-.botao-play:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.icone-play {
-  width: 0.85rem;
-  height: 0.85rem;
-}
-
-.spinner {
-  width: 0.85rem;
-  height: 0.85rem;
+.spinner-sm {
+  width: 1rem;
+  height: 1rem;
   border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border-top-color: #ffffff;
   border-radius: 50%;
-  animation: girar 0.7s linear infinite;
+  animation: girar 0.65s linear infinite;
+}
+
+.spinner-grande {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #e2e8f0;
+  border-top-color: #15803d;
+  border-radius: 50%;
+  animation: girar 0.65s linear infinite;
 }
 
 @keyframes girar {
   to { transform: rotate(360deg); }
 }
 
+/* Banner de Progresso e Resultados */
 .linha-resultado td {
-  padding: 0 0.6rem 0.6rem;
-  border-bottom: 1px solid #eee;
+  padding: 0.5rem 1rem 1.25rem;
+  background: #fbfcfe;
 }
 
-.resultado {
-  padding: 0.5rem 0.7rem;
-  border-radius: 6px;
-  font-size: 0.82rem;
-}
-
-.resultado--ok {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.resultado--neutro {
-  background: #eef1f5;
-  color: #556;
-}
-
-.resultado--erro {
-  background: #fdecea;
-  color: #a12a22;
+.banner-progresso {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.85rem 1.1rem;
 }
 
 .linha-fase {
-  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #1e293b;
 }
 
-.detalhe-progresso {
-  margin-top: 0.15rem;
+.tempo-decorrido {
   font-size: 0.78rem;
-  color: #6b7280;
+  color: #64748b;
+  font-weight: normal;
 }
 
-.barra-progresso {
-  margin-top: 0.4rem;
-  height: 6px;
-  border-radius: 999px;
-  background: #dfe4ea;
+.detalhe-fase {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+.trilho-progresso {
+  margin-top: 0.5rem;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 9999px;
   overflow: hidden;
 }
 
-.barra-progresso-preenchida {
+.barra-preenchida {
   height: 100%;
-  background: #2e7d32;
-  border-radius: 999px;
-  transition: width 0.4s ease;
+  background: linear-gradient(90deg, #15803d, #22c55e);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
 }
 
 .contagem-progresso {
-  margin-top: 0.3rem;
+  margin-top: 0.35rem;
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.resultado-banner {
+  padding: 0.85rem 1.15rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+}
+
+.resultado-banner--neutro {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.resultado-banner--alerta {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.resultado-banner--sucesso {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.resultado-banner--erro {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.resultado-alerta-corpo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.alerta-regra {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+}
+
+.resultado-botoes-atalho {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-atalho {
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
   font-size: 0.78rem;
-  color: #556;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+  border: 1px solid transparent;
+}
+
+.btn-atalho--quarentena {
+  background: #b45309;
+  color: #ffffff;
+}
+
+.btn-atalho--quarentena:hover {
+  background: #92400e;
+}
+
+.btn-atalho--pipeline {
+  background: #ffffff;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.btn-atalho--pipeline:hover {
+  background: #f1f5f9;
+}
+
+.estado-carregando,
+.estado-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  color: #64748b;
+  gap: 0.6rem;
+  text-align: center;
+}
+
+.estado-vazio svg {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #94a3b8;
+}
+
+/* Responsividade Mobile e Tablet */
+@media (max-width: 900px) {
+  .formulario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .campo-grupo--full {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .topo-pagina {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-recarregar {
+    justify-content: center;
+  }
+
+  .cartao {
+    padding: 1.1rem;
+  }
 }
 </style>
