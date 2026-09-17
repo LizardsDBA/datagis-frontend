@@ -42,6 +42,14 @@ async function preencher() {
 }
 
 describe('ConjuntosView', () => {
+  it('preserva as geometrias de uma GeometryCollection recebida da API', async () => {
+    const cobertura = { type: 'GeometryCollection', geometries: [
+      { type: 'Point', coordinates: [-50, -25] },
+    ] }
+    buscarConjuntos.mockResolvedValue([{ id: 42, fonteDadoNome: 'CAR PR', competencia: '2026-09-01', statusCamada: 'ATIVA', coberturaTerritorial: cobertura }])
+    await abrir()
+    expect(L.geoJSON).toHaveBeenCalledWith(cobertura, expect.any(Object))
+  })
   it('carrega fontes e mostra o estado vazio', async () => {
     await abrir()
     expect(buscarConjuntos).toHaveBeenCalledOnce()
