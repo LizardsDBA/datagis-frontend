@@ -27,6 +27,12 @@ const itens = [
     icone: 'quarentena',
     descricao: 'Auditoria & Correção',
   },
+  {
+    rota: '/conjuntos',
+    rotulo: 'Conjuntos & Cobertura',
+    icone: 'conjuntos',
+    descricao: 'Cadastro & Mapa Territorial',
+  },
 ]
 
 function navegar() {
@@ -95,6 +101,11 @@ function navegar() {
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               <path d="M12 8v4" />
               <path d="M12 16h.01" />
+            </svg>
+            <!-- Ícone para Conjuntos & Cobertura -->
+            <svg v-else-if="item.icone === 'conjuntos'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
             </svg>
           </div>
           <div class="item-texto">
