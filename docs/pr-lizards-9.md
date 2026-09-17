@@ -20,7 +20,7 @@ status, com apresentação de cobertura territorial no mapa. Atende à tarefa
 
 ## Validação local — 2026-09-16
 
-- `npm test`: 16 testes aprovados em 2 arquivos.
+- `npm test`: 17 testes aprovados em 2 arquivos.
 - `npm run build`: build de produção concluído.
 - `git diff --check`: sem erros.
 - O teste da mensagem no campo `erro` falhou antes da correção e passou depois dela.
@@ -30,14 +30,13 @@ status, com apresentação de cobertura territorial no mapa. Atende à tarefa
 - O lockfile inclui as novas dependências de desenvolvimento; instalar com `npm ci`.
 - Os testes simulam HTTP e Leaflet. Não validam tiles reais nem a serialização
   de geometria JTS proveniente do Oracle. O cenário de mapa usa uma fixture GeoJSON.
-- A validação de ponta a ponta com a API e geometria real permanece pendente.
-  O teste `ConjuntoOracleIT` do backend reproduziu HTTP 400 ao listar geometria
-  real (`Operation does not support GeometryCollection arguments`); corrigir
-  esse contrato antes de considerar a integração do mapa concluída.
+- A falha HTTP 400 do backend foi corrigida localmente: os 4 testes Oracle passaram,
+  incluindo listagem de polígono real em GeoJSON. A tela agora preserva também
+  GeometryCollection, coberta por um novo teste de componente.
+- A visualização final em navegador com tiles reais ainda requer verificação manual.
 - O proxy local cobre `/conjuntos` e `/api`; o ambiente de publicação precisa
   encaminhar essas rotas ao backend.
 - Instruções de execução e limites estão em `docs/testes-conjuntos.md`.
 
 Antes de publicar: revisar o código, validar a integração pendente e conferir
-se a base está atualizada com a sprint remota. Este arquivo é apenas um rascunho
-local de descrição; nenhuma PR foi aberta.
+se a base está atualizada com a sprint remota. Esta descrição deve acompanhar a correção quando enviada ao GitHub.
