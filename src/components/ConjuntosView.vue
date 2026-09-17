@@ -81,8 +81,7 @@ function iniciarMapa() {
 
 /**
  * Converte o valor de coberturaTerritorial que chega do back-end.
- * O JTS serializa Geometry como um objeto com propriedades geometryType, coordinates, etc.
- * Convertemos para GeoJSON para o Leaflet entender.
+ * A API retorna GeoJSON; preservamos também coleções com o campo geometries.
  */
 function geometriaParaGeoJson(geo) {
   if (!geo) return null
@@ -90,6 +89,7 @@ function geometriaParaGeoJson(geo) {
   if (typeof geo === 'string') {
     try { return JSON.parse(geo) } catch { return null }
   }
+  if (geo.type) return geo
   // Se for objeto JTS-like com geometryType
   if (geo.geometryType || geo.type) {
     const tipo = (geo.geometryType || geo.type || '').toLowerCase()
