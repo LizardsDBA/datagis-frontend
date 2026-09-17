@@ -18,6 +18,10 @@ export default defineConfig({
         target: 'http://backend:8080',
         changeOrigin: true,
       },
+      '/conjuntos': {
+        target: 'http://backend:8080',
+        changeOrigin: true,
+      },
     },
   },
 })
