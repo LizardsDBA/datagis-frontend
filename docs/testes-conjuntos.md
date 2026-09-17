@@ -9,7 +9,7 @@ npm run build
 
 Para desenvolver com reexecução automática: `npm run test:watch`.
 
-São 16 testes usando Vitest, Vue Test Utils e jsdom:
+São 17 testes usando Vitest, Vue Test Utils e jsdom:
 
 - Serviço HTTP: rotas de fontes/conjuntos, envio de JSON, retorno do cadastro,
   mensagens de erro (`erro`, `mensagem`, `message`), erro sem JSON e falha de rede.
@@ -27,7 +27,7 @@ A API atual usa `/conjuntos` e `/api/fontes`, com proxy Vite para ambas as rotas
 O formulário envia `coberturaTerritorial: null`. A integração com uma geometria
 real do Oracle precisa ser validada separadamente.
 
-Na integração do backend com Oracle local em 2026-09-16, a V032 e a persistência
-espacial foram verificadas, mas `GET /conjuntos` com geometria real retornou HTTP 400
-(`Operation does not support GeometryCollection arguments`). Portanto, os 16 testes
-do frontend aprovados não significam que o mapa já funcione com dados reais da API.
+Após a correção da API, os 4 testes de integração Oracle passaram: a listagem de
+polígono real retorna HTTP 200 e GeoJSON. A tela preserva objetos GeoJSON completos,
+incluindo GeometryCollection com seu campo geometries (novo teste de componente).
+A visualização em navegador com tiles reais ainda não foi exercitada nesta rodada.
