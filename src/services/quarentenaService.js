@@ -114,3 +114,14 @@ export async function excluirMapeamento(fonteId, id) {
   if (!resp.ok) throw new Error('Falha ao excluir mapeamento')
   return true
 }
+
+export async function buscarDiagnosticoQuarentena(params = {}) {
+  const query = new URLSearchParams()
+  if (params.loteIngestaoId) query.set('loteIngestaoId', params.loteIngestaoId)
+  if (params.dataInicio) query.set('dataInicio', params.dataInicio)
+  if (params.dataFim) query.set('dataFim', params.dataFim)
+
+  const resp = await fetch(`/api/quarentena/diagnostico?${query.toString()}`)
+  if (!resp.ok) throw new Error(`Falha ao carregar diagnóstico da quarentena: ${resp.statusText}`)
+  return resp.json()
+}
