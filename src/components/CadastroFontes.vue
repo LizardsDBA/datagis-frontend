@@ -32,6 +32,7 @@ const formVazio = () => ({
   formatoEsperado: '',
   campoGeometriaLat: '',
   campoGeometriaLon: '',
+  separadorCsv: ',',
   ativo: true,
 })
 
@@ -50,6 +51,17 @@ const FASES_LABEL = {
   ERRO: 'Erro',
 }
 const INTERVALO_SONDAGEM_MS = 2000
+
+// value="\t" em HTML puro vira a string literal de 2 caracteres "\t", nao uma
+// tabulacao de verdade - por isso o <select> usa :value ligado a este array (string
+// JS real) em vez de "\t" escrito direto no atributo do <option>.
+const OPCOES_SEPARADOR_CSV = [
+  { valor: ',', rotulo: 'Vírgula ( , )' },
+  { valor: ';', rotulo: 'Ponto e vírgula ( ; )' },
+  { valor: '|', rotulo: 'Pipe ( | )' },
+  { valor: '\t', rotulo: 'Tabulação ( TAB )' },
+]
+const SEPARADOR_LABEL = Object.fromEntries(OPCOES_SEPARADOR_CSV.map((o) => [o.valor, o.rotulo]))
 
 function estadoDe(id) {
   if (!execucoes[id]) {
@@ -131,6 +143,7 @@ function editar(fonte) {
     formatoEsperado: fonte.formatoEsperado || '',
     campoGeometriaLat: fonte.campoGeometriaLat || '',
     campoGeometriaLon: fonte.campoGeometriaLon || '',
+    separadorCsv: fonte.separadorCsv || ',',
     ativo: fonte.ativo,
   }
   sucesso.value = false
@@ -380,6 +393,16 @@ onUnmounted(() => {
         <template v-if="form.formatoEsperado === 'CSV'">
           <div class="campo-grupo">
             <label class="campo-label">
+              Separador de Campo
+              <select v-model="form.separadorCsv" class="campo-select">
+                <option v-for="opcao in OPCOES_SEPARADOR_CSV" :key="opcao.valor" :value="opcao.valor">
+                  {{ opcao.rotulo }}
+                </option>
+              </select>
+            </label>
+          </div>
+          <div class="campo-grupo">
+            <label class="campo-label">
               Nome da Coluna de Latitude
               <input v-model="form.campoGeometriaLat" placeholder="Ex.: latitude, lat, Y" class="campo-input" />
             </label>
@@ -499,6 +522,9 @@ onUnmounted(() => {
                 <!-- Formato -->
                 <td>
                   <span class="badge-formato">{{ fonte.formatoEsperado || 'Autodetectar' }}</span>
+                  <div v-if="fonte.formatoEsperado === 'CSV'" class="tag-geo-hint">
+                    Separador: {{ SEPARADOR_LABEL[fonte.separadorCsv] || fonte.separadorCsv || 'Vírgula' }}
+                  </div>
                   <div v-if="fonte.campoGeometriaLat" class="tag-geo-hint">
                     Coord: {{ fonte.campoGeometriaLat }}, {{ fonte.campoGeometriaLon }}
                   </div>
