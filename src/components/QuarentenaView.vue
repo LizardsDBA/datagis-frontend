@@ -19,6 +19,26 @@ const statusLista = ref([])
 const carregando = ref(false)
 const erro = ref(null)
 
+// Paginação
+const paginaAtual = ref(1)
+const tamanhoPagina = ref(50)
+const totalItens = ref(0)
+
+const totalPaginas = computed(() => {
+  if (!totalItens.value || totalItens.value <= 0) return 1
+  return Math.ceil(totalItens.value / tamanhoPagina.value)
+})
+
+const indiceInicio = computed(() => {
+  if (totalItens.value === 0) return 0
+  return (paginaAtual.value - 1) * tamanhoPagina.value + 1
+})
+
+const indiceFim = computed(() => {
+  if (totalItens.value === 0) return 0
+  return Math.min(paginaAtual.value * tamanhoPagina.value, totalItens.value)
+})
+
 // Controle de expansão de motivos muito longos
 const motivosExpandidos = reactive({})
 
@@ -35,7 +55,8 @@ const filtroLoteId = ref(route.query.loteId ? String(route.query.loteId) : '')
 
 function selecionarFiltroStatus(st) {
   filtroStatus.value = st
-  aplicarFiltros()
+  paginaAtual.value = 1
+  aplicarFiltros(true)
 }
 
 // Modal de detalhes
@@ -63,14 +84,15 @@ async function carregarTudo() {
         status: filtroStatus.value,
         tipoErro: filtroTipoErro.value,
         loteIngestaoId: filtroLoteId.value ? Number(filtroLoteId.value) : undefined,
-        pagina: 0,
-        tamanho: 50,
+        pagina: paginaAtual.value - 1,
+        tamanho: tamanhoPagina.value,
       }),
       buscarTiposErro(),
       buscarStatusAnalise(),
     ])
     metricas.value = met
-    itens.value = itensRes
+    itens.value = itensRes.itens
+    totalItens.value = itensRes.totalCount
     tiposErro.value = errRes
     statusLista.value = stRes
   } catch (e) {
@@ -80,18 +102,23 @@ async function carregarTudo() {
   }
 }
 
-async function aplicarFiltros() {
+async function aplicarFiltros(resetarPagina = true) {
+  if (resetarPagina) {
+    paginaAtual.value = 1
+  }
   carregando.value = true
   erro.value = null
   try {
-    itens.value = await buscarItensQuarentena({
+    const res = await buscarItensQuarentena({
       entidade: filtroEntidade.value,
       status: filtroStatus.value,
       tipoErro: filtroTipoErro.value,
       loteIngestaoId: filtroLoteId.value ? Number(filtroLoteId.value) : undefined,
-      pagina: 0,
-      tamanho: 50,
+      pagina: paginaAtual.value - 1,
+      tamanho: tamanhoPagina.value,
     })
+    itens.value = res.itens
+    totalItens.value = res.totalCount
   } catch (e) {
     erro.value = e.message
   } finally {
@@ -99,16 +126,30 @@ async function aplicarFiltros() {
   }
 }
 
+function mudarPagina(novaPagina) {
+  if (novaPagina < 1 || novaPagina > totalPaginas.value || novaPagina === paginaAtual.value) return
+  paginaAtual.value = novaPagina
+  aplicarFiltros(false)
+}
+
+function mudarTamanhoPagina(novoTamanho) {
+  tamanhoPagina.value = Number(novoTamanho)
+  paginaAtual.value = 1
+  aplicarFiltros(false)
+}
+
 function filtrarPorLote(id) {
   filtroLoteId.value = String(id)
+  paginaAtual.value = 1
   router.replace({ query: { loteId: id } })
-  aplicarFiltros()
+  aplicarFiltros(false)
 }
 
 function removerFiltroLote() {
   filtroLoteId.value = ''
+  paginaAtual.value = 1
   router.replace({ query: {} })
-  aplicarFiltros()
+  aplicarFiltros(false)
 }
 
 const itensFiltrados = computed(() => {
@@ -421,6 +462,70 @@ onMounted(() => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Barra de Paginação -->
+      <div v-if="totalItens > 0" class="paginacao-container">
+        <div class="paginacao-info">
+          Exibindo <strong>{{ indiceInicio.toLocaleString('pt-BR') }}</strong> a <strong>{{ indiceFim.toLocaleString('pt-BR') }}</strong> de <strong>{{ totalItens.toLocaleString('pt-BR') }}</strong> registros
+          <span v-if="filtroLoteId" class="paginacao-lote-tag">no Lote #{{ filtroLoteId }}</span>
+        </div>
+
+        <div class="paginacao-controles">
+          <div class="paginacao-tamanho">
+            <label class="rotulo-paginacao">Itens por página:</label>
+            <select :value="tamanhoPagina" @change="mudarTamanhoPagina($event.target.value)" class="select-tamanho">
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+              <option :value="200">200</option>
+            </select>
+          </div>
+
+          <div class="paginacao-botoes">
+            <button
+              type="button"
+              class="btn-pag"
+              :disabled="paginaAtual <= 1 || carregando"
+              @click="mudarPagina(1)"
+              title="Primeira página"
+            >
+              ««
+            </button>
+            <button
+              type="button"
+              class="btn-pag"
+              :disabled="paginaAtual <= 1 || carregando"
+              @click="mudarPagina(paginaAtual - 1)"
+              title="Página anterior"
+            >
+              ◀ Anterior
+            </button>
+
+            <span class="paginacao-status">
+              Página <strong>{{ paginaAtual }}</strong> de <strong>{{ totalPaginas }}</strong>
+            </span>
+
+            <button
+              type="button"
+              class="btn-pag"
+              :disabled="paginaAtual >= totalPaginas || carregando"
+              @click="mudarPagina(paginaAtual + 1)"
+              title="Próxima página"
+            >
+              Próxima ▶
+            </button>
+            <button
+              type="button"
+              class="btn-pag"
+              :disabled="paginaAtual >= totalPaginas || carregando"
+              @click="mudarPagina(totalPaginas)"
+              title="Última página"
+            >
+              »»
+            </button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -964,6 +1069,119 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
+.paginacao-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  background-color: #ffffff;
+  border-top: 1px solid #f1f5f9;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.paginacao-info {
+  font-size: 0.84rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.paginacao-info strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.paginacao-lote-tag {
+  background-color: #f1f5f9;
+  color: #475569;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.25rem;
+}
+
+.paginacao-controles {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.paginacao-tamanho {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.rotulo-paginacao {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.select-tamanho {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #1e293b;
+  background-color: #f8fafc;
+  cursor: pointer;
+  outline: none;
+}
+
+.select-tamanho:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.15);
+}
+
+.paginacao-botoes {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-pag {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-pag:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.btn-pag:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.paginacao-status {
+  font-size: 0.82rem;
+  color: #475569;
+  padding: 0 0.4rem;
+}
+
+.paginacao-status strong {
+  color: #0f172a;
+}
+
 @media (max-width: 768px) {
   .topo-pagina {
     flex-direction: column;
@@ -977,6 +1195,23 @@ onMounted(() => {
   .banner-filtro-lote {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .paginacao-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+  }
+
+  .paginacao-controles {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .paginacao-botoes {
+    justify-content: center;
+    flex-wrap: wrap;
   }
 }
 </style>

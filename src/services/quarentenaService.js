@@ -13,8 +13,16 @@ export async function buscarItensQuarentena(params = {}) {
   if (params.tamanho !== undefined) query.set('tamanho', params.tamanho)
 
   const resp = await fetch(`/api/quarentena?${query.toString()}`)
-  if (!resp.ok) throw new Error(`Falha ao carregar itens da quarentena: ${resp.statusText}`)
-  return resp.json()
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || `Falha ao carregar itens da quarentena: ${resp.statusText}`)
+  }
+  const totalHeader = resp.headers.get('X-Total-Count')
+  const dados = await resp.json()
+  return {
+    itens: dados,
+    totalCount: totalHeader ? parseInt(totalHeader, 10) : dados.length,
+  }
 }
 
 export async function buscarMetricasQuarentena() {
