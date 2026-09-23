@@ -75,7 +75,10 @@ export async function reprocessarItem(entidade, id, payloadCorrigido, analistaId
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payloadCorrigido, analistaId }),
   })
-  if (!resp.ok) throw new Error('Falha ao reprocessar item')
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || `Falha ao reprocessar item: ${resp.statusText}`)
+  }
   return true
 }
 
@@ -85,7 +88,10 @@ export async function liberarLote(loteId, analistaId = 1) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ analistaId }),
   })
-  if (!resp.ok) throw new Error('Falha ao liberar lote para a Silver')
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || `Falha ao liberar lote para a Silver: ${resp.statusText}`)
+  }
   return true
 }
 
