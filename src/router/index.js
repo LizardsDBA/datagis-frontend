@@ -3,6 +3,7 @@ import CadastroFontes from '../components/CadastroFontes.vue'
 import QuarentenaView from '../components/QuarentenaView.vue'
 import LotesView from '../components/LotesView.vue'
 import ConjuntosView from '../components/ConjuntosView.vue'
+import GoldView from '../components/GoldView.vue'
 
 // Rotas ativas do DataGIS:
 // - /fontes: Cadastro e execução de fontes
@@ -14,6 +15,7 @@ const routes = [
   { path: '/lotes', name: 'lotes', component: LotesView },
   { path: '/quarentena', name: 'quarentena', component: QuarentenaView },
   { path: '/conjuntos', name: 'conjuntos', component: ConjuntosView },
+  { path: '/gold', name: 'gold', component: GoldView },
 ]
 
 export default createRouter({
