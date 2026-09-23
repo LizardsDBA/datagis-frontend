@@ -174,7 +174,7 @@ async function onReprocessar() {
               rows="9"
               placeholder="Ajuste os atributos no payload JSON..."
             ></textarea>
-            <small class="dica">O operador pode corrigir manualmente códigos de domínio, nomes ou atributos faltantes antes de submeter à revalidação.</small>
+            <small class="dica">O operador pode corrigir manualmente códigos de domínio, nomes ou atributos faltantes. Ao revalidar, o registro é aprovado e aguarda a liberação conjunta do lote para ser transferido à Silver.</small>
           </div>
         </section>
 
@@ -225,7 +225,7 @@ async function onReprocessar() {
             @click="onReprocessar"
             :disabled="enviando"
           >
-            {{ enviando ? 'Revalidando...' : 'Revalidar & Promover' }}
+            {{ enviando ? 'Revalidando...' : 'Revalidar & Aprovar' }}
           </button>
         </div>
       </footer>
