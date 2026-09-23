@@ -128,3 +128,23 @@ export async function excluirMapeamento(fonteId, id) {
   if (!resp.ok) throw new Error('Falha ao excluir mapeamento')
   return true
 }
+
+export async function adicionarValorDominio(dados) {
+  const resp = await fetch('/api/quarentena/dominios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dados),
+  })
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || 'Falha ao adicionar valor ao domínio')
+  }
+  return resp.json()
+}
+
+export async function buscarTiposAreaProtegida() {
+  const resp = await fetch('/api/quarentena/dominios/tipos-area-protegida')
+  if (!resp.ok) throw new Error('Falha ao listar tipos de áreas protegidas')
+  return resp.json()
+}
+
