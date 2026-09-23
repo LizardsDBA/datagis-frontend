@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ConstrutorCron from './ConstrutorCron.vue'
 import ModalMapeamentoColunas from './ModalMapeamentoColunas.vue'
@@ -37,6 +37,33 @@ const formVazio = () => ({
 })
 
 const form = ref(formVazio())
+
+// A tela abre direto na lista; o formulario de cadastro/edicao vira pop-up.
+const modalAberto = ref(false)
+
+function abrirCadastro() {
+  editandoId.value = null
+  form.value = formVazio()
+  erro.value = null
+  sucesso.value = false
+  modalAberto.value = true
+}
+
+function fecharModal() {
+  modalAberto.value = false
+  editandoId.value = null
+  form.value = formVazio()
+  erro.value = null
+}
+
+function aoPressionarEsc(evento) {
+  if (evento.key === 'Escape' && modalAberto.value) fecharModal()
+}
+
+// Trava a rolagem do fundo enquanto o modal estiver aberto.
+watch(modalAberto, (aberto) => {
+  document.body.style.overflow = aberto ? 'hidden' : ''
+})
 
 // Estado de execucao por fonte (chave = id)
 const execucoes = reactive({})
@@ -148,7 +175,7 @@ function editar(fonte) {
   }
   sucesso.value = false
   erro.value = null
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+ modalAberto.value = true
 }
 
 function cancelarEdicao() {
@@ -174,8 +201,7 @@ async function salvar() {
       throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)
     }
     sucesso.value = true
-    editandoId.value = null
-    form.value = formVazio()
+    fecharModal()
     await carregarFontes()
   } catch (e) {
     erro.value = e.message
@@ -297,8 +323,13 @@ function formatarDuracao(ms) {
   return `${(ms / 1000).toFixed(1).replace('.', ',')}s`
 }
 
-onMounted(carregarFontes)
+onMounted(() => {
+  carregarFontes()
+  window.addEventListener('keydown', aoPressionarEsc)
+})
 onUnmounted(() => {
+  window.removeEventListener('keydown', aoPressionarEsc)
+  document.body.style.overflow = ''
   Object.values(execucoes).forEach((e) => {
     if (e.cronometro) clearInterval(e.cronometro)
     if (e.sondagem) clearInterval(e.sondagem)
@@ -318,19 +349,32 @@ onUnmounted(() => {
         </p>
       </div>
 
-      <button class="btn-recarregar" @click="carregarFontes" :disabled="carregandoLista" title="Recarregar lista de fontes">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 2v6h-6" />
-          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-          <path d="M3 22v-6h6" />
-          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-        </svg>
-        <span>Atualizar</span>
-      </button>
+      <div class="topo-acoes">
+        <button class="btn-recarregar" @click="carregarFontes" :disabled="carregandoLista" title="Recarregar lista de fontes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 2v6h-6" />
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+            <path d="M3 22v-6h6" />
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+          <span>Atualizar</span>
+        </button>
+
+        <button class="btn-adicionar-fonte" @click="abrirCadastro">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+          <span>Adicionar fonte</span>
+        </button>
+      </div>
     </header>
 
-    <!-- Seção de Formulário de Cadastro / Edição -->
-    <section class="cartao">
+    <!-- Seção de Formulário de Cadastro / Edição (em modal) -->
+    <div v-if="modalAberto" class="modal-backdrop" @click.self="fecharModal">
+      <div class="modal-dialog">
+        <button class="btn-fechar" @click="fecharModal" aria-label="Fechar">✕</button>
+        <section class="cartao">
       <div class="cartao-header">
         <div class="cartao-header-icone">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -450,7 +494,9 @@ onUnmounted(() => {
           ✕ Falha: {{ erro }}
         </div>
       </form>
-    </section>
+        </section>
+      </div>
+    </div>
 
     <!-- Tabela de Fontes Cadastradas -->
     <section class="cartao">
@@ -1461,5 +1507,77 @@ onUnmounted(() => {
   .cartao {
     padding: 1.1rem;
   }
+}
+/* ----- Cabeçalho: ações ----- */
+.topo-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-adicionar-fonte {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.1rem;
+  background: #15803d;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-adicionar-fonte:hover {
+  background: #166534;
+}
+
+.btn-adicionar-fonte svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ----- Modal do formulário ----- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 9999;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+}
+
+.modal-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+}
+
+.modal-dialog .cartao {
+  margin: 0;
+}
+
+.btn-fechar {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.25rem;
+  z-index: 1;
+}
+
+.btn-fechar:hover {
+  color: #0f172a;
 }
 </style>
