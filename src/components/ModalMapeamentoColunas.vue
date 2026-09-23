@@ -249,7 +249,6 @@ async function remover(id) {
                   <option value="situacao_imovel">situacao_imovel (AT, PE, CA, SU...)</option>
                   <option value="condicao_imovel">condicao_imovel (Aguardando análise, Em análise...)</option>
                   <option value="tipo_imovel">tipo_imovel (IRU, AST, PCT...)</option>
-                  <option value="municipio">municipio (Código IBGE ou Nome)</option>
                 </optgroup>
                 <optgroup label="Área Protegida (UC / TI)">
                   <option value="tipo_area_protegida">tipo_area_protegida (Proteção Integral, Uso Sustentável, TI...)</option>
@@ -262,13 +261,10 @@ async function remover(id) {
                   <option value="tipo_infracao">tipo_infracao (Contra a flora, fauna, poluição...)</option>
                   <option value="tipo_pessoa">tipo_pessoa (PF, PJ)</option>
                   <option value="status_auto_infracao">status_auto_infracao (Lavrado, Homologado, Julgado...)</option>
-                  <option value="municipio">municipio (Código IBGE ou Nome)</option>
                   <option value="orgao">orgao (IBAMA, ICMBio, IAT...)</option>
                 </optgroup>
                 <optgroup label="Embargo Ambiental">
                   <option value="tipo_area_embargo">tipo_area_embargo (Desmatamento, Queimada, Exploração irregular...)</option>
-                  <option value="auto_infracao">auto_infracao (Número do Auto de Infração)</option>
-                  <option value="municipio">municipio (Código IBGE ou Nome)</option>
                   <option value="orgao">orgao (IBAMA, ICMBio, IAT...)</option>
                 </optgroup>
                 <optgroup label="Desmatamento (PRODES)">
@@ -279,7 +275,6 @@ async function remover(id) {
                 <optgroup label="Foco de Calor">
                   <option value="satelite">satelite (AQUA, TERRA, GOES-16, NOAA-20...)</option>
                   <option value="bioma">bioma (Mata Atlântica, Cerrado, Amazônia...)</option>
-                  <option value="municipio">municipio (Código IBGE ou Nome)</option>
                 </optgroup>
                 <optgroup label="Município / Território">
                   <option value="unidade_federativa">unidade_federativa (PR, SP, RJ, SC...)</option>
