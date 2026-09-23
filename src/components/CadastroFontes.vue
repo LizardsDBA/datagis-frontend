@@ -56,6 +56,17 @@ function fecharModal() {
   erro.value = null
 }
 
+// A confirmacao aparece na pagina, ja com o modal fechado, e some sozinha.
+let temporizadorSucesso = null
+
+function mostrarSucesso() {
+  sucesso.value = true
+  clearTimeout(temporizadorSucesso)
+  temporizadorSucesso = setTimeout(() => {
+    sucesso.value = false
+  }, 4000)
+}
+
 function aoPressionarEsc(evento) {
   if (evento.key === 'Escape' && modalAberto.value) fecharModal()
 }
@@ -178,12 +189,6 @@ function editar(fonte) {
  modalAberto.value = true
 }
 
-function cancelarEdicao() {
-  editandoId.value = null
-  form.value = formVazio()
-  erro.value = null
-}
-
 async function salvar() {
   enviando.value = true
   erro.value = null
@@ -200,7 +205,7 @@ async function salvar() {
       const corpo = await resposta.json().catch(() => null)
       throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)
     }
-    sucesso.value = true
+    mostrarSucesso()
     fecharModal()
     await carregarFontes()
   } catch (e) {
@@ -330,6 +335,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', aoPressionarEsc)
   document.body.style.overflow = ''
+  clearTimeout(temporizadorSucesso)
   Object.values(execucoes).forEach((e) => {
     if (e.cronometro) clearInterval(e.cronometro)
     if (e.sondagem) clearInterval(e.sondagem)
@@ -481,21 +487,22 @@ onUnmounted(() => {
             <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
           </button>
 
-          <button v-if="editandoId" type="button" class="botao-secundario" @click="cancelarEdicao">
-            Cancelar Edição
+         <button type="button" class="botao-secundario" @click="fecharModal">
+            Cancelar
           </button>
         </div>
 
-        <div v-if="sucesso" class="alerta-sucesso campo-grupo--full">
-          ✓ Fonte salva com sucesso! O catálogo de dados foi atualizado.
-        </div>
-
+        
         <div v-if="erro" class="alerta-erro campo-grupo--full">
           ✕ Falha: {{ erro }}
         </div>
       </form>
         </section>
       </div>
+    </div>
+
+        <div v-if="sucesso" class="alerta-sucesso alerta-pagina">
+      ✓ Fonte salva com sucesso! O catálogo de dados foi atualizado.
     </div>
 
     <!-- Tabela de Fontes Cadastradas -->
@@ -1511,7 +1518,7 @@ onUnmounted(() => {
 /* ----- Cabeçalho: ações ----- */
 .topo-acoes {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 0.75rem;
 }
 
@@ -1579,5 +1586,9 @@ onUnmounted(() => {
 
 .btn-fechar:hover {
   color: #0f172a;
+}
+
+.alerta-pagina {
+  margin-bottom: 1.25rem;
 }
 </style>
