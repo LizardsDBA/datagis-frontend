@@ -322,6 +322,28 @@ function formatarData(iso) {
   return new Date(iso).toLocaleString('pt-BR')
 }
 
+const DIAS_SEMANA_CRON = {
+  MON: 'segunda', TUE: 'terça', WED: 'quarta', THU: 'quinta',
+  FRI: 'sexta', SAT: 'sábado', SUN: 'domingo',
+}
+
+// Traduz as expressoes que o ConstrutorCron gera. Qualquer outra (modo
+// "Personalizado") aparece como veio, sem tentar adivinhar.
+function descreverCron(expressao) {
+  if (!expressao) return null
+  const campos = expressao.trim().split(/\s+/)
+  if (campos.length !== 6) return expressao
+
+  const [, minuto, hora, diaDoMes, , diaDaSemana] = campos
+  if (!/^\d+$/.test(minuto) || !/^\d+$/.test(hora)) return expressao
+  const horario = `${hora.padStart(2, '0')}:${minuto.padStart(2, '0')}`
+
+  if (diaDoMes === '*' && diaDaSemana === '?') return `Todo dia às ${horario}`
+  if (diaDoMes === '?' && DIAS_SEMANA_CRON[diaDaSemana]) return `Toda ${DIAS_SEMANA_CRON[diaDaSemana]} às ${horario}`
+  if (diaDaSemana === '?' && /^\d+$/.test(diaDoMes)) return `Todo dia ${diaDoMes} às ${horario}`
+  return expressao
+}
+
 function formatarDuracao(ms) {
   if (ms == null) return ''
   if (ms < 1000) return `${ms}ms`
@@ -537,6 +559,7 @@ onUnmounted(() => {
               <th>Modalidade</th>
               <th>Formato</th>
               <th>Status</th>
+              <th>Agendamento</th>
               <th>Última Execução</th>
               <th>Cadastrada em</th>
               <th class="col-acoes-titulo">Ações</th>
@@ -588,6 +611,15 @@ onUnmounted(() => {
                   <span class="badge-tag" :class="fonte.ativo ? 'badge-tag--sucesso' : 'badge-tag--neutro'">
                     {{ fonte.ativo ? 'Ativa' : 'Inativa' }}
                   </span>
+                </td>
+
+                <!-- Agendamento automático (cron do Quartz) -->
+                <td class="celula-agendamento">
+                  <template v-if="fonte.cronExpressao">
+                    <div class="agendamento-texto">{{ descreverCron(fonte.cronExpressao) }}</div>
+                    <code class="agendamento-cron">{{ fonte.cronExpressao }}</code>
+                  </template>
+                  <span v-else class="agendamento-vazio">Somente manual</span>
                 </td>
 
                 <!-- Última Execução e Detalhes de Erro Completos -->
@@ -686,7 +718,7 @@ onUnmounted(() => {
 
               <!-- Linha de Feedback de Execução em Andamento / Concluída -->
               <tr v-if="estadoDe(fonte.id).estado !== 'ocioso'" class="linha-resultado">
-                <td colspan="7">
+                <td colspan="8">
                   <div v-if="estadoDe(fonte.id).estado === 'executando'" class="banner-progresso">
                     <template v-if="estadoDe(fonte.id).progressoUploadPct !== null && estadoDe(fonte.id).progressoUploadPct < 100">
                       <div class="linha-fase">
@@ -1591,4 +1623,31 @@ onUnmounted(() => {
 .alerta-pagina {
   margin-bottom: 1.25rem;
 }
+
+.celula-agendamento {
+  min-width: 150px;
+}
+
+.agendamento-texto {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.agendamento-cron {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+}
+
+.agendamento-vazio {
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
 </style>
