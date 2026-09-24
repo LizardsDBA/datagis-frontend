@@ -18,7 +18,10 @@ export default defineConfig({
         target: 'http://backend:8080',
         changeOrigin: true,
       },
-      '/conjuntos': {
+      // Regex, não prefixo simples: "/conjuntos" (endpoint legado do backend sem
+      // prefixo /api) casava por prefixo com "/conjuntos-dados" também, mandando a
+      // rota da tela nova (SPA, client-side) direto pro backend por engano.
+      '^/conjuntos($|/)': {
         target: 'http://backend:8080',
         changeOrigin: true,
       },
