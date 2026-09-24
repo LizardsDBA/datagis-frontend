@@ -18,6 +18,29 @@ const tiposErro = ref([])
 const statusLista = ref([])
 const carregando = ref(false)
 const erro = ref(null)
+const mensagemSucesso = ref(null)
+let timeoutSucesso = null
+
+function handleAtualizado(res) {
+  if (res?.totalColetivoAprovados > 0) {
+    let msg = `Registro revalidado! Outros ${res.totalColetivoAprovados} registro(s) com erro de domínio também foram revalidados e promovidos.`
+    if (res.lotesLiberados && res.lotesLiberados.length > 0) {
+      msg += ` Lote(s) #${res.lotesLiberados.join(', #')} liberado(s) integralmente para a Silver!`
+    }
+    exibirMensagemSucesso(msg)
+  } else if (res?.lotesLiberados && res.lotesLiberados.length > 0) {
+    exibirMensagemSucesso(`Registro revalidado com sucesso! Lote(s) #${res.lotesLiberados.join(', #')} liberado(s) integralmente para a Silver!`)
+  }
+  carregarTudo()
+}
+
+function exibirMensagemSucesso(msg) {
+  mensagemSucesso.value = msg
+  if (timeoutSucesso) clearTimeout(timeoutSucesso)
+  timeoutSucesso = setTimeout(() => {
+    mensagemSucesso.value = null
+  }, 8000)
+}
 
 // Paginação
 const paginaAtual = ref(1)
@@ -214,6 +237,15 @@ onMounted(() => {
         <span>Atualizar</span>
       </button>
     </header>
+
+    <!-- Banner de Sucesso / Promoção Coletiva -->
+    <transition name="fade">
+      <div v-if="mensagemSucesso" class="banner-sucesso-flutuante">
+        <span class="icone-check">✓</span>
+        <span class="texto-sucesso">{{ mensagemSucesso }}</span>
+        <button class="btn-fechar-banner" @click="mensagemSucesso = null" title="Fechar aviso">&times;</button>
+      </div>
+    </transition>
 
     <!-- Cards de Métricas Interativos (Clicáveis) -->
     <section v-if="metricas" class="grid-metricas">
@@ -534,12 +566,59 @@ onMounted(() => {
       v-if="itemSelecionado"
       :item="itemSelecionado"
       @close="fecharDetalhes"
-      @atualizado="carregarTudo"
+      @atualizado="handleAtualizado"
     />
   </div>
 </template>
 
 <style scoped>
+.banner-sucesso-flutuante {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.3s ease;
+}
+
+.icone-check {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.texto-sucesso {
+  flex: 1;
+}
+
+.btn-fechar-banner {
+  background: transparent;
+  border: none;
+  color: #34d399;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn-fechar-banner:hover {
+  opacity: 0.8;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .pagina-quarentena {
   display: flex;
   flex-direction: column;

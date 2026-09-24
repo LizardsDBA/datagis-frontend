@@ -79,7 +79,7 @@ export async function reprocessarItem(entidade, id, payloadCorrigido, analistaId
     const corpoErro = await resp.json().catch(() => null)
     throw new Error(corpoErro?.erro || corpoErro?.message || `Falha ao reprocessar item: ${resp.statusText}`)
   }
-  return true
+  return await resp.json().catch(() => ({ sucesso: true }))
 }
 
 export async function liberarLote(loteId, analistaId = 1) {

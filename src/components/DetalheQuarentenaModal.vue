@@ -228,8 +228,8 @@ async function onReprocessar() {
   enviando.value = true
   erroAcao.value = null
   try {
-    await reprocessarItem(props.item.entidade, props.item.id, payloadEditado.value)
-    emit('atualizado')
+    const res = await reprocessarItem(props.item.entidade, props.item.id, payloadEditado.value)
+    emit('atualizado', res)
     emit('close')
   } catch (err) {
     erroAcao.value = err.message
