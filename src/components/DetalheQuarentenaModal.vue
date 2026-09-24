@@ -22,7 +22,119 @@ const erroAcao = ref(null)
 const motivoDescarte = ref('')
 const modoEdicao = ref(false)
 const copiado = ref(false)
+const copiadoGeometria = ref(false)
 const payloadEditado = ref(formatarJson(props.item.payloadOriginal))
+
+// Helpers para conversão bidirecional entre WKT e Lista de Coordenadas JSON
+function extrairTipoWkt(wkt) {
+  if (!wkt || typeof wkt !== 'string') return 'POLYGON'
+  const w = wkt.trim().toUpperCase()
+  if (w.startsWith('MULTIPOLYGON')) return 'MULTIPOLYGON'
+  if (w.startsWith('POLYGON')) return 'POLYGON'
+  if (w.startsWith('POINT')) return 'POINT'
+  if (w.startsWith('LINESTRING')) return 'LINESTRING'
+  return 'POLYGON'
+}
+
+function extrairParesCoordenadas(texto) {
+  if (!texto || typeof texto !== 'string') return []
+  const limpo = texto.trim()
+
+  if (limpo.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(limpo)
+      if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
+        // Se for array 1D de pontos [ [lon, lat], ... ]
+        if (typeof parsed[0][0] === 'number') return parsed
+        // Se for aninhado [ [ [lon, lat], ... ] ]
+        if (Array.isArray(parsed[0][0])) return parsed[0]
+      }
+    } catch (e) {}
+  }
+
+  // Regex para capturar números decimais [lon, lat] de WKT ou texto livre
+  const coordRegex = /(-?\d+\.?\d*(?:[eE][-+]?\d+)?)\s+(-?\d+\.?\d*(?:[eE][-+]?\d+)?)/g
+  const lista = []
+  let match
+  while ((match = coordRegex.exec(limpo)) !== null) {
+    const lon = parseFloat(match[1])
+    const lat = parseFloat(match[2])
+    if (!isNaN(lon) && !isNaN(lat)) {
+      lista.push([lon, lat])
+    }
+  }
+  return lista
+}
+
+function formatarCoordenadasEmListaJson(coords) {
+  if (!coords || !coords.length) return '[]'
+  const linhas = coords.map((p) => `  [${p[0]}, ${p[1]}]`)
+  return '[\n' + linhas.join(',\n') + '\n]'
+}
+
+function converterParaWkt(textoJsonOuWkt, tipoPrimitivo = 'POLYGON') {
+  if (!textoJsonOuWkt || !textoJsonOuWkt.trim()) return ''
+  const limpo = textoJsonOuWkt.trim()
+
+  if (limpo.toUpperCase().startsWith('POLYGON') || limpo.toUpperCase().startsWith('MULTIPOLYGON')) {
+    return limpo
+  }
+
+  const coords = extrairParesCoordenadas(limpo)
+  if (coords.length > 0) {
+    const pts = coords.map((c) => `${c[0]} ${c[1]}`).join(', ')
+    if (tipoPrimitivo.toUpperCase().includes('MULTI')) {
+      return `MULTIPOLYGON (((${pts})))`
+    }
+    return `POLYGON ((${pts}))`
+  }
+
+  return limpo
+}
+
+// Inicialização: carrega as coordenadas no formato de lista JSON separada
+const tipoGeometriaOriginal = ref(extrairTipoWkt(props.item.geometriaWkt || props.item.valorRecebido))
+const coordsIniciais = extrairParesCoordenadas(props.item.geometriaWkt || props.item.valorRecebido)
+const geometriaEditada = ref(
+  coordsIniciais.length > 0
+    ? formatarCoordenadasEmListaJson(coordsIniciais)
+    : (props.item.geometriaWkt || props.item.valorRecebido || '')
+)
+const modoVisualizacaoWkt = ref(false)
+
+const totalVertices = computed(() => {
+  return extrairParesCoordenadas(geometriaEditada.value).length
+})
+
+function alternarModoVisualizacaoGeometria() {
+  modoVisualizacaoWkt.value = !modoVisualizacaoWkt.value
+  if (modoVisualizacaoWkt.value) {
+    geometriaEditada.value = converterParaWkt(geometriaEditada.value, tipoGeometriaOriginal.value)
+  } else {
+    const coords = extrairParesCoordenadas(geometriaEditada.value)
+    geometriaEditada.value = formatarCoordenadasEmListaJson(coords)
+  }
+}
+
+// Identificação estrita de erros de geometria
+const isErroGeometria = computed(() => {
+  const cod = (props.item.tipoErroCodigo || '').toUpperCase()
+  const campo = (props.item.campoProblema || '').toLowerCase()
+  const codigosGeometria = [
+    'GEOMETRIA_NULA',
+    'GEOMETRIA_MALFORMADA',
+    'GEOMETRIA_INVALIDA',
+    'GEOMETRIA_TIPO_INCOMPATIVEL',
+    'FORA_DO_RECORTE_TERRITORIAL'
+  ]
+  return codigosGeometria.includes(cod) ||
+         cod.includes('GEOMETRIA') ||
+         cod.includes('TERRITORIAL') ||
+         campo === 'geometria' ||
+         campo === 'geometria_wkt' ||
+         campo === 'geometry' ||
+         campo === 'geom'
+})
 
 // Estado para Adição ao Domínio Dinâmico
 const modoAdicionarDominio = ref(false)
@@ -56,6 +168,13 @@ function copiarPayload() {
   navigator.clipboard.writeText(payloadEditado.value)
   copiado.value = true
   setTimeout(() => { copiado.value = false }, 2000)
+}
+
+function copiarGeometria() {
+  if (!geometriaEditada.value) return
+  navigator.clipboard.writeText(geometriaEditada.value)
+  copiadoGeometria.value = true
+  setTimeout(() => { copiadoGeometria.value = false }, 2000)
 }
 
 function gerarSlug(texto) {
@@ -228,7 +347,13 @@ async function onReprocessar() {
   enviando.value = true
   erroAcao.value = null
   try {
-    const res = await reprocessarItem(props.item.entidade, props.item.id, payloadEditado.value)
+    let res
+    if (isErroGeometria.value) {
+      const wktFinal = converterParaWkt(geometriaEditada.value, tipoGeometriaOriginal.value)
+      res = await reprocessarItem(props.item.entidade, props.item.id, null, 1, wktFinal)
+    } else {
+      res = await reprocessarItem(props.item.entidade, props.item.id, payloadEditado.value, 1, null)
+    }
     emit('atualizado', res)
     emit('close')
   } catch (err) {
@@ -432,8 +557,57 @@ async function onReprocessar() {
           </div>
         </section>
 
-        <!-- Visualizador e Editor do Payload JSON -->
-        <section class="secao-payload">
+        <!-- Editor de Polígono / Geometria Completa - Exclusivo para Erros de Geometria -->
+        <section v-if="isErroGeometria" class="secao-geometria">
+          <div class="geometria-header">
+            <div class="geometria-titulo-container">
+              <div class="titulo-linha">
+                <span class="icone-gis">🗺️</span>
+                <h3>Lista de Coordenadas do Polígono</h3>
+                <span class="badge-srid">SRID 4674 • SIRGAS 2000</span>
+                <span v-if="totalVertices > 0" class="badge-vertices">{{ totalVertices }} vértices</span>
+              </div>
+              <p class="geometria-sub">Cada coordenada está separada em formato de lista [Longitude, Latitude] para fácil inspeção e correção manual</p>
+            </div>
+            <div class="geometria-acoes">
+              <button type="button" class="btn-secundario-sm" @click="alternarModoVisualizacaoGeometria" :title="modoVisualizacaoWkt ? 'Ver lista de coordenadas' : 'Ver WKT completo'">
+                {{ modoVisualizacaoWkt ? 'Formato Lista [JSON]' : 'Formato WKT OGC' }}
+              </button>
+              <button type="button" class="btn-copiar-wkt" @click="copiarGeometria" title="Copiar coordenadas para a área de transferência">
+                {{ copiadoGeometria ? '✓ Copiado!' : (modoVisualizacaoWkt ? 'Copiar WKT' : 'Copiar Lista [JSON]') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="geometria-editor">
+            <div class="editor-subtitulo-linha">
+              <label class="label">
+                {{ modoVisualizacaoWkt ? 'Geometria WKT (Linha Contínua):' : 'Coordenadas do Polígono em Lista [Longitude, Latitude]:' }}
+              </label>
+              <span class="dica-contador" v-if="geometriaEditada">{{ geometriaEditada.length }} caracteres • {{ totalVertices }} pontos</span>
+            </div>
+            <textarea
+              v-model="geometriaEditada"
+              class="campo-textarea campo-textarea--geometria"
+              rows="11"
+              :placeholder="modoVisualizacaoWkt ? 'POLYGON ((...))' : '[\n  [-51.4, -24.2],\n  [-51.3, -24.2]\n]'"
+              spellcheck="false"
+            ></textarea>
+            <div class="geometria-guia">
+              <div class="guia-item">
+                <span class="guia-bullet">📍</span>
+                <span><strong>Formato das Coordenadas:</strong> Lista ordenada de pares <code>[longitude, latitude]</code>. O primeiro e o último ponto devem ser iguais para fechar o polígono.</span>
+              </div>
+              <div class="guia-item">
+                <span class="guia-bullet">📐</span>
+                <span><strong>Recorte Territorial do Paraná:</strong> Longitude entre <code>-55.00</code> e <code>-47.50</code>, Latitude entre <code>-27.20</code> e <code>-22.00</code>.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Visualizador e Editor do Payload JSON (Exibido apenas quando NÃO for erro de geometria) -->
+        <section v-else class="secao-payload">
           <div class="payload-header">
             <div>
               <h3>Payload Original (Camada Bronze)</h3>
@@ -1168,6 +1342,162 @@ async function onReprocessar() {
   border-radius: 6px;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+/* Seção Especializada: Edição de Polígono / Geometria WKT */
+.secao-geometria {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.geometria-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.geometria-titulo-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icone-gis {
+  font-size: 1.25rem;
+}
+
+.titulo-linha h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.badge-srid {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  letter-spacing: 0.03em;
+}
+
+.badge-vertices {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.geometria-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.btn-copiar-wkt {
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  padding: 0.45rem 0.95rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
+}
+
+.btn-copiar-wkt:hover {
+  background: #0369a1;
+}
+
+.geometria-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.editor-subtitulo-linha {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dica-contador {
+  font-size: 0.74rem;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.campo-textarea--geometria {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: #0f172a;
+  color: #38bdf8;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.campo-textarea--geometria:focus {
+  outline: none;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.geometria-guia {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 1px solid #e2e8f0;
+}
+
+.guia-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.guia-item code {
+  background: #e2e8f0;
+  color: #0f172a;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.76rem;
+}
+
+.guia-bullet {
+  font-size: 0.9rem;
+  line-height: 1.2;
 }
 
 @media (max-width: 640px) {

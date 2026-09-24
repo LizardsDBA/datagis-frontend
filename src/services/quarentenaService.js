@@ -69,11 +69,11 @@ export async function iniciarAnaliseItem(entidade, id, analistaId = 1) {
   return true
 }
 
-export async function reprocessarItem(entidade, id, payloadCorrigido, analistaId = 1) {
+export async function reprocessarItem(entidade, id, payloadCorrigido, analistaId = 1, geometriaCorrigida = null) {
   const resp = await fetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}/reprocessar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ payloadCorrigido, analistaId }),
+    body: JSON.stringify({ payloadCorrigido, analistaId, geometriaCorrigida }),
   })
   if (!resp.ok) {
     const corpoErro = await resp.json().catch(() => null)
