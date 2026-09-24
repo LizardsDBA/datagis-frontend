@@ -2,8 +2,9 @@
 // Painel guiado pra montar uma expressao cron do Quartz (6 campos: segundo minuto
 // hora dia-do-mes mes dia-da-semana) sem precisar saber a sintaxe de cor. O campo de
 // texto continua editavel direto no modo "Personalizado" — ninguem fica preso ao
-// construtor se precisar de algo que ele nao cobre. O cron nao e lido por nada ainda
-// (Quartz so agenda de verdade numa fatia futura), mas ja fica cadastrado certo.
+// construtor se precisar de algo que ele nao cobre. O valor alimenta o agendamento
+// do Quartz (LIZARDS-10): o AgendadorInicializacaoRunner le fonte_dado.cron_expressao
+// na subida do backend e cria o trigger de cada fonte ativa.
 import { ref, computed, watch } from 'vue'
 
 const props = defineProps({ modelValue: { type: String, default: '' } })

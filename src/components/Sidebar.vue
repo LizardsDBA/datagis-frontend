@@ -33,6 +33,12 @@ const itens = [
     icone: 'conjuntos',
     descricao: 'Cadastro & Mapa Territorial',
   },
+  {
+    rota: '/gold',
+    rotulo: 'Indicadores & Imóveis',
+    icone: 'gold',
+    descricao: 'Camada Gold',
+  },
 ]
 
 function navegar() {
@@ -106,6 +112,13 @@ function navegar() {
             <svg v-else-if="item.icone === 'conjuntos'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
+            </svg>
+            <!-- Ícone para a camada Gold -->
+            <svg v-else-if="item.icone === 'gold'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19V5" />
+              <path d="M4 5h11l-2 3 2 3H4" />
+              <path d="M16 15h4" />
+              <path d="M18 13v4" />
             </svg>
           </div>
           <div class="item-texto">
