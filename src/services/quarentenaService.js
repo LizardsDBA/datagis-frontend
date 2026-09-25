@@ -13,8 +13,16 @@ export async function buscarItensQuarentena(params = {}) {
   if (params.tamanho !== undefined) query.set('tamanho', params.tamanho)
 
   const resp = await fetch(`/api/quarentena?${query.toString()}`)
-  if (!resp.ok) throw new Error(`Falha ao carregar itens da quarentena: ${resp.statusText}`)
-  return resp.json()
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || `Falha ao carregar itens da quarentena: ${resp.statusText}`)
+  }
+  const totalHeader = resp.headers.get('X-Total-Count')
+  const dados = await resp.json()
+  return {
+    itens: dados,
+    totalCount: totalHeader ? parseInt(totalHeader, 10) : dados.length,
+  }
 }
 
 export async function buscarMetricasQuarentena() {
@@ -61,14 +69,17 @@ export async function iniciarAnaliseItem(entidade, id, analistaId = 1) {
   return true
 }
 
-export async function reprocessarItem(entidade, id, payloadCorrigido, analistaId = 1) {
+export async function reprocessarItem(entidade, id, payloadCorrigido, analistaId = 1, geometriaCorrigida = null) {
   const resp = await fetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}/reprocessar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ payloadCorrigido, analistaId }),
+    body: JSON.stringify({ payloadCorrigido, analistaId, geometriaCorrigida }),
   })
-  if (!resp.ok) throw new Error('Falha ao reprocessar item')
-  return true
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || `Falha ao reprocessar item: ${resp.statusText}`)
+  }
+  return await resp.json().catch(() => ({ sucesso: true }))
 }
 
 export async function liberarLote(loteId, analistaId = 1) {
@@ -77,7 +88,10 @@ export async function liberarLote(loteId, analistaId = 1) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ analistaId }),
   })
-  if (!resp.ok) throw new Error('Falha ao liberar lote para a Silver')
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || `Falha ao liberar lote para a Silver: ${resp.statusText}`)
+  }
   return true
 }
 
@@ -114,3 +128,23 @@ export async function excluirMapeamento(fonteId, id) {
   if (!resp.ok) throw new Error('Falha ao excluir mapeamento')
   return true
 }
+
+export async function adicionarValorDominio(dados) {
+  const resp = await fetch('/api/quarentena/dominios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dados),
+  })
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || 'Falha ao adicionar valor ao domínio')
+  }
+  return resp.json()
+}
+
+export async function buscarTiposAreaProtegida() {
+  const resp = await fetch('/api/quarentena/dominios/tipos-area-protegida')
+  if (!resp.ok) throw new Error('Falha ao listar tipos de áreas protegidas')
+  return resp.json()
+}
+
