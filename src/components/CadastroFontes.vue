@@ -712,6 +712,20 @@ onUnmounted(() => {
                         <path d="M8 5v14l11-7z" />
                       </svg>
                     </button>
+
+                    <button
+                      class="btn-acao-circulo btn-conjunto-dados"
+                      title="Ver Conjunto de Dados (Bronze / Silver / Quarentena)"
+                      @click="router.push('/conjuntos-dados/' + fonte.id)"
+                      aria-label="Ver conjunto de dados"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -1281,8 +1295,8 @@ onUnmounted(() => {
 }
 
 .grupo-botoes-acoes {
-  display: inline-flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.45rem;
 }
 
@@ -1338,6 +1352,17 @@ onUnmounted(() => {
 .btn-executar:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.btn-conjunto-dados {
+  background: #faf5ff;
+  border-color: #e9d5ff;
+  color: #7e22ce;
+}
+
+.btn-conjunto-dados:hover {
+  background: #f3e8ff;
+  border-color: #c084fc;
 }
 
 .spinner-sm-branco {

@@ -26,6 +26,50 @@ const secoesExpandidas = reactive({
   tabela: true
 })
 
+const mensagemSucesso = ref(null)
+let timeoutSucesso = null
+
+function handleAtualizado(res) {
+  if (res?.totalColetivoAprovados > 0) {
+    let msg = `Registro revalidado! Outros ${res.totalColetivoAprovados} registro(s) com erro de domínio também foram revalidados e promovidos.`
+    if (res.lotesLiberados && res.lotesLiberados.length > 0) {
+      msg += ` Lote(s) #${res.lotesLiberados.join(', #')} liberado(s) integralmente para a Silver!`
+    }
+    exibirMensagemSucesso(msg)
+  } else if (res?.lotesLiberados && res.lotesLiberados.length > 0) {
+    exibirMensagemSucesso(`Registro revalidado com sucesso! Lote(s) #${res.lotesLiberados.join(', #')} liberado(s) integralmente para a Silver!`)
+  }
+  carregarTudo()
+}
+
+function exibirMensagemSucesso(msg) {
+  mensagemSucesso.value = msg
+  if (timeoutSucesso) clearTimeout(timeoutSucesso)
+  timeoutSucesso = setTimeout(() => {
+    mensagemSucesso.value = null
+  }, 8000)
+}
+
+// Paginação
+const paginaAtual = ref(1)
+const tamanhoPagina = ref(50)
+const totalItens = ref(0)
+
+const totalPaginas = computed(() => {
+  if (!totalItens.value || totalItens.value <= 0) return 1
+  return Math.ceil(totalItens.value / tamanhoPagina.value)
+})
+
+const indiceInicio = computed(() => {
+  if (totalItens.value === 0) return 0
+  return (paginaAtual.value - 1) * tamanhoPagina.value + 1
+})
+
+const indiceFim = computed(() => {
+  if (totalItens.value === 0) return 0
+  return Math.min(paginaAtual.value * tamanhoPagina.value, totalItens.value)
+})
+
 const motivosExpandidos = reactive({})
 
 function alternarMotivoExpandido(itemKey) {
@@ -40,7 +84,8 @@ const filtroLoteId = ref(route.query.loteId ? String(route.query.loteId) : '')
 
 function selecionarFiltroStatus(st) {
   filtroStatus.value = st
-  aplicarFiltros()
+  paginaAtual.value = 1
+  aplicarFiltros(true)
 }
 
 const itemSelecionado = ref(null)
@@ -67,14 +112,15 @@ async function carregarTudo() {
         status: filtroStatus.value,
         tipoErro: filtroTipoErro.value,
         loteIngestaoId: filtroLoteId.value ? Number(filtroLoteId.value) : undefined,
-        pagina: 0,
-        tamanho: 50,
+        pagina: paginaAtual.value - 1,
+        tamanho: tamanhoPagina.value,
       }),
       buscarTiposErro(),
       buscarStatusAnalise(),
     ])
     metricas.value = met
-    itens.value = itensRes
+    itens.value = itensRes.itens
+    totalItens.value = itensRes.totalCount
     tiposErro.value = errRes
     statusLista.value = stRes
   } catch (e) {
@@ -84,18 +130,23 @@ async function carregarTudo() {
   }
 }
 
-async function aplicarFiltros() {
+async function aplicarFiltros(resetarPagina = true) {
+  if (resetarPagina) {
+    paginaAtual.value = 1
+  }
   carregando.value = true
   erro.value = null
   try {
-    itens.value = await buscarItensQuarentena({
+    const res = await buscarItensQuarentena({
       entidade: filtroEntidade.value,
       status: filtroStatus.value,
       tipoErro: filtroTipoErro.value,
       loteIngestaoId: filtroLoteId.value ? Number(filtroLoteId.value) : undefined,
-      pagina: 0,
-      tamanho: 50,
+      pagina: paginaAtual.value - 1,
+      tamanho: tamanhoPagina.value,
     })
+    itens.value = res.itens
+    totalItens.value = res.totalCount
   } catch (e) {
     erro.value = e.message
   } finally {
@@ -103,16 +154,30 @@ async function aplicarFiltros() {
   }
 }
 
+function mudarPagina(novaPagina) {
+  if (novaPagina < 1 || novaPagina > totalPaginas.value || novaPagina === paginaAtual.value) return
+  paginaAtual.value = novaPagina
+  aplicarFiltros(false)
+}
+
+function mudarTamanhoPagina(novoTamanho) {
+  tamanhoPagina.value = Number(novoTamanho)
+  paginaAtual.value = 1
+  aplicarFiltros(false)
+}
+
 function filtrarPorLote(id) {
   filtroLoteId.value = String(id)
+  paginaAtual.value = 1
   router.replace({ query: { loteId: id } })
-  aplicarFiltros()
+  aplicarFiltros(false)
 }
 
 function removerFiltroLote() {
   filtroLoteId.value = ''
+  paginaAtual.value = 1
   router.replace({ query: {} })
-  aplicarFiltros()
+  aplicarFiltros(false)
 }
 
 const itensFiltrados = computed(() => {
@@ -176,6 +241,16 @@ onMounted(() => {
       </button>
     </header>
 
+    <!-- Banner de Sucesso / Promoção Coletiva -->
+    <transition name="fade">
+      <div v-if="mensagemSucesso" class="banner-sucesso-flutuante">
+        <span class="icone-check">✓</span>
+        <span class="texto-sucesso">{{ mensagemSucesso }}</span>
+        <button class="btn-fechar-banner" @click="mensagemSucesso = null" title="Fechar aviso">&times;</button>
+      </div>
+    </transition>
+
+    <!-- Cards de Métricas Interativos (Clicáveis) -->
     <section v-if="metricas" class="grid-metricas">
       <div class="card-metrica card-metrica--clicavel" :class="{ 'card-metrica--ativo': filtroStatus === 'todos' }" @click="selecionarFiltroStatus('todos')">
         <span class="metrica-label">Total Retido</span>
@@ -278,10 +353,14 @@ onMounted(() => {
         </button>
       </div>
       <div v-show="secoesExpandidas.tabela" class="acordeao-corpo">
+        <!-- Banner Informativo quando filtrado por Lote -->
         <div v-if="filtroLoteId" class="banner-filtro-lote">
           <div class="banner-lote-info">
             <span class="badge-lote-banner">LOTE #{{ filtroLoteId }}</span>
-            <span>Exibindo inconsistências do <strong>Lote #{{ filtroLoteId }}</strong>. Lote retido e <strong>0 registros foram para a Silver</strong>.</span>
+            <span>
+              Exibindo inconsistências do <strong>Lote #{{ filtroLoteId }}</strong>. Pela regra de integridade total,
+              este lote está retido e <strong>0 registros foram para a Silver</strong> até sua liberação.
+            </span>
           </div>
           <div class="banner-lote-acoes">
             <button class="btn-banner-link" @click="router.push('/lotes')">Ver no Pipeline →</button>
@@ -289,7 +368,10 @@ onMounted(() => {
           </div>
         </div>
 
-        <div v-if="erro" class="banner-erro">✕ {{ erro }}</div>
+        <!-- Banner de Erro Global -->
+        <div v-if="erro" class="banner-erro">
+          ✕ {{ erro }}
+        </div>
 
         <section class="tabela-container">
           <div v-if="carregando" class="estado-carregando">
@@ -303,7 +385,7 @@ onMounted(() => {
               <path d="m9 12 2 2 4-4" />
             </svg>
             <h3>Nenhuma inconsistência encontrada</h3>
-            <p>Nenhum registro retido corresponde aos filtros selecionados.</p>
+            <p>Nenhum registro retido corresponde aos filtros selecionados no momento.</p>
           </div>
 
           <div v-else class="tabela-responsiva-wrapper">
@@ -338,9 +420,8 @@ onMounted(() => {
                       <p class="motivo-texto" :class="{ 'motivo-expandido': motivosExpandidos[item.entidade + '-' + item.id] }">
                         {{ item.motivoRejeicao }}
                       </p>
-                      <button v-if="item.motivoRejeicao && item.motivoRejeicao.length > 95" type="button" class="btn-toggle-acordeao mt-2" @click="alternarMotivoExpandido(item.entidade + '-' + item.id)">
-                        <span>{{ motivosExpandidos[item.entidade + '-' + item.id] ? 'Recolher motivo' : 'Expandir motivo' }}</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" :class="{ 'icone-rotacionado': !motivosExpandidos[item.entidade + '-' + item.id] }"><polyline points="18 15 12 9 6 15" /></svg>
+                      <button v-if="item.motivoRejeicao && item.motivoRejeicao.length > 95" type="button" class="btn-toggle-motivo" @click="alternarMotivoExpandido(item.entidade + '-' + item.id)">
+                        {{ motivosExpandidos[item.entidade + '-' + item.id] ? '▲ Recolher' : '▼ Ver texto completo' }}
                       </button>
                     </div>
                   </td>
@@ -352,24 +433,107 @@ onMounted(() => {
                   </td>
                   <td><span class="badge-tag" :class="badgeStatus(item.statusAnaliseCodigo)">{{ item.statusAnaliseDescricao || item.statusAnaliseCodigo }}</span></td>
                   <td class="col-acao-td">
-                    <button class="btn-inspecionar" @click="abrirDetalhes(item)" title="Inspecionar detalhes">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-    <span>Inspecionar</span>
-  </button>
-</td>
+                    <button class="btn-inspecionar" @click="abrirDetalhes(item)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                      <span>Inspecionar</span>
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Barra de Paginação -->
+          <div v-if="totalItens > 0" class="paginacao-container">
+            <div class="paginacao-info">
+              Exibindo <strong>{{ indiceInicio.toLocaleString('pt-BR') }}</strong> a <strong>{{ indiceFim.toLocaleString('pt-BR') }}</strong> de <strong>{{ totalItens.toLocaleString('pt-BR') }}</strong> registros
+              <span v-if="filtroLoteId" class="paginacao-lote-tag">no Lote #{{ filtroLoteId }}</span>
+            </div>
+
+            <div class="paginacao-controles">
+              <div class="paginacao-tamanho">
+                <label class="rotulo-paginacao">Itens por página:</label>
+                <select :value="tamanhoPagina" @change="mudarTamanhoPagina($event.target.value)" class="select-tamanho">
+                  <option :value="25">25</option>
+                  <option :value="50">50</option>
+                  <option :value="100">100</option>
+                  <option :value="200">200</option>
+                </select>
+              </div>
+
+              <div class="paginacao-botoes">
+                <button type="button" class="btn-pag" :disabled="paginaAtual <= 1 || carregando" @click="mudarPagina(1)" title="Primeira página">««</button>
+                <button type="button" class="btn-pag" :disabled="paginaAtual <= 1 || carregando" @click="mudarPagina(paginaAtual - 1)" title="Página anterior">◀ Anterior</button>
+                <span class="paginacao-status">
+                  Página <strong>{{ paginaAtual }}</strong> de <strong>{{ totalPaginas }}</strong>
+                </span>
+                <button type="button" class="btn-pag" :disabled="paginaAtual >= totalPaginas || carregando" @click="mudarPagina(paginaAtual + 1)" title="Próxima página">Próxima ▶</button>
+                <button type="button" class="btn-pag" :disabled="paginaAtual >= totalPaginas || carregando" @click="mudarPagina(totalPaginas)" title="Última página">»»</button>
+              </div>
+            </div>
           </div>
         </section>
       </div>
     </div>
 
-    <DetalheQuarentenaModal v-if="itemSelecionado" :item="itemSelecionado" @close="fecharDetalhes" @atualizado="carregarTudo" />
+    <!-- Modal de Detalhes e Correção do Operador -->
+    <DetalheQuarentenaModal
+      v-if="itemSelecionado"
+      :item="itemSelecionado"
+      @close="fecharDetalhes"
+      @atualizado="handleAtualizado"
+    />
   </div>
 </template>
 
 <style scoped>
+.banner-sucesso-flutuante {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.3s ease;
+}
+
+.icone-check {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.texto-sucesso {
+  flex: 1;
+}
+
+.btn-fechar-banner {
+  background: transparent;
+  border: none;
+  color: #34d399;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn-fechar-banner:hover {
+  opacity: 0.8;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .pagina-quarentena {
   display: flex;
   flex-direction: column;
@@ -444,14 +608,12 @@ onMounted(() => {
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* Distribui os itens para alinhar base e topo */
+  justify-content: space-between;
   gap: 0.25rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: all 0.15s ease;
-  height: 100%; /* Garante que todos os cards tenham a mesma altura do grid */
+  height: 100%;
 }
-
-
 
 .metrica-label {
   font-size: 0.74rem;
@@ -459,7 +621,7 @@ onMounted(() => {
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  min-height: 2.2rem; /* Reserva o espaço exato de duas linhas para todos os cards */
+  min-height: 2.2rem;
   display: flex;
   align-items: flex-start;
 }
@@ -476,23 +638,23 @@ onMounted(() => {
 
 .card-metrica:first-child,
 .card-metrica--total {
-  border-left: 5px solid #0f172a !important; /* Preto / Grafite escuro */
+  border-left: 5px solid #0f172a !important;
 }
 
 .card-metrica--pendente {
-  border-left: 5px solid #f59e0b !important; /* Laranja */
+  border-left: 5px solid #f59e0b !important;
 }
 
 .card-metrica--analise {
-  border-left: 5px solid #0ea5e9 !important; /* Ciano / Azul */
+  border-left: 5px solid #0ea5e9 !important;
 }
 
 .card-metrica--sucesso {
-  border-left: 5px solid #16a34a !important; /* Verde */
+  border-left: 5px solid #16a34a !important;
 }
 
 .card-metrica--descarte {
-  border-left: 5px solid #64748b !important; /* Cinza */
+  border-left: 5px solid #64748b !important;
 }
 
 .card-metrica:first-child .metrica-valor,
@@ -516,7 +678,6 @@ onMounted(() => {
   color: #64748b;
 }
 
-/* Efeito de clique (ativo) com realce na cor do card */
 .card-metrica:first-child.card-metrica--ativo,
 .card-metrica--total.card-metrica--ativo {
   border-color: #0f172a !important;
@@ -543,40 +704,6 @@ onMounted(() => {
   box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.3) !important;
 }
 
-/* Efeito de clique (ativo): ressalta na cor correspondente do KPI */
-.card-metrica--total.card-metrica--ativo {
-  border-color: #0f172a !important;
-  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.35) !important;
-}
-
-.card-metrica--pendente.card-metrica--ativo {
-  border-color: #f59e0b !important;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3) !important;
-}
-
-.card-metrica--analise.card-metrica--ativo {
-  border-color: #0ea5e9 !important;
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.3) !important;
-}
-
-.card-metrica--sucesso.card-metrica--ativo {
-  border-color: #16a34a !important;
-  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.3) !important;
-}
-
-.card-metrica--descarte.card-metrica--ativo {
-  border-color: #64748b !important;
-  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.3) !important;
-}
-
-.metrica-label {
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
 .metrica-valor {
   font-size: 1.85rem;
   font-weight: 800;
@@ -587,11 +714,6 @@ onMounted(() => {
   font-size: 0.74rem;
   color: #94a3b8;
 }
-
-.card-metrica--pendente .metrica-valor { color: #d97706; }
-.card-metrica--analise .metrica-valor { color: #0284c7; }
-.card-metrica--sucesso .metrica-valor { color: #16a34a; }
-.card-metrica--descarte .metrica-valor { color: #64748b; }
 
 /* Estilos do Novo Banner Fino (Ofensor) */
 .secao-ofensor {
@@ -650,7 +772,6 @@ onMounted(() => {
   text-transform: uppercase;
 }
 
-/* Restante do CSS Original */
 .card-acordeao {
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -933,9 +1054,197 @@ onMounted(() => {
 .btn-inspecionar {
   display: inline-flex; align-items: center; gap: 0.35rem; background: #ffffff; border: 1px solid #cbd5e1; color: #1e293b; font-weight: 700; font-size: 0.78rem; padding: 0.45rem 0.85rem; border-radius: 6px; cursor: pointer;
 }
-.btn-inspecionar svg { width: 0.9rem; height: 0.9rem; color: #64748b; }
-.estado-carregando, .estado-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3.5rem 1rem; color: #64748b; gap: 0.6rem; text-align: center; }
-.estado-vazio svg { width: 2.5rem; height: 2.5rem; color: #94a3b8; }
-.spinner { width: 2rem; height: 2rem; border: 3px solid #e2e8f0; border-top-color: #15803d; border-radius: 50%; animation: girar 0.65s linear infinite; }
-@keyframes girar { to { transform: rotate(360deg); } }
+
+.btn-inspecionar svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: #64748b;
+}
+
+.btn-inspecionar:hover {
+  background: #15803d;
+  color: #ffffff;
+  border-color: #15803d;
+}
+
+.btn-inspecionar:hover svg {
+  color: #ffffff;
+}
+
+.estado-carregando,
+.estado-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 1rem;
+  color: #64748b;
+  gap: 0.6rem;
+  text-align: center;
+}
+
+.estado-vazio svg {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #94a3b8;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #e2e8f0;
+  border-top-color: #15803d;
+  border-radius: 50%;
+  animation: girar 0.65s linear infinite;
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+.paginacao-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  background-color: #ffffff;
+  border-top: 1px solid #f1f5f9;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.paginacao-info {
+  font-size: 0.84rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.paginacao-info strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.paginacao-lote-tag {
+  background-color: #f1f5f9;
+  color: #475569;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.25rem;
+}
+
+.paginacao-controles {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.paginacao-tamanho {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.rotulo-paginacao {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.select-tamanho {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #1e293b;
+  background-color: #f8fafc;
+  cursor: pointer;
+  outline: none;
+}
+
+.select-tamanho:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.15);
+}
+
+.paginacao-botoes {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-pag {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-pag:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.btn-pag:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.paginacao-status {
+  font-size: 0.82rem;
+  color: #475569;
+  padding: 0 0.4rem;
+}
+
+.paginacao-status strong {
+  color: #0f172a;
+}
+
+@media (max-width: 768px) {
+  .topo-pagina {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-atualizar {
+    justify-content: center;
+  }
+
+  .banner-filtro-lote {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .paginacao-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+  }
+
+  .paginacao-controles {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .paginacao-botoes {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
 </style>
