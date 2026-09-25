@@ -224,8 +224,8 @@ onMounted(() => {
   <div class="pagina-quarentena">
     <header class="topo-pagina">
       <div>
-        <p class="etiqueta">QUALIDADE & TRIAGEM</p>
-        <h1 class="titulo">Quarentena & Qualidade de Dados</h1>
+        <p class="etiqueta">QUALIDADE e TRIAGEM</p>
+        <h1 class="titulo">Quarentena e Qualidade de Dados</h1>
         <p class="subtitulo">
           Auditoria de inconsistências e resolução de pendências antes da promoção definitiva para a camada Silver.
         </p>
@@ -268,7 +268,7 @@ onMounted(() => {
         <span class="metrica-sub">Em tratamento ativo</span>
       </div>
       <div class="card-metrica card-metrica--sucesso card-metrica--clicavel" :class="{ 'card-metrica--ativo': filtroStatus === 'CORRIGIDO_REPROCESSADO' }" @click="selecionarFiltroStatus('CORRIGIDO_REPROCESSADO')">
-        <span class="metrica-label">Corrigidos & Promovidos</span>
+        <span class="metrica-label">Corrigidos e Promovidos</span>
         <span class="metrica-valor">{{ metricas.totalCorrigidos }}</span>
         <span class="metrica-sub">Liberados para Silver</span>
       </div>
@@ -354,12 +354,20 @@ onMounted(() => {
       </div>
       <div v-show="secoesExpandidas.tabela" class="acordeao-corpo">
         <!-- Banner Informativo quando filtrado por Lote -->
-        <div v-if="filtroLoteId" class="banner-filtro-lote">
+        <!-- Só fala em inconsistência quando a lista realmente trouxe registros; com a lista vazia vira um aviso neutro de filtro -->
+        <div
+          v-if="filtroLoteId && !carregando"
+          class="banner-filtro-lote"
+          :class="{ 'banner-filtro-lote--neutro': itensFiltrados.length === 0 }"
+        >
           <div class="banner-lote-info">
             <span class="badge-lote-banner">LOTE #{{ filtroLoteId }}</span>
-            <span>
-              Exibindo inconsistências do <strong>Lote #{{ filtroLoteId }}</strong>. Pela regra de integridade total,
-              este lote está retido e <strong>0 registros foram para a Silver</strong> até sua liberação.
+            <span v-if="itensFiltrados.length > 0">
+              Estes são os problemas encontrados no <strong>Lote #{{ filtroLoteId }}</strong>. Enquanto eles não forem resolvidos,
+              <strong>nenhum registro do lote vai para a Silver</strong>.
+            </span>
+            <span v-else>
+              Mostrando apenas o <strong>Lote #{{ filtroLoteId }}</strong>.
             </span>
           </div>
           <div class="banner-lote-acoes">
@@ -395,8 +403,8 @@ onMounted(() => {
                   <th>Chave Natural / ID</th>
                   <th>Entidade</th>
                   <th>Tipo de Erro</th>
-                  <th>Campo & Motivo da Rejeição</th>
-                  <th>Origem & Lote</th>
+                  <th>Campo e Motivo da Rejeição</th>
+                  <th>Origem e Lote</th>
                   <th>Status</th>
                   <th class="col-acao-th">Ação</th>
                 </tr>
@@ -428,7 +436,7 @@ onMounted(() => {
                   <td class="col-origem">
                     <div class="origem-fonte-nome">{{ item.fonteDadoNome || ('Fonte #' + item.fonteDadoId) }}</div>
                     <button class="badge-lote-clicavel" :title="'Filtrar quarentena pelo Lote #' + item.loteIngestaoId" @click="filtrarPorLote(item.loteIngestaoId)">
-                      📁 Lote #{{ item.loteIngestaoId }}
+                      Lote #{{ item.loteIngestaoId }}
                     </button>
                   </td>
                   <td><span class="badge-tag" :class="badgeStatus(item.statusAnaliseCodigo)">{{ item.statusAnaliseDescricao || item.statusAnaliseCodigo }}</span></td>
@@ -634,27 +642,6 @@ onMounted(() => {
   transform: translateY(-2px);
   box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.08);
   border-color: #cbd5e1;
-}
-
-.card-metrica:first-child,
-.card-metrica--total {
-  border-left: 5px solid #0f172a !important;
-}
-
-.card-metrica--pendente {
-  border-left: 5px solid #f59e0b !important;
-}
-
-.card-metrica--analise {
-  border-left: 5px solid #0ea5e9 !important;
-}
-
-.card-metrica--sucesso {
-  border-left: 5px solid #16a34a !important;
-}
-
-.card-metrica--descarte {
-  border-left: 5px solid #64748b !important;
 }
 
 .card-metrica:first-child .metrica-valor,
@@ -937,6 +924,16 @@ onMounted(() => {
   color: #92400e;
   font-size: 0.86rem;
   margin-bottom: 1rem;
+}
+
+.banner-filtro-lote--neutro {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.banner-filtro-lote--neutro .badge-lote-banner {
+  background: #64748b;
 }
 
 .banner-lote-info {
