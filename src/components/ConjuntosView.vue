@@ -259,7 +259,7 @@ onUnmounted(() => {
     <header class="topo-pagina">
       <div>
         <p class="etiqueta">CAMADA SILVER</p>
-        <h1 class="titulo">Conjuntos & Cobertura Territorial</h1>
+        <h1 class="titulo">Conjuntos e Cobertura Territorial</h1>
         <p class="subtitulo">
           Cadastre conjuntos de dados associados a fontes e visualize a área de cobertura geoespacial no mapa.
         </p>
