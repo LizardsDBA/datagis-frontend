@@ -9,6 +9,8 @@ import {
 } from '../services/quarentenaService'
 import DetalheQuarentenaModal from './DetalheQuarentenaModal.vue'
 
+import DiagnosticoChart from './DiagnosticoChart.vue'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -26,9 +28,23 @@ function alternarMotivoExpandido(itemKey) {
   motivosExpandidos[itemKey] = !motivosExpandidos[itemKey]
 }
 
+function executarAcaoRapida(item, evento) {
+  const acao = evento.target.value
+  
+  if (acao === 'iniciar') {
+    iniciarAnaliseItem(item.entidade, item.id)
+      .then(() => carregarTudo())
+      .catch(err => { erro.value = err.message })
+  } else if (acao === 'descartar' || acao === 'detalhes') {
+    abrirDetalhes(item)
+  }
+  
+  evento.target.value = ''
+}
+
 // Filtros
 const filtroEntidade = ref('todas')
-const filtroStatus = ref(route.query.loteId ? 'todos' : 'PENDENTE')
+const filtroStatus = ref('todos') 
 const filtroTipoErro = ref('todos')
 const filtroBusca = ref('')
 const filtroLoteId = ref(route.query.loteId ? String(route.query.loteId) : '')
@@ -291,6 +307,10 @@ onMounted(() => {
       </div>
     </section>
 
+<section class="secao-diagnostico">
+  <DiagnosticoChart :loteId="filtroLoteId" />
+</section>
+  
     <!-- Banner Informativo quando filtrado por Lote -->
     <div v-if="filtroLoteId" class="banner-filtro-lote">
       <div class="banner-lote-info">
@@ -379,13 +399,22 @@ onMounted(() => {
                     {{ item.motivoRejeicao }}
                   </p>
                   <button
-                    v-if="item.motivoRejeicao && item.motivoRejeicao.length > 95"
-                    type="button"
-                    class="btn-toggle-motivo"
-                    @click="alternarMotivoExpandido(item.entidade + '-' + item.id)"
-                  >
-                    {{ motivosExpandidos[item.entidade + '-' + item.id] ? '▲ Recolher' : '▼ Ver texto completo' }}
-                  </button>
+  v-if="item.motivoRejeicao && item.motivoRejeicao.length > 95"
+  type="button"
+  class="btn-toggle-acordeao mt-2"
+  @click="alternarMotivoExpandido(item.entidade + '-' + item.id)"
+>
+  <span>{{ motivosExpandidos[item.entidade + '-' + item.id] ? 'Recolher motivo' : 'Expandir motivo' }}</span>
+  <svg 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    stroke-width="2.5" 
+    :class="{ 'icone-rotacionado': !motivosExpandidos[item.entidade + '-' + item.id] }"
+  >
+    <polyline points="18 15 12 9 6 15" />
+  </svg>
+</button>
                 </div>
               </td>
 
@@ -410,14 +439,28 @@ onMounted(() => {
 
               <!-- Ação de Inspeção -->
               <td class="col-acao-td">
-                <button class="btn-inspecionar" @click="abrirDetalhes(item)">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  <span>Inspecionar</span>
-                </button>
-              </td>
+  <div class="grupo-acao-linha">
+    <button class="btn-inspecionar" @click="abrirDetalhes(item)" title="Inspecionar detalhes e payload">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+      <span>Inspecionar</span>
+    </button>
+
+    <!-- Dropdown de Ações Rápidas da Quarentena -->
+    <!-- Dropdown de Ações Rápidas da Quarentena -->
+<select 
+  class="select-acao-rapida" 
+  @change="executarAcaoRapida(item, $event)"
+>
+  <option value="" disabled selected>Ações...</option>
+  <option v-if="item.statusAnaliseCodigo === 'PENDENTE'" value="iniciar">Iniciar Análise</option>
+  <option value="descartar">Descartar Registro</option>
+  <option value="detalhes">Editar Payload (RN007)</option>
+</select>
+  </div>
+</td>
             </tr>
           </tbody>
         </table>
@@ -614,6 +657,69 @@ onMounted(() => {
 .grupo-campo--busca {
   flex: 1;
   min-width: 260px;
+}
+
+.secao-diagnostico {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.grupo-acao-linha {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.select-acao-rapida {
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.select-acao-rapida:focus {
+  border-color: #15803d;
+}
+
+.btn-toggle-acordeao {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-toggle-acordeao:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.btn-toggle-acordeao svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  transition: transform 0.2s ease;
+}
+
+.icone-rotacionado {
+  transform: rotate(180deg);
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
 }
 
 .input-busca-wrapper {

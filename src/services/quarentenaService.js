@@ -115,7 +115,7 @@ export async function excluirMapeamento(fonteId, id) {
   return true
 }
 
-export async function buscarDiagnosticoQuarentena(params = {}) {
+export async function buscarDiagnostico(params = {}) {
   const query = new URLSearchParams()
   if (params.loteIngestaoId) query.set('loteIngestaoId', params.loteIngestaoId)
   if (params.dataInicio) query.set('dataInicio', params.dataInicio)
