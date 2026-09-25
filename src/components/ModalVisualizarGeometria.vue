@@ -144,7 +144,7 @@ onUnmounted(() => {
         <h3>{{ titulo }}</h3>
         <div class="acoes-cabecalho">
           <button class="botao-copiar-wkt" title="Copiar WKT" @click="copiarWkt">
-            {{ copiado ? '✓ Copiado' : '📋 Copiar WKT' }}
+            {{ copiado ? '✓ Copiado' : 'Copiar WKT' }}
           </button>
           <button class="botao-fechar" @click="emit('fechar')" aria-label="Fechar">✕</button>
         </div>
