@@ -129,6 +129,17 @@ export async function excluirMapeamento(fonteId, id) {
   return true
 }
 
+export async function buscarDiagnostico(params = {}) {
+  const query = new URLSearchParams()
+  if (params.loteIngestaoId) query.set('loteIngestaoId', params.loteIngestaoId)
+  if (params.dataInicio) query.set('dataInicio', params.dataInicio)
+  if (params.dataFim) query.set('dataFim', params.dataFim)
+
+  const resp = await fetch(`/api/quarentena/diagnostico?${query.toString()}`)
+  if (!resp.ok) throw new Error(`Falha ao carregar diagnóstico da quarentena: ${resp.statusText}`)
+  return resp.json()
+}
+
 export async function adicionarValorDominio(dados) {
   const resp = await fetch('/api/quarentena/dominios', {
     method: 'POST',
@@ -147,4 +158,3 @@ export async function buscarTiposAreaProtegida() {
   if (!resp.ok) throw new Error('Falha ao listar tipos de áreas protegidas')
   return resp.json()
 }
-

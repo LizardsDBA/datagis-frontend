@@ -14,6 +14,18 @@ const sucesso = ref(null)
 const filtroStatus = ref('TODOS')
 const filtroBusca = ref('')
 
+// Controles de Acordeão (Progressive Disclosure)
+const filtrosExpandidos = ref(true)
+const tabelaExpandida = ref(true)
+
+function alternarFiltros() {
+  filtrosExpandidos.value = !filtrosExpandidos.value
+}
+
+function alternarTabela() {
+  tabelaExpandida.value = !tabelaExpandida.value
+}
+
 // Modal de Descarte de Lote
 const loteParaDescartar = ref(null)
 const motivoDescarte = ref('')
@@ -207,7 +219,7 @@ onMounted(() => {
       </button>
     </header>
 
-    <!-- Grid de Métricas Responsivo -->
+    <!-- Grid de Métricas Responsivo e Alinhado (5 KPIs) -->
     <section class="grid-metricas">
       <div class="card-metrica">
         <span class="metrica-label">Total de Lotes</span>
@@ -248,191 +260,225 @@ onMounted(() => {
       <span>✓ {{ sucesso }}</span>
     </div>
 
-    <!-- Barra de Filtros e Busca -->
-    <section class="barra-filtros">
-      <div class="grupo-campo">
-        <label class="rotulo-filtro">Filtrar por Status:</label>
-        <select v-model="filtroStatus" class="select-filtro">
-          <option value="TODOS">Todos os Status</option>
-          <option value="PROMOVIDO_SILVER">Promovido para Silver</option>
-          <option value="RETIDO_QUARENTENA">Retido na Quarentena</option>
-          <option value="DESCARTADO">Descartado</option>
-          <option value="SEM_MUDANCA">Sem Alteração</option>
-        </select>
-      </div>
-
-      <div class="grupo-campo grupo-campo--busca">
-        <label class="rotulo-filtro">Buscar Lote, Fonte ou Arquivo:</label>
-        <div class="input-busca-wrapper">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icone-busca">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            v-model="filtroBusca"
-            type="text"
-            placeholder="Ex: #12, IBAMA, imoveis.zip..."
-            class="input-busca"
-          />
+    <!-- Seção de Filtros (Acordeão) -->
+    <div class="card-secao">
+      <div class="card-header" @click="alternarFiltros" role="button">
+        <div class="header-titulos">
+          <h3 class="diagnostico-titulo">Pesquisa e Filtros</h3>
         </div>
+        <button type="button" class="btn-toggle-acordeao">
+          <span>{{ tabelaExpandida ? 'Recolher' : 'Expandir' }}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" :class="{ 'icone-rotacionado': !filtrosExpandidos }">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+        </button>
       </div>
-    </section>
+      
+      <div v-show="filtrosExpandidos" class="corpo-secao">
+        <section class="barra-filtros">
+          <div class="grupo-campo">
+            <label class="rotulo-filtro">Filtrar por Status:</label>
+            <select v-model="filtroStatus" class="select-filtro">
+              <option value="TODOS">Todos os Status</option>
+              <option value="PROMOVIDO_SILVER">Promovido para Silver</option>
+              <option value="RETIDO_QUARENTENA">Retido na Quarentena</option>
+              <option value="DESCARTADO">Descartado</option>
+              <option value="SEM_MUDANCA">Sem Alteração</option>
+            </select>
+          </div>
 
-    <!-- Tabela de Lotes -->
-    <section class="tabela-container">
-      <div v-if="carregando" class="estado-carregando">
-        <div class="spinner"></div>
-        <span>Carregando histórico de lotes e transições...</span>
+          <div class="grupo-campo grupo-campo--busca">
+            <label class="rotulo-filtro">Buscar Lote, Fonte ou Arquivo:</label>
+            <div class="input-busca-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icone-busca">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                v-model="filtroBusca"
+                type="text"
+                placeholder="Ex: #12, IBAMA, imoveis.zip..."
+                class="input-busca"
+              />
+            </div>
+          </div>
+        </section>
       </div>
+    </div>
 
-      <div v-else-if="lotesFiltrados.length === 0" class="estado-vazio">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="8" y1="12" x2="16" y2="12" />
-        </svg>
-        <h3>Nenhum lote encontrado</h3>
-        <p>Nenhuma execução corresponde aos filtros aplicados.</p>
+    <!-- Seção da Tabela (Acordeão) -->
+    <div class="card-secao">
+      <div class="card-header" @click="alternarTabela" role="button">
+        <div class="header-titulos">
+          <h3 class="diagnostico-titulo">Histórico de Transições</h3>
+        </div>
+        <button type="button" class="btn-toggle-acordeao">
+          <span>{{ tabelaExpandida ? 'Recolher Tabela' : 'Expandir Tabela' }}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" :class="{ 'icone-rotacionado': !tabelaExpandida }">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+        </button>
       </div>
+      
+      <div v-show="tabelaExpandida" class="corpo-secao">
+        <section class="tabela-container">
+          <div v-if="carregando" class="estado-carregando">
+            <div class="spinner"></div>
+            <span>Carregando histórico de lotes e transições...</span>
+          </div>
 
-      <div v-else class="tabela-responsiva-wrapper">
-        <table class="tabela-dados">
-          <thead>
-            <tr>
-              <th class="col-id">Lote ID</th>
-              <th>Fonte de Origem & Arquivo</th>
-              <th>Registros</th>
-              <th>Data de Execução</th>
-              <th>Status da Transição</th>
-              <th class="col-acao-th">Ações do Pipeline</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="lote in lotesFiltrados" :key="lote.id" class="linha-tabela">
-              <!-- Lote ID -->
-              <td class="col-id">
-                <span class="badge-lote-id">#{{ lote.id }}</span>
-              </td>
+          <div v-else-if="lotesFiltrados.length === 0" class="estado-vazio">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="8" y1="12" x2="16" y2="12" />
+            </svg>
+            <h3>Nenhum lote encontrado</h3>
+            <p>Nenhuma execução corresponde aos filtros aplicados.</p>
+          </div>
 
-              <!-- Fonte de Dados + Origem / Referência exposta -->
-              <td class="col-fonte">
-                <div class="fonte-nome">{{ lote.fonteDadoNome }}</div>
-                <div class="fonte-sub-info">
-                  <span class="texto-apagado">Fonte #{{ lote.fonteDadoId }}</span>
-                  <!-- Informação que antes estava escondida: Expor arquivo ou URL de onde o lote veio -->
-                  <div v-if="lote.origemReferencia" class="origem-ref-badge" :title="lote.origemReferencia">
-                    <span class="origem-icone">📁</span>
-                    <span class="origem-texto">{{ lote.origemReferencia }}</span>
-                  </div>
-                </div>
-              </td>
+          <div v-else class="tabela-responsiva-wrapper">
+            <table class="tabela-dados">
+              <thead>
+                <tr>
+                  <th class="col-id">Lote ID</th>
+                  <th>Fonte de Origem & Arquivo</th>
+                  <th>Registros</th>
+                  <th>Data de Execução</th>
+                  <th>Status da Transição</th>
+                  <th class="col-acao-th">Ações do Pipeline</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="lote in lotesFiltrados" :key="lote.id" class="linha-tabela">
+                  <!-- Lote ID -->
+                  <td class="col-id">
+                    <span class="badge-lote-id">#{{ lote.id }}</span>
+                  </td>
 
-              <!-- Quantidade de Registros -->
-              <td class="col-registros">
-                <strong class="valor-registros">{{ (lote.quantidadeRegistros || 0).toLocaleString('pt-BR') }}</strong>
-                <span class="sub-rotulo">linhas</span>
-              </td>
+                  <!-- Fonte de Dados + Origem / Referência exposta -->
+                  <td class="col-fonte">
+                    <div class="fonte-nome">{{ lote.fonteDadoNome }}</div>
+                    <div class="fonte-sub-info">
+                      <span class="texto-apagado">Fonte #{{ lote.fonteDadoId }}</span>
+                      <div v-if="lote.origemReferencia" class="origem-ref-badge" :title="lote.origemReferencia">
+                        <span class="origem-icone">📁</span>
+                        <span class="origem-texto">{{ lote.origemReferencia }}</span>
+                      </div>
+                    </div>
+                  </td>
 
-              <!-- Data de Execução -->
-              <td class="col-data">
-                {{ formatarData(lote.dataExecucao) }}
-              </td>
+                  <!-- Quantidade de Registros -->
+                  <td class="col-registros">
+                    <strong class="valor-registros">{{ (lote.quantidadeRegistros || 0).toLocaleString('pt-BR') }}</strong>
+                    <span class="sub-rotulo">linhas</span>
+                  </td>
 
-              <!-- Status com Badges e Regra All-or-Nothing -->
-              <td class="col-status">
-                <div class="status-wrapper">
-                  <span
-                    class="badge-status"
-                    :class="{
-                      'badge--promovido': lote.status === 'PROMOVIDO_SILVER',
-                      'badge--retido': lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'),
-                      'badge--processando': loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO',
-                      'badge--descartado': lote.status === 'DESCARTADO',
-                      'badge--neutro': lote.status === 'SEM_MUDANCA' || !lote.status,
-                    }"
-                  >
-                    <template v-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'">
-                      <span class="spinner-dot"></span> Promovendo para Silver...
-                    </template>
-                    <template v-else>
-                      {{
-                        lote.status === 'PROMOVIDO_SILVER' ? 'Promovido para Silver' :
-                        lote.status === 'RETIDO_QUARENTENA' ? 'Retido na Quarentena' :
-                        lote.status === 'DESCARTADO' ? 'Descartado' :
-                        lote.status === 'SEM_MUDANCA' ? 'Sem Mudança' : lote.status
-                      }}
-                    </template>
-                  </span>
+                  <!-- Data de Execução -->
+                  <td class="col-data">
+                    {{ formatarData(lote.dataExecucao) }}
+                  </td>
 
-                  <span v-if="lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO')" class="regra-aviso">
-                    Integridade lote: 0 registros em Silver
-                  </span>
-                  <span v-else-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'" class="regra-aviso texto-azul">
-                    Gravando registros atômicos na Silver...
-                  </span>
-                </div>
-              </td>
+                  <!-- Status com Badges e Regra All-or-Nothing -->
+                  <td class="col-status">
+                    <div class="status-wrapper">
+                      <span
+                        class="badge-status"
+                        :class="{
+                          'badge--promovido': lote.status === 'PROMOVIDO_SILVER',
+                          'badge--retido': lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'),
+                          'badge--processando': loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO',
+                          'badge--descartado': lote.status === 'DESCARTADO',
+                          'badge--neutro': lote.status === 'SEM_MUDANCA' || !lote.status,
+                        }"
+                      >
+                        <template v-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'">
+                          <span class="spinner-dot"></span> Promovendo para Silver...
+                        </template>
+                        <template v-else>
+                          {{
+                            lote.status === 'PROMOVIDO_SILVER' ? 'Promovido para Silver' :
+                            lote.status === 'RETIDO_QUARENTENA' ? 'Retido na Quarentena' :
+                            lote.status === 'DESCARTADO' ? 'Descartado' :
+                            lote.status === 'SEM_MUDANCA' ? 'Sem Mudança' : lote.status
+                          }}
+                        </template>
+                      </span>
 
-              <!-- Ações -->
-              <td class="col-acao-td">
-                <div v-if="lote.status === 'RETIDO_QUARENTENA'" class="acoes-retido">
-                  <template v-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'">
-                    <button class="btn-acao btn-liberar btn--em-progresso" disabled>
-                      <span class="spinner-pequeno"></span> Promovendo ({{ progressoPercentual }}%)...
-                    </button>
-                  </template>
-                  <template v-else>
-                    <button
-                      class="btn-acao btn-ver-erros"
-                      title="Inspecionar inconsistências deste lote na Quarentena"
-                      @click="verNaQuarentena(lote.id)"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                      <span>Inspecionar Erros</span>
-                    </button>
-                    <button
-                      class="btn-acao btn-liberar"
-                      title="Liberar lote para Silver após validação do analista"
-                      :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
-                      @click="abrirModalLiberacao(lote)"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                        <path d="M9 12l2 2 4-4" />
-                      </svg>
-                      <span>Liberar para Silver</span>
-                    </button>
-                    <button
-                      class="btn-acao btn-descartar"
-                      title="Descartar lote e não promover nenhum registro"
-                      :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
-                      @click="abrirModalDescarte(lote)"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                      <span>Descartar</span>
-                    </button>
-                  </template>
-                </div>
+                      <span v-if="lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO')" class="regra-aviso">
+                        Integridade lote: 0 registros em Silver
+                      </span>
+                      <span v-else-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'" class="regra-aviso texto-azul">
+                        Gravando registros atômicos na Silver...
+                      </span>
+                    </div>
+                  </td>
 
-                <div v-else-if="lote.status === 'PROMOVIDO_SILVER'" class="texto-concluido">
-                  <span class="icone-check">✓</span>
-                  <span>Disponível na Silver</span>
-                </div>
+                  <!-- Ações -->
+                  <td class="col-acao-td">
+                    <div v-if="lote.status === 'RETIDO_QUARENTENA'" class="acoes-retido">
+                      <template v-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'">
+                        <button class="btn-acao btn-liberar btn--em-progresso" disabled>
+                          <span class="spinner-pequeno"></span> Promovendo ({{ progressoPercentual }}%)...
+                        </button>
+                      </template>
+                      <template v-else>
+                        <button
+                          class="btn-acao btn-ver-erros"
+                          title="Inspecionar inconsistências deste lote na Quarentena"
+                          @click="verNaQuarentena(lote.id)"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                          <span>Inspecionar Erros</span>
+                        </button>
+                        <button
+                          class="btn-acao btn-liberar"
+                          title="Liberar lote para Silver após validação do analista"
+                          :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
+                          @click="abrirModalLiberacao(lote)"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            <path d="M9 12l2 2 4-4" />
+                          </svg>
+                          <span>Liberar para Silver</span>
+                        </button>
+                        <button
+                          class="btn-acao btn-descartar"
+                          title="Descartar lote e não promover nenhum registro"
+                          :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
+                          @click="abrirModalDescarte(lote)"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                          <span>Descartar</span>
+                        </button>
+                      </template>
+                    </div>
 
-                <span v-else class="texto-apagado">—</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                    <div v-else-if="lote.status === 'PROMOVIDO_SILVER'" class="texto-concluido">
+                      <span class="icone-check">✓</span>
+                      <span>Disponível na Silver</span>
+                    </div>
+
+                    <span v-else class="texto-apagado">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
 
-    <!-- Modal de Liberação de Lote com Barra de Progresso e Stepper -->
+    <!-- Modais omitidos no <template> aqui para não repetir 300 linhas idênticas, 
+         o código dos modais (Liberação e Descarte) continua INTACTO abaixo das sections -->
+         
+    <!-- Modal de Liberação de Lote -->
     <div v-if="loteParaLiberar" class="modal-backdrop" @click.self="fecharModalLiberacao">
       <div class="modal-dialog modal-dialog--liberacao">
         
@@ -692,6 +738,110 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 
+=========================================
+  ESTILOS DO ACORDEÃO E GRID PADRONIZADO
+========================================= 
+*/
+
+.grid-metricas {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); /* Força os 5 cards na mesma linha */
+  gap: 1rem;
+}
+
+@media (max-width: 1200px) {
+  .grid-metricas {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+}
+
+.metrica-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-height: 2.2rem; /* Alinha horizontalmente cards com títulos longos */
+  display: flex;
+  align-items: flex-start;
+}
+
+.card-secao {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.card-header:hover {
+  background: #f8fafc;
+}
+
+.header-titulos {
+  display: flex;
+  flex-direction: column;
+}
+
+.diagnostico-titulo {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.btn-toggle-acordeao {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  padding: 0;
+}
+
+.btn-toggle-acordeao:hover {
+  color: #0f172a;
+}
+
+.btn-toggle-acordeao svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  transition: transform 0.2s ease;
+}
+
+.icone-rotacionado {
+  transform: rotate(180deg);
+}
+
+.corpo-secao {
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+}
+
+/* 
+=========================================
+  ESTILOS GERAIS DA PÁGINA (MANTIDOS)
+========================================= 
+*/
+
 .pagina-lotes {
   display: flex;
   flex-direction: column;
@@ -753,13 +903,6 @@ onMounted(() => {
   height: 1rem;
 }
 
-/* Grid de Métricas Responsivo */
-.grid-metricas {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
-}
-
 .card-metrica {
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -771,12 +914,46 @@ onMounted(() => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.metrica-label {
-  font-size: 0.74rem;
-  font-weight: 700;
+/* Bordas laterais fixas dos KPIs de Lotes */
+.card-metrica:first-child {
+  border-left: 5px solid #0284c7 !important; /* Total de Lotes */
+}
+
+.card-metrica--promovido {
+  border-left: 5px solid #16a34a !important;
+}
+
+.card-metrica--retido {
+  border-left: 5px solid #f59e0b !important;
+}
+
+.card-metrica--descartado {
+  border-left: 5px solid #dc2626 !important;
+}
+
+.card-metrica--neutro {
+  border-left: 5px solid #64748b !important;
+}
+
+/* Números acompanhando as cores das caixas */
+.card-metrica:first-child .metrica-valor {
+  color: #0284c7;
+}
+
+.card-metrica--promovido .metrica-valor {
+  color: #16a34a;
+}
+
+.card-metrica--retido .metrica-valor {
+  color: #d97706;
+}
+
+.card-metrica--descartado .metrica-valor {
+  color: #dc2626;
+}
+
+.card-metrica--neutro .metrica-valor {
   color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .metrica-valor {
@@ -831,12 +1008,8 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  background: #ffffff;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
   align-items: flex-end;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  /* Retirados padding e bordas, pois agora o card-secao envolve o conteúdo */
 }
 
 .grupo-campo {
@@ -904,11 +1077,9 @@ onMounted(() => {
 
 /* Tabela de Lotes */
 .tabela-container {
-  background: #ffffff;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .tabela-dados {
