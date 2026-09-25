@@ -240,7 +240,7 @@ onUnmounted(() => {
     <header class="topo-pagina">
       <div>
         <p class="etiqueta">CAMADA GOLD</p>
-        <h1 class="titulo">Indicadores & Imóveis Publicados</h1>
+        <h1 class="titulo">Indicadores e Imóveis Publicados</h1>
         <p class="subtitulo">
           Administração dos tipos de indicadores e consulta dos imóveis já publicados para consumo do portal.
         </p>
