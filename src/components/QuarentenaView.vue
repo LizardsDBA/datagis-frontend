@@ -451,6 +451,8 @@ onMounted(() => {
   height: 100%; /* Garante que todos os cards tenham a mesma altura do grid */
 }
 
+
+
 .metrica-label {
   font-size: 0.74rem;
   font-weight: 700;
@@ -472,9 +474,99 @@ onMounted(() => {
   border-color: #cbd5e1;
 }
 
-.card-metrica--ativo {
-  border-color: #0284c7 !important;
-  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25) !important;
+.card-metrica:first-child,
+.card-metrica--total {
+  border-left: 5px solid #0f172a !important; /* Preto / Grafite escuro */
+}
+
+.card-metrica--pendente {
+  border-left: 5px solid #f59e0b !important; /* Laranja */
+}
+
+.card-metrica--analise {
+  border-left: 5px solid #0ea5e9 !important; /* Ciano / Azul */
+}
+
+.card-metrica--sucesso {
+  border-left: 5px solid #16a34a !important; /* Verde */
+}
+
+.card-metrica--descarte {
+  border-left: 5px solid #64748b !important; /* Cinza */
+}
+
+.card-metrica:first-child .metrica-valor,
+.card-metrica--total .metrica-valor {
+  color: #0f172a;
+}
+
+.card-metrica--pendente .metrica-valor {
+  color: #d97706;
+}
+
+.card-metrica--analise .metrica-valor {
+  color: #0284c7;
+}
+
+.card-metrica--sucesso .metrica-valor {
+  color: #16a34a;
+}
+
+.card-metrica--descarte .metrica-valor {
+  color: #64748b;
+}
+
+/* Efeito de clique (ativo) com realce na cor do card */
+.card-metrica:first-child.card-metrica--ativo,
+.card-metrica--total.card-metrica--ativo {
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.35) !important;
+}
+
+.card-metrica--pendente.card-metrica--ativo {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3) !important;
+}
+
+.card-metrica--analise.card-metrica--ativo {
+  border-color: #0ea5e9 !important;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.3) !important;
+}
+
+.card-metrica--sucesso.card-metrica--ativo {
+  border-color: #16a34a !important;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.3) !important;
+}
+
+.card-metrica--descarte.card-metrica--ativo {
+  border-color: #64748b !important;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.3) !important;
+}
+
+/* Efeito de clique (ativo): ressalta na cor correspondente do KPI */
+.card-metrica--total.card-metrica--ativo {
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.35) !important;
+}
+
+.card-metrica--pendente.card-metrica--ativo {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3) !important;
+}
+
+.card-metrica--analise.card-metrica--ativo {
+  border-color: #0ea5e9 !important;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.3) !important;
+}
+
+.card-metrica--sucesso.card-metrica--ativo {
+  border-color: #16a34a !important;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.3) !important;
+}
+
+.card-metrica--descarte.card-metrica--ativo {
+  border-color: #64748b !important;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.3) !important;
 }
 
 .metrica-label {
