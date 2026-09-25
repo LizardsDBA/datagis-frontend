@@ -8,7 +8,6 @@ import {
   buscarStatusAnalise,
 } from '../services/quarentenaService'
 import DetalheQuarentenaModal from './DetalheQuarentenaModal.vue'
-
 import DiagnosticoChart from './DiagnosticoChart.vue'
 
 const route = useRoute()
@@ -20,29 +19,19 @@ const tiposErro = ref([])
 const statusLista = ref([])
 const carregando = ref(false)
 const erro = ref(null)
+const topInconsistencia = ref(null)
 
-// Controle de expansão de motivos muito longos
+const secoesExpandidas = reactive({
+  filtros: true,
+  tabela: true
+})
+
 const motivosExpandidos = reactive({})
 
 function alternarMotivoExpandido(itemKey) {
   motivosExpandidos[itemKey] = !motivosExpandidos[itemKey]
 }
 
-function executarAcaoRapida(item, evento) {
-  const acao = evento.target.value
-  
-  if (acao === 'iniciar') {
-    iniciarAnaliseItem(item.entidade, item.id)
-      .then(() => carregarTudo())
-      .catch(err => { erro.value = err.message })
-  } else if (acao === 'descartar' || acao === 'detalhes') {
-    abrirDetalhes(item)
-  }
-  
-  evento.target.value = ''
-}
-
-// Filtros
 const filtroEntidade = ref('todas')
 const filtroStatus = ref('todos') 
 const filtroTipoErro = ref('todos')
@@ -54,7 +43,6 @@ function selecionarFiltroStatus(st) {
   aplicarFiltros()
 }
 
-// Modal de detalhes
 const itemSelecionado = ref(null)
 
 const entidadesDisponiveis = [
@@ -169,7 +157,6 @@ onMounted(() => {
 
 <template>
   <div class="pagina-quarentena">
-    <!-- Cabeçalho Principal -->
     <header class="topo-pagina">
       <div>
         <p class="etiqueta">QUALIDADE & TRIAGEM</p>
@@ -178,7 +165,6 @@ onMounted(() => {
           Auditoria de inconsistências e resolução de pendências antes da promoção definitiva para a camada Silver.
         </p>
       </div>
-
       <button class="btn-atualizar" @click="carregarTudo" :disabled="carregando" title="Recarregar registros">
         <svg class="icone-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 2v6h-6" />
@@ -190,290 +176,196 @@ onMounted(() => {
       </button>
     </header>
 
-    <!-- Cards de Métricas Interativos (Clicáveis) -->
     <section v-if="metricas" class="grid-metricas">
-      <div
-        class="card-metrica card-metrica--clicavel"
-        :class="{ 'card-metrica--ativo': filtroStatus === 'todos' }"
-        @click="selecionarFiltroStatus('todos')"
-        title="Clique para ver todos os registros retidos"
-      >
+      <div class="card-metrica card-metrica--clicavel" :class="{ 'card-metrica--ativo': filtroStatus === 'todos' }" @click="selecionarFiltroStatus('todos')">
         <span class="metrica-label">Total Retido</span>
         <span class="metrica-valor">{{ metricas.totalRegistros }}</span>
         <span class="metrica-sub">Todos os registros</span>
       </div>
-
-      <div
-        class="card-metrica card-metrica--pendente card-metrica--clicavel"
-        :class="{ 'card-metrica--ativo': filtroStatus === 'PENDENTE' }"
-        @click="selecionarFiltroStatus('PENDENTE')"
-        title="Clique para filtrar pendentes de análise"
-      >
+      <div class="card-metrica card-metrica--pendente card-metrica--clicavel" :class="{ 'card-metrica--ativo': filtroStatus === 'PENDENTE' }" @click="selecionarFiltroStatus('PENDENTE')">
         <span class="metrica-label">Pendentes de Análise</span>
         <span class="metrica-valor">{{ metricas.totalPendentes }}</span>
         <span class="metrica-sub">Aguardando operador (RN007)</span>
       </div>
-
-      <div
-        class="card-metrica card-metrica--analise card-metrica--clicavel"
-        :class="{ 'card-metrica--ativo': filtroStatus === 'EM_ANALISE' }"
-        @click="selecionarFiltroStatus('EM_ANALISE')"
-        title="Clique para filtrar em análise"
-      >
+      <div class="card-metrica card-metrica--analise card-metrica--clicavel" :class="{ 'card-metrica--ativo': filtroStatus === 'EM_ANALISE' }" @click="selecionarFiltroStatus('EM_ANALISE')">
         <span class="metrica-label">Em Análise</span>
         <span class="metrica-valor">{{ metricas.totalEmAnalise }}</span>
         <span class="metrica-sub">Em tratamento ativo</span>
       </div>
-
-      <div
-        class="card-metrica card-metrica--sucesso card-metrica--clicavel"
-        :class="{ 'card-metrica--ativo': filtroStatus === 'CORRIGIDO_REPROCESSADO' }"
-        @click="selecionarFiltroStatus('CORRIGIDO_REPROCESSADO')"
-        title="Clique para filtrar corrigidos & promovidos"
-      >
+      <div class="card-metrica card-metrica--sucesso card-metrica--clicavel" :class="{ 'card-metrica--ativo': filtroStatus === 'CORRIGIDO_REPROCESSADO' }" @click="selecionarFiltroStatus('CORRIGIDO_REPROCESSADO')">
         <span class="metrica-label">Corrigidos & Promovidos</span>
         <span class="metrica-valor">{{ metricas.totalCorrigidos }}</span>
         <span class="metrica-sub">Liberados para Silver</span>
       </div>
-
-      <div
-        class="card-metrica card-metrica--descarte card-metrica--clicavel"
-        :class="{ 'card-metrica--ativo': filtroStatus === 'DESCARTADO' }"
-        @click="selecionarFiltroStatus('DESCARTADO')"
-        title="Clique para filtrar descartados"
-      >
+      <div class="card-metrica card-metrica--descarte card-metrica--clicavel" :class="{ 'card-metrica--ativo': filtroStatus === 'DESCARTADO' }" @click="selecionarFiltroStatus('DESCARTADO')">
         <span class="metrica-label">Descartados</span>
         <span class="metrica-valor">{{ metricas.totalDescartados }}</span>
         <span class="metrica-sub">Registros irrecuperáveis</span>
       </div>
     </section>
 
-    <!-- Barra de Filtros e Busca -->
-    <section class="barra-filtros">
-      <div class="grupo-campo">
-        <label class="rotulo-filtro">Entidade Silver:</label>
-        <select v-model="filtroEntidade" @change="aplicarFiltros" class="select-filtro">
-          <option v-for="ent in entidadesDisponiveis" :key="ent.valor" :value="ent.valor">
-            {{ ent.label }}
-          </option>
-        </select>
-      </div>
-
-      <div class="grupo-campo">
-        <label class="rotulo-filtro">Status da Análise:</label>
-        <select v-model="filtroStatus" @change="aplicarFiltros" class="select-filtro">
-          <option value="todos">Todos os Status</option>
-          <option v-for="st in statusLista" :key="st.codigo" :value="st.codigo">
-            {{ st.descricao }}
-          </option>
-        </select>
-      </div>
-
-      <div class="grupo-campo">
-        <label class="rotulo-filtro">Tipo de Erro:</label>
-        <select v-model="filtroTipoErro" @change="aplicarFiltros" class="select-filtro">
-          <option value="todos">Todos os Tipos</option>
-          <option v-for="te in tiposErro" :key="te.codigo" :value="te.codigo">
-            {{ te.codigo }}
-          </option>
-        </select>
-      </div>
-
-      <div class="grupo-campo grupo-campo--lote">
-        <label class="rotulo-filtro">Lote ID:</label>
-        <input
-          v-model="filtroLoteId"
-          type="number"
-          placeholder="Ex: 1"
-          class="input-filtro-lote"
-          @change="aplicarFiltros"
-        />
-      </div>
-
-      <div class="grupo-campo grupo-campo--busca">
-        <label class="rotulo-filtro">Buscar por texto:</label>
-        <div class="input-busca-wrapper">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icone-busca">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            v-model="filtroBusca"
-            type="text"
-            placeholder="Chave, campo ou motivo da inconsistência..."
-            class="input-busca"
-          />
+    <section v-if="topInconsistencia" class="secao-ofensor">
+      <div class="banner-ofensor">
+        <div class="ofensor-info">
+          <span class="ofensor-label">Principal Ofensor:</span>
+          <span class="ofensor-nome">{{ topInconsistencia.rotulo }}</span>
+        </div>
+        <div class="ofensor-valor-container">
+          <span class="ofensor-valor">{{ topInconsistencia.quantidade.toLocaleString('pt-BR') }}</span>
+          <span class="ofensor-sub">Registros afetados</span>
         </div>
       </div>
     </section>
 
-<section class="secao-diagnostico">
-  <DiagnosticoChart :loteId="filtroLoteId" />
-</section>
-  
-    <!-- Banner Informativo quando filtrado por Lote -->
-    <div v-if="filtroLoteId" class="banner-filtro-lote">
-      <div class="banner-lote-info">
-        <span class="badge-lote-banner">LOTE #{{ filtroLoteId }}</span>
-        <span>
-          Exibindo inconsistências do <strong>Lote #{{ filtroLoteId }}</strong>. Pela regra de integridade total,
-          este lote está retido e <strong>0 registros foram para a Silver</strong> até sua liberação.
-        </span>
-      </div>
-      <div class="banner-lote-acoes">
-        <button class="btn-banner-link" @click="router.push('/lotes')">Ver no Pipeline →</button>
-        <button class="btn-banner-remover" @click="removerFiltroLote">Limpar filtro de lote ✕</button>
-      </div>
-    </div>
-
-    <!-- Banner de Erro Global -->
-    <div v-if="erro" class="banner-erro">
-      ✕ {{ erro }}
-    </div>
-
-    <!-- Tabela de Itens em Quarentena -->
-    <section class="tabela-container">
-      <div v-if="carregando" class="estado-carregando">
-        <div class="spinner"></div>
-        <span>Consultando registros da quarentena...</span>
-      </div>
-
-      <div v-else-if="itensFiltrados.length === 0" class="estado-vazio">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="10" />
-          <path d="m9 12 2 2 4-4" />
-        </svg>
-        <h3>Nenhuma inconsistência encontrada</h3>
-        <p>Nenhum registro retido corresponde aos filtros selecionados no momento.</p>
-      </div>
-
-      <!-- Tabela Responsiva sem Truncamento de Informações -->
-      <div v-else class="tabela-responsiva-wrapper">
-        <table class="tabela-dados">
-          <thead>
-            <tr>
-              <th>Chave Natural / ID</th>
-              <th>Entidade</th>
-              <th>Tipo de Erro</th>
-              <th>Campo & Motivo da Rejeição</th>
-              <th>Origem & Lote</th>
-              <th>Status</th>
-              <th class="col-acao-th">Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in itensFiltrados" :key="item.entidade + '-' + item.id" class="linha-tabela">
-              <!-- Chave Natural / ID -->
-              <td class="col-chave">
-                <div class="chave-wrapper" :title="item.chaveIdentificacao">
-                  <code class="chave-codigo">{{ item.chaveIdentificacao || '—' }}</code>
-                  <span class="sub-id">ID #{{ item.id }}</span>
-                </div>
-              </td>
-
-              <!-- Entidade -->
-              <td>
-                <span class="tag-entidade">{{ item.entidade }}</span>
-              </td>
-
-              <!-- Tipo de Erro -->
-              <td>
-                <span class="badge-tag" :class="badgeTipoErro(item.tipoErroCodigo)">
-                  {{ item.tipoErroCodigo }}
-                </span>
-              </td>
-
-              <!-- Campo e Motivo da Rejeição (VISIBILIDADE COMPLETA SEM TRUNCAMENTO) -->
-              <td class="col-motivo">
-                <div class="campo-alvo">
-                  <span class="rotulo-campo-problema">Campo:</span>
-                  <code class="codigo-campo-problema">{{ item.campoProblema || 'Geral' }}</code>
-                </div>
-
-                <!-- O motivo agora tem quebra de linha normal e botão de expansão caso seja muito extenso -->
-                <div class="motivo-texto-container">
-                  <p
-                    class="motivo-texto"
-                    :class="{ 'motivo-expandido': motivosExpandidos[item.entidade + '-' + item.id] }"
-                  >
-                    {{ item.motivoRejeicao }}
-                  </p>
-                  <button
-  v-if="item.motivoRejeicao && item.motivoRejeicao.length > 95"
-  type="button"
-  class="btn-toggle-acordeao mt-2"
-  @click="alternarMotivoExpandido(item.entidade + '-' + item.id)"
->
-  <span>{{ motivosExpandidos[item.entidade + '-' + item.id] ? 'Recolher motivo' : 'Expandir motivo' }}</span>
-  <svg 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    stroke-width="2.5" 
-    :class="{ 'icone-rotacionado': !motivosExpandidos[item.entidade + '-' + item.id] }"
-  >
-    <polyline points="18 15 12 9 6 15" />
-  </svg>
-</button>
-                </div>
-              </td>
-
-              <!-- Origem & Lote -->
-              <td class="col-origem">
-                <div class="origem-fonte-nome">{{ item.fonteDadoNome || ('Fonte #' + item.fonteDadoId) }}</div>
-                <button
-                  class="badge-lote-clicavel"
-                  :title="'Filtrar quarentena pelo Lote #' + item.loteIngestaoId"
-                  @click="filtrarPorLote(item.loteIngestaoId)"
-                >
-                  📁 Lote #{{ item.loteIngestaoId }}
-                </button>
-              </td>
-
-              <!-- Status -->
-              <td>
-                <span class="badge-tag" :class="badgeStatus(item.statusAnaliseCodigo)">
-                  {{ item.statusAnaliseDescricao || item.statusAnaliseCodigo }}
-                </span>
-              </td>
-
-              <!-- Ação de Inspeção -->
-              <td class="col-acao-td">
-  <div class="grupo-acao-linha">
-    <button class="btn-inspecionar" @click="abrirDetalhes(item)" title="Inspecionar detalhes e payload">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-      <span>Inspecionar</span>
-    </button>
-
-    <!-- Dropdown de Ações Rápidas da Quarentena -->
-    <!-- Dropdown de Ações Rápidas da Quarentena -->
-<select 
-  class="select-acao-rapida" 
-  @change="executarAcaoRapida(item, $event)"
->
-  <option value="" disabled selected>Ações...</option>
-  <option v-if="item.statusAnaliseCodigo === 'PENDENTE'" value="iniciar">Iniciar Análise</option>
-  <option value="descartar">Descartar Registro</option>
-  <option value="detalhes">Editar Payload (RN007)</option>
-</select>
-  </div>
-</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <section class="secao-diagnostico">
+      <DiagnosticoChart :loteId="filtroLoteId" @top-inconsistencia="topInconsistencia = $event" />
     </section>
 
-    <!-- Modal de Detalhes e Correção do Operador -->
-    <DetalheQuarentenaModal
-      v-if="itemSelecionado"
-      :item="itemSelecionado"
-      @close="fecharDetalhes"
-      @atualizado="carregarTudo"
-    />
+    <div class="card-acordeao">
+      <div class="acordeao-header" @click="secoesExpandidas.filtros = !secoesExpandidas.filtros">
+        <h3 class="acordeao-titulo">Pesquisa e Filtros</h3>
+        <button class="btn-toggle-acordeao">
+          <span>{{ secoesExpandidas.filtros ? 'Recolher' : 'Expandir' }}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" :class="{ 'icone-rotacionado': !secoesExpandidas.filtros }"><polyline points="18 15 12 9 6 15" /></svg>
+        </button>
+      </div>
+      <div v-show="secoesExpandidas.filtros" class="acordeao-corpo">
+        <section class="barra-filtros">
+          <div class="grupo-campo">
+            <label class="rotulo-filtro">Entidade Silver:</label>
+            <select v-model="filtroEntidade" @change="aplicarFiltros" class="select-filtro">
+              <option v-for="ent in entidadesDisponiveis" :key="ent.valor" :value="ent.valor">{{ ent.label }}</option>
+            </select>
+          </div>
+          <div class="grupo-campo">
+            <label class="rotulo-filtro">Status da Análise:</label>
+            <select v-model="filtroStatus" @change="aplicarFiltros" class="select-filtro">
+              <option value="todos">Todos os Status</option>
+              <option v-for="st in statusLista" :key="st.codigo" :value="st.codigo">{{ st.descricao }}</option>
+            </select>
+          </div>
+          <div class="grupo-campo">
+            <label class="rotulo-filtro">Tipo de Erro:</label>
+            <select v-model="filtroTipoErro" @change="aplicarFiltros" class="select-filtro">
+              <option value="todos">Todos os Tipos</option>
+              <option v-for="te in tiposErro" :key="te.codigo" :value="te.codigo">{{ te.codigo }}</option>
+            </select>
+          </div>
+          <div class="grupo-campo grupo-campo--lote">
+            <label class="rotulo-filtro">Lote ID:</label>
+            <input v-model="filtroLoteId" type="number" placeholder="Ex: 1" class="input-filtro-lote" @change="aplicarFiltros" />
+          </div>
+          <div class="grupo-campo grupo-campo--busca">
+            <label class="rotulo-filtro">Buscar por texto:</label>
+            <div class="input-busca-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icone-busca">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input v-model="filtroBusca" type="text" placeholder="Chave, campo ou motivo..." class="input-busca" />
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="card-acordeao">
+      <div class="acordeao-header" @click="secoesExpandidas.tabela = !secoesExpandidas.tabela">
+        <h3 class="acordeao-titulo">Registros Isolados em Quarentena</h3>
+        <button class="btn-toggle-acordeao">
+          <span>{{ secoesExpandidas.tabela ? 'Recolher' : 'Expandir' }}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" :class="{ 'icone-rotacionado': !secoesExpandidas.tabela }"><polyline points="18 15 12 9 6 15" /></svg>
+        </button>
+      </div>
+      <div v-show="secoesExpandidas.tabela" class="acordeao-corpo">
+        <div v-if="filtroLoteId" class="banner-filtro-lote">
+          <div class="banner-lote-info">
+            <span class="badge-lote-banner">LOTE #{{ filtroLoteId }}</span>
+            <span>Exibindo inconsistências do <strong>Lote #{{ filtroLoteId }}</strong>. Lote retido e <strong>0 registros foram para a Silver</strong>.</span>
+          </div>
+          <div class="banner-lote-acoes">
+            <button class="btn-banner-link" @click="router.push('/lotes')">Ver no Pipeline →</button>
+            <button class="btn-banner-remover" @click="removerFiltroLote">Limpar filtro de lote ✕</button>
+          </div>
+        </div>
+
+        <div v-if="erro" class="banner-erro">✕ {{ erro }}</div>
+
+        <section class="tabela-container">
+          <div v-if="carregando" class="estado-carregando">
+            <div class="spinner"></div>
+            <span>Consultando registros da quarentena...</span>
+          </div>
+
+          <div v-else-if="itensFiltrados.length === 0" class="estado-vazio">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+            <h3>Nenhuma inconsistência encontrada</h3>
+            <p>Nenhum registro retido corresponde aos filtros selecionados.</p>
+          </div>
+
+          <div v-else class="tabela-responsiva-wrapper">
+            <table class="tabela-dados">
+              <thead>
+                <tr>
+                  <th>Chave Natural / ID</th>
+                  <th>Entidade</th>
+                  <th>Tipo de Erro</th>
+                  <th>Campo & Motivo da Rejeição</th>
+                  <th>Origem & Lote</th>
+                  <th>Status</th>
+                  <th class="col-acao-th">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in itensFiltrados" :key="item.entidade + '-' + item.id" class="linha-tabela">
+                  <td class="col-chave">
+                    <div class="chave-wrapper" :title="item.chaveIdentificacao">
+                      <code class="chave-codigo">{{ item.chaveIdentificacao || '—' }}</code>
+                      <span class="sub-id">ID #{{ item.id }}</span>
+                    </div>
+                  </td>
+                  <td><span class="tag-entidade">{{ item.entidade }}</span></td>
+                  <td><span class="badge-tag" :class="badgeTipoErro(item.tipoErroCodigo)">{{ item.tipoErroCodigo }}</span></td>
+                  <td class="col-motivo">
+                    <div class="campo-alvo">
+                      <span class="rotulo-campo-problema">Campo:</span>
+                      <code class="codigo-campo-problema">{{ item.campoProblema || 'Geral' }}</code>
+                    </div>
+                    <div class="motivo-texto-container">
+                      <p class="motivo-texto" :class="{ 'motivo-expandido': motivosExpandidos[item.entidade + '-' + item.id] }">
+                        {{ item.motivoRejeicao }}
+                      </p>
+                      <button v-if="item.motivoRejeicao && item.motivoRejeicao.length > 95" type="button" class="btn-toggle-acordeao mt-2" @click="alternarMotivoExpandido(item.entidade + '-' + item.id)">
+                        <span>{{ motivosExpandidos[item.entidade + '-' + item.id] ? 'Recolher motivo' : 'Expandir motivo' }}</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" :class="{ 'icone-rotacionado': !motivosExpandidos[item.entidade + '-' + item.id] }"><polyline points="18 15 12 9 6 15" /></svg>
+                      </button>
+                    </div>
+                  </td>
+                  <td class="col-origem">
+                    <div class="origem-fonte-nome">{{ item.fonteDadoNome || ('Fonte #' + item.fonteDadoId) }}</div>
+                    <button class="badge-lote-clicavel" :title="'Filtrar quarentena pelo Lote #' + item.loteIngestaoId" @click="filtrarPorLote(item.loteIngestaoId)">
+                      📁 Lote #{{ item.loteIngestaoId }}
+                    </button>
+                  </td>
+                  <td><span class="badge-tag" :class="badgeStatus(item.statusAnaliseCodigo)">{{ item.statusAnaliseDescricao || item.statusAnaliseCodigo }}</span></td>
+                  <td class="col-acao-td">
+                    <button class="btn-inspecionar" @click="abrirDetalhes(item)" title="Inspecionar detalhes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+    <span>Inspecionar</span>
+  </button>
+</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <DetalheQuarentenaModal v-if="itemSelecionado" :item="itemSelecionado" @close="fecharDetalhes" @atualizado="carregarTudo" />
   </div>
 </template>
 
@@ -481,7 +373,7 @@ onMounted(() => {
 .pagina-quarentena {
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 1.5rem;
 }
 
 .topo-pagina {
@@ -539,10 +431,9 @@ onMounted(() => {
   height: 1rem;
 }
 
-/* Métricas Interativas */
 .grid-metricas {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 1rem;
 }
 
@@ -553,9 +444,22 @@ onMounted(() => {
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
+  justify-content: space-between; /* Distribui os itens para alinhar base e topo */
   gap: 0.25rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: all 0.15s ease;
+  height: 100%; /* Garante que todos os cards tenham a mesma altura do grid */
+}
+
+.metrica-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-height: 2.2rem; /* Reserva o espaço exato de duas linhas para todos os cards */
+  display: flex;
+  align-items: flex-start;
 }
 
 .card-metrica--clicavel {
@@ -592,33 +496,133 @@ onMounted(() => {
   color: #94a3b8;
 }
 
-.card-metrica--pendente .metrica-valor {
-  color: #d97706;
+.card-metrica--pendente .metrica-valor { color: #d97706; }
+.card-metrica--analise .metrica-valor { color: #0284c7; }
+.card-metrica--sucesso .metrica-valor { color: #16a34a; }
+.card-metrica--descarte .metrica-valor { color: #64748b; }
+
+/* Estilos do Novo Banner Fino (Ofensor) */
+.secao-ofensor {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
-.card-metrica--analise .metrica-valor {
-  color: #0284c7;
+.banner-ofensor {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  padding: 0.6rem 1.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.card-metrica--sucesso .metrica-valor {
-  color: #16a34a;
+.ofensor-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.card-metrica--descarte .metrica-valor {
+.ofensor-label {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #9f1239;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ofensor-nome {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #be123c;
+  font-family: var(--fonte-mono, monospace);
+}
+
+.ofensor-valor-container {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.ofensor-valor {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #e11d48;
+}
+
+.ofensor-sub {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #9f1239;
+  text-transform: uppercase;
+}
+
+/* Restante do CSS Original */
+.card-acordeao {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.acordeao-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.acordeao-header:hover {
+  background: #f8fafc;
+}
+
+.acordeao-titulo {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.btn-toggle-acordeao {
+  background: transparent;
+  border: none;
   color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  padding: 0;
 }
 
-/* Barra de Filtros */
+.btn-toggle-acordeao svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  transition: transform 0.2s ease;
+}
+
+.icone-rotacionado {
+  transform: rotate(180deg);
+}
+
+.acordeao-corpo {
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  margin-top: 0.25rem;
+  padding-top: 1.25rem;
+}
+
 .barra-filtros {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  background: #ffffff;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
   align-items: flex-end;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .grupo-campo {
@@ -644,12 +648,8 @@ onMounted(() => {
   color: #1e293b;
 }
 
-.input-filtro-lote {
-  width: 90px;
-}
-
-.select-filtro:focus,
-.input-filtro-lote:focus {
+.input-filtro-lote { width: 90px; }
+.select-filtro:focus, .input-filtro-lote:focus {
   border-color: #15803d;
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
 }
@@ -657,69 +657,6 @@ onMounted(() => {
 .grupo-campo--busca {
   flex: 1;
   min-width: 260px;
-}
-
-.secao-diagnostico {
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.grupo-acao-linha {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.4rem;
-}
-
-.select-acao-rapida {
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background-color: #ffffff;
-  color: #334155;
-  font-size: 0.76rem;
-  font-weight: 600;
-  cursor: pointer;
-  outline: none;
-}
-
-.select-acao-rapida:focus {
-  border-color: #15803d;
-}
-
-.btn-toggle-acordeao {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #64748b;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-toggle-acordeao:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-  border-color: #cbd5e1;
-}
-
-.btn-toggle-acordeao svg {
-  width: 0.8rem;
-  height: 0.8rem;
-  transition: transform 0.2s ease;
-}
-
-.icone-rotacionado {
-  transform: rotate(180deg);
-}
-
-.mt-2 {
-  margin-top: 0.5rem;
 }
 
 .input-busca-wrapper {
@@ -744,8 +681,6 @@ onMounted(() => {
   border: 1px solid #cbd5e1;
   font-size: 0.86rem;
   outline: none;
-  background: #ffffff;
-  color: #1e293b;
 }
 
 .input-busca:focus {
@@ -753,7 +688,30 @@ onMounted(() => {
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
 }
 
-/* Banner de Filtro de Lote */
+.secao-diagnostico {
+  margin-bottom: 0.5rem;
+}
+
+.grupo-acao-linha {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.select-acao-rapida {
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mt-2 { margin-top: 0.5rem; }
+
 .banner-filtro-lote {
   display: flex;
   justify-content: space-between;
@@ -765,14 +723,13 @@ onMounted(() => {
   padding: 0.85rem 1.25rem;
   color: #92400e;
   font-size: 0.86rem;
-  flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
 
 .banner-lote-info {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  flex-wrap: wrap;
 }
 
 .badge-lote-banner {
@@ -824,15 +781,13 @@ onMounted(() => {
   padding: 0.85rem 1.15rem;
   font-size: 0.86rem;
   font-weight: 600;
+  margin-bottom: 1rem;
 }
 
-/* Tabela */
 .tabela-container {
-  background: #ffffff;
-  border-radius: 12px;
   border: 1px solid #e2e8f0;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .tabela-dados {
@@ -849,9 +804,7 @@ onMounted(() => {
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   border-bottom: 1px solid #e2e8f0;
-  white-space: nowrap;
 }
 
 .tabela-dados td {
@@ -860,229 +813,37 @@ onMounted(() => {
   vertical-align: top;
 }
 
-.linha-tabela:hover {
-  background: #fcfdfe;
-}
-
-.col-chave {
-  min-width: 180px;
-}
-
-.chave-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
+.linha-tabela:hover { background: #fcfdfe; }
+.col-chave { min-width: 180px; }
+.chave-wrapper { display: flex; flex-direction: column; gap: 0.2rem; }
 .chave-codigo {
-  font-family: var(--fonte-mono);
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #0f172a;
-  background: #f1f5f9;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-  word-break: break-all;
-  display: inline-block;
-  width: fit-content;
+  font-family: var(--fonte-mono); font-size: 0.8rem; font-weight: 700;
+  color: #0f172a; background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px;
 }
-
-.sub-id {
-  font-size: 0.72rem;
-  color: #94a3b8;
-}
-
+.sub-id { font-size: 0.72rem; color: #94a3b8; }
 .tag-entidade {
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  background: #f1f5f9;
-  color: #475569;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  white-space: nowrap;
+  font-size: 0.74rem; font-weight: 700; text-transform: uppercase;
+  background: #f1f5f9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 4px;
 }
-
-/* Coluna de Motivo sem Truncamento */
-.col-motivo {
-  min-width: 280px;
-  max-width: 420px;
-}
-
-.campo-alvo {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.76rem;
-}
-
-.rotulo-campo-problema {
-  color: #64748b;
-  font-weight: 600;
-}
-
-.codigo-campo-problema {
-  font-family: var(--fonte-mono);
-  background: #fef2f2;
-  color: #991b1b;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  font-weight: 700;
-}
-
-.motivo-texto-container {
-  margin-top: 0.35rem;
-}
-
-.motivo-texto {
-  font-size: 0.82rem;
-  color: #334155;
-  line-height: 1.4;
-  margin: 0;
-  word-break: break-word;
-  /* Exibe até 3 linhas confortavelmente e dá botão de expansão caso seja gigante */
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.motivo-texto.motivo-expandido {
-  display: block;
-  overflow: visible;
-}
-
-.btn-toggle-motivo {
-  background: transparent;
-  border: none;
-  color: #0284c7;
-  font-size: 0.72rem;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0.25rem 0 0;
-  display: block;
-}
-
-.btn-toggle-motivo:hover {
-  text-decoration: underline;
-}
-
-.col-origem {
-  min-width: 150px;
-}
-
-.origem-fonte-nome {
-  font-weight: 600;
-  color: #1e293b;
-  font-size: 0.82rem;
-}
-
+.col-motivo { min-width: 280px; max-width: 420px; }
+.campo-alvo { display: flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; }
+.rotulo-campo-problema { color: #64748b; font-weight: 600; }
+.codigo-campo-problema { font-family: var(--fonte-mono); background: #fef2f2; color: #991b1b; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 700; }
+.motivo-texto-container { margin-top: 0.35rem; }
+.motivo-texto { font-size: 0.82rem; color: #334155; line-height: 1.4; margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.motivo-texto.motivo-expandido { display: block; overflow: visible; }
+.col-origem { min-width: 150px; }
+.origem-fonte-nome { font-weight: 600; color: #1e293b; font-size: 0.82rem; }
 .badge-lote-clicavel {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #15803d;
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 0.25rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; font-size: 0.74rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; cursor: pointer;
 }
-
-.badge-lote-clicavel:hover {
-  background: #dcfce7;
-}
-
-.col-acao-th {
-  text-align: right;
-  min-width: 120px;
-}
-
-.col-acao-td {
-  text-align: right;
-  min-width: 120px;
-}
-
+.col-acao-th, .col-acao-td { text-align: right; min-width: 120px; }
 .btn-inspecionar {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: #1e293b;
-  font-weight: 700;
-  font-size: 0.78rem;
-  padding: 0.45rem 0.85rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 0.35rem; background: #ffffff; border: 1px solid #cbd5e1; color: #1e293b; font-weight: 700; font-size: 0.78rem; padding: 0.45rem 0.85rem; border-radius: 6px; cursor: pointer;
 }
-
-.btn-inspecionar svg {
-  width: 0.9rem;
-  height: 0.9rem;
-  color: #64748b;
-}
-
-.btn-inspecionar:hover {
-  background: #15803d;
-  color: #ffffff;
-  border-color: #15803d;
-}
-
-.btn-inspecionar:hover svg {
-  color: #ffffff;
-}
-
-.estado-carregando,
-.estado-vazio {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 3.5rem 1rem;
-  color: #64748b;
-  gap: 0.6rem;
-  text-align: center;
-}
-
-.estado-vazio svg {
-  width: 2.5rem;
-  height: 2.5rem;
-  color: #94a3b8;
-}
-
-.spinner {
-  width: 2rem;
-  height: 2rem;
-  border: 3px solid #e2e8f0;
-  border-top-color: #15803d;
-  border-radius: 50%;
-  animation: girar 0.65s linear infinite;
-}
-
-@keyframes girar {
-  to { transform: rotate(360deg); }
-}
-
-@media (max-width: 768px) {
-  .topo-pagina {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .btn-atualizar {
-    justify-content: center;
-  }
-
-  .banner-filtro-lote {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
+.btn-inspecionar svg { width: 0.9rem; height: 0.9rem; color: #64748b; }
+.estado-carregando, .estado-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3.5rem 1rem; color: #64748b; gap: 0.6rem; text-align: center; }
+.estado-vazio svg { width: 2.5rem; height: 2.5rem; color: #94a3b8; }
+.spinner { width: 2rem; height: 2rem; border: 3px solid #e2e8f0; border-top-color: #15803d; border-radius: 50%; animation: girar 0.65s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
 </style>
