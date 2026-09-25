@@ -396,7 +396,7 @@ async function remover(id) {
                       class="tag-regra tag-regra--ref"
                       :title="'Integridade Cruzada ativa contra SILVER.' + map.referenciaEntidadeSilver"
                     >
-                      🔗 Ref: {{ map.referenciaEntidadeSilver }}
+                      Ref: {{ map.referenciaEntidadeSilver }}
                     </span>
 
                     <!-- Regra de Domínio -->
@@ -405,7 +405,7 @@ async function remover(id) {
                       class="tag-regra tag-regra--dom"
                       :title="'Validação de domínio ativa contra SILVER.' + map.tabelaReferencia"
                     >
-                      📖 Domínio: {{ map.tabelaReferencia }}
+                      Domínio: {{ map.tabelaReferencia }}
                     </span>
 
                     <!-- Regra de Valor Mínimo -->
