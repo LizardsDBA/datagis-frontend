@@ -20,6 +20,7 @@ const statusLista = ref([])
 const carregando = ref(false)
 const erro = ref(null)
 const topInconsistencia = ref(null)
+const diagnosticoChartRef = ref(null)
 
 const secoesExpandidas = reactive({
   filtros: true,
@@ -39,7 +40,8 @@ function handleAtualizado(res) {
   } else if (res?.lotesLiberados && res.lotesLiberados.length > 0) {
     exibirMensagemSucesso(`Registro revalidado com sucesso! Lote(s) #${res.lotesLiberados.join(', #')} liberado(s) integralmente para a Silver!`)
   }
-  carregarTudo()
+    carregarTudo()
+  diagnosticoChartRef.value?.recarregar()
 }
 
 function exibirMensagemSucesso(msg) {
@@ -293,7 +295,7 @@ onMounted(() => {
     </section>
 
     <section class="secao-diagnostico">
-      <DiagnosticoChart :loteId="filtroLoteId" @top-inconsistencia="topInconsistencia = $event" />
+      <DiagnosticoChart ref="diagnosticoChartRef" :loteId="filtroLoteId" @top-inconsistencia="topInconsistencia = $event" />
     </section>
 
     <div class="card-acordeao">

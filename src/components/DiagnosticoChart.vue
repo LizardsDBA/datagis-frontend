@@ -99,6 +99,8 @@ async function carregarDados() {
 
 onMounted(carregarDados)
 watch(() => props.loteId, carregarDados)
+
+defineExpose({ recarregar: carregarDados })
 </script>
 
 <template>
