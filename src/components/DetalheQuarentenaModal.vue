@@ -358,6 +358,7 @@ async function onReprocessar() {
     emit('close')
   } catch (err) {
     erroAcao.value = err.message
+    emit('atualizado')
   } finally {
     enviando.value = false
   }
