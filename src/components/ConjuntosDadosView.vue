@@ -272,7 +272,7 @@ onMounted(async () => {
                       title="Copiar payload (JSON)"
                       @click="copiarPayload(item)"
                     >
-                      {{ idCopiadoRecentemente === item.registroBrutoId ? '✓ Copiado' : '📋 Copiar' }}
+                      {{ idCopiadoRecentemente === item.registroBrutoId ? '✓ Copiado' : 'Copiar' }}
                     </button>
                     <button
                       v-if="item.temGeometria"
@@ -280,7 +280,7 @@ onMounted(async () => {
                       title="Ver geometria"
                       @click="verGeometria(item)"
                     >
-                      🗺️
+                      Mapa
                     </button>
                     <button
                       v-for="destino in outrasCamadas"

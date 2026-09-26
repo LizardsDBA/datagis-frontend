@@ -568,7 +568,7 @@ onUnmounted(() => {
           <tbody>
             <template v-for="fonte in fontes" :key="fonte.id">
               <tr class="linha-fonte">
-                <!-- Nome & Órgão & URL exposta -->
+                <!-- Nome e Órgão e URL exposta -->
                 <td class="celula-fonte-principal">
                   <div class="fonte-nome-linha">
                     <span class="fonte-id">#{{ fonte.id }}</span>
@@ -579,7 +579,6 @@ onUnmounted(() => {
                   </div>
                   <!-- Informação que antes estava escondida: URL de origem exposta diretamente -->
                   <div v-if="fonte.urlOrigem" class="fonte-url-preview" :title="fonte.urlOrigem">
-                    <span class="url-icone">🔗</span>
                     <span class="url-texto">{{ fonte.urlOrigem }}</span>
                   </div>
                 </td>
@@ -736,7 +735,7 @@ onUnmounted(() => {
                   <div v-if="estadoDe(fonte.id).estado === 'executando'" class="banner-progresso">
                     <template v-if="estadoDe(fonte.id).progressoUploadPct !== null && estadoDe(fonte.id).progressoUploadPct < 100">
                       <div class="linha-fase">
-                        <span>📤 Enviando arquivo para o servidor...</span>
+                        <span>Enviando arquivo para o servidor...</span>
                         <strong>{{ estadoDe(fonte.id).progressoUploadPct }}%</strong>
                       </div>
                       <div class="trilho-progresso">
@@ -746,7 +745,7 @@ onUnmounted(() => {
 
                     <template v-else>
                       <div class="linha-fase">
-                        <span>⚙️ {{ FASES_LABEL[estadoDe(fonte.id).fase] || 'Executando pipeline de ingestão…' }}</span>
+                        <span>{{ FASES_LABEL[estadoDe(fonte.id).fase] || 'Executando pipeline de ingestão…' }}</span>
                         <span class="tempo-decorrido">({{ estadoDe(fonte.id).segundos }}s decorridos)</span>
                       </div>
                       <div v-if="estadoDe(fonte.id).detalhe" class="detalhe-fase">
@@ -770,7 +769,7 @@ onUnmounted(() => {
                     v-else-if="estadoDe(fonte.id).estado === 'sucesso' && estadoDe(fonte.id).resultado?.status === 'SEM_MUDANCA'"
                     class="resultado-banner resultado-banner--neutro"
                   >
-                    ℹ️ <strong>Conteúdo inalterado:</strong> Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} verificado — nenhum registro novo encontrado na origem.
+                    <strong>Conteúdo inalterado:</strong> Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} verificado — nenhum registro novo encontrado na origem.
                   </div>
 
                   <div
@@ -779,7 +778,7 @@ onUnmounted(() => {
                   >
                     <div class="resultado-alerta-corpo">
                       <div>
-                        ⚠️ <strong>Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} retido na Quarentena!</strong>
+                        <strong>Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} retido na Quarentena!</strong>
                         <p class="alerta-regra">
                           Pela regra de integridade total (All-or-Nothing), <strong>nenhum registro foi promovido para a Silver</strong> até que as inconsistências sejam validadas por um analista.
                         </p>
@@ -809,9 +808,9 @@ onUnmounted(() => {
                   >
                     <div class="resultado-alerta-corpo">
                       <div>
-                        ✓ <strong>Lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} promovido para a Silver com 100% de integridade!</strong>
+                        ✓ <strong>Tudo certo! O lote #{{ estadoDe(fonte.id).resultado.loteIngestaoId }} foi para a Silver.</strong>
                         <p class="alerta-regra">
-                          {{ estadoDe(fonte.id).resultado.quantidadeRegistros?.toLocaleString('pt-BR') }} registros gravados com sucesso na camada analítica.
+                          {{ estadoDe(fonte.id).resultado.quantidadeRegistros?.toLocaleString('pt-BR') }} registros salvos.
                         </p>
                       </div>
                       <div class="resultado-botoes-atalho">

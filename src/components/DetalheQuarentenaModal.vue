@@ -416,7 +416,6 @@ async function onReprocessar() {
         <section v-if="podeAdicionarAoDominio" class="secao-dominio">
           <div class="dominio-header">
             <div class="dominio-info">
-              <span class="icone-sparkle">✨</span>
               <div>
                 <h4>Adicionar ao Domínio Silver</h4>
                 <p>O valor rejeitado pode ser inserido na tabela de referência <code>{{ item.tabelaReferencia }}</code>.</p>
@@ -501,7 +500,7 @@ async function onReprocessar() {
                       </option>
                     </select>
                     <small v-if="sugestaoTipoEncontrada" class="campo-ajuda dica-sugestao">
-                      ✨ Pré-selecionado automaticamente a partir do registro bruto original ({{ item.tipoAreaProtegida }}).
+                      Pré-selecionado automaticamente a partir do registro bruto original ({{ item.tipoAreaProtegida }}).
                     </small>
                   </div>
                 </div>
@@ -547,7 +546,7 @@ async function onReprocessar() {
                 @click="onSalvarDominio"
                 :disabled="salvandoDominio || !novaDescricao.trim()"
               >
-                {{ salvandoDominio ? 'Cadastrando & Revalidando...' : 'Salvar no Domínio & Revalidar' }}
+                {{ salvandoDominio ? 'Cadastrando e Revalidando...' : 'Salvar no Domínio e Revalidar' }}
               </button>
             </div>
           </div>
@@ -562,7 +561,6 @@ async function onReprocessar() {
           <div class="geometria-header">
             <div class="geometria-titulo-container">
               <div class="titulo-linha">
-                <span class="icone-gis">🗺️</span>
                 <h3>Lista de Coordenadas do Polígono</h3>
                 <span class="badge-srid">SRID 4674 • SIRGAS 2000</span>
                 <span v-if="totalVertices > 0" class="badge-vertices">{{ totalVertices }} vértices</span>
@@ -595,11 +593,9 @@ async function onReprocessar() {
             ></textarea>
             <div class="geometria-guia">
               <div class="guia-item">
-                <span class="guia-bullet">📍</span>
                 <span><strong>Formato das Coordenadas:</strong> Lista ordenada de pares <code>[longitude, latitude]</code>. O primeiro e o último ponto devem ser iguais para fechar o polígono.</span>
               </div>
               <div class="guia-item">
-                <span class="guia-bullet">📐</span>
                 <span><strong>Recorte Territorial do Paraná:</strong> Longitude entre <code>-55.00</code> e <code>-47.50</code>, Latitude entre <code>-27.20</code> e <code>-22.00</code>.</span>
               </div>
             </div>
@@ -696,7 +692,7 @@ async function onReprocessar() {
             @click="onReprocessar"
             :disabled="enviando"
           >
-            {{ enviando ? 'Revalidando...' : 'Revalidar & Aprovar' }}
+            {{ enviando ? 'Revalidando...' : 'Revalidar e Aprovar' }}
           </button>
         </div>
       </footer>
@@ -1083,14 +1079,6 @@ async function onReprocessar() {
   gap: 0.75rem;
 }
 
-.icone-sparkle {
-  font-size: 1.3rem;
-  background: #dcfce7;
-  padding: 0.4rem;
-  border-radius: 8px;
-  line-height: 1;
-}
-
 .dominio-info h4 {
   margin: 0;
   font-size: 0.95rem;
@@ -1375,10 +1363,6 @@ async function onReprocessar() {
   gap: 0.5rem;
 }
 
-.icone-gis {
-  font-size: 1.25rem;
-}
-
 .titulo-linha h3 {
   margin: 0;
   font-size: 1.05rem;
@@ -1493,11 +1477,6 @@ async function onReprocessar() {
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.76rem;
-}
-
-.guia-bullet {
-  font-size: 0.9rem;
-  line-height: 1.2;
 }
 
 @media (max-width: 640px) {

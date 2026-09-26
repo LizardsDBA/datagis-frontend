@@ -8,9 +8,9 @@ const route = useRoute()
 
 function obterNomePagina() {
   if (route.path.startsWith('/fontes')) return 'Cadastro de Fontes'
-  if (route.path.startsWith('/lotes')) return 'Lotes & Pipeline'
-  if (route.path.startsWith('/quarentena')) return 'Quarentena & Qualidade'
-  if (route.path.startsWith('/gold')) return 'Indicadores & Imóveis'
+  if (route.path.startsWith('/lotes')) return 'Lotes e Pipeline'
+  if (route.path.startsWith('/quarentena')) return 'Quarentena e Qualidade'
+  if (route.path.startsWith('/gold')) return 'Indicadores e Imóveis'
   return 'DataGIS'
 }
 </script>

@@ -142,7 +142,7 @@ async function confirmarLiberacao() {
     if (item) {
       item.status = 'PROMOVIDO_SILVER'
     }
-    sucesso.value = `Lote #${loteIdAlvo} liberado com sucesso para a camada Silver!`
+    sucesso.value = `Pronto! O lote #${loteIdAlvo} foi para a Silver.`
 
     carregarLotes()
 
@@ -154,7 +154,7 @@ async function confirmarLiberacao() {
   } catch (e) {
     if (timerProgresso) clearInterval(timerProgresso)
     faseLiberacao.value = 'ERRO'
-    mensagemErroLiberacao.value = e.message || 'Falha ao liberar lote para a camada Silver.'
+    mensagemErroLiberacao.value = e.message || 'Não foi possível enviar o lote para a Silver.'
   }
 }
 
@@ -201,8 +201,8 @@ onMounted(() => {
     <!-- Cabeçalho Principal -->
     <header class="topo-pagina">
       <div>
-        <p class="etiqueta">PIPELINE & TRANSIÇÃO</p>
-        <h1 class="titulo">Lotes de Ingestão & Pipeline</h1>
+        <p class="etiqueta">PIPELINE e TRANSIÇÃO</p>
+        <h1 class="titulo">Lotes de Ingestão e Pipeline</h1>
         <p class="subtitulo">
           Monitoramento do fluxo Bronze → Silver e governança da integridade total (All-or-Nothing).
         </p>
@@ -341,7 +341,7 @@ onMounted(() => {
               <thead>
                 <tr>
                   <th class="col-id">Lote ID</th>
-                  <th>Fonte de Origem & Arquivo</th>
+                  <th>Fonte de Origem e Arquivo</th>
                   <th>Registros</th>
                   <th>Data de Execução</th>
                   <th>Status da Transição</th>
@@ -361,7 +361,6 @@ onMounted(() => {
                     <div class="fonte-sub-info">
                       <span class="texto-apagado">Fonte #{{ lote.fonteDadoId }}</span>
                       <div v-if="lote.origemReferencia" class="origem-ref-badge" :title="lote.origemReferencia">
-                        <span class="origem-icone">📁</span>
                         <span class="origem-texto">{{ lote.origemReferencia }}</span>
                       </div>
                     </div>
@@ -486,8 +485,8 @@ onMounted(() => {
         <template v-if="faseLiberacao === 'CONFIRMACAO'">
           <header class="modal-header">
             <div>
-              <span class="modal-etiqueta etiqueta-verde">TRANSIÇÃO BRONZE → SILVER</span>
-              <h2 class="modal-titulo">Liberar Lote #{{ loteParaLiberar.id }} para a Silver</h2>
+              <span class="modal-etiqueta etiqueta-verde">ENVIAR PARA A SILVER</span>
+              <h2 class="modal-titulo">Enviar o lote #{{ loteParaLiberar.id }} para a Silver?</h2>
               <p class="modal-sub">
                 Fonte: <strong>{{ loteParaLiberar.fonteDadoNome }}</strong> ({{ (loteParaLiberar.quantidadeRegistros || 0).toLocaleString('pt-BR') }} registros)
               </p>
@@ -504,12 +503,12 @@ onMounted(() => {
                 </svg>
               </div>
               <div class="info-texto">
-                <h4>Promoção Atômica de Dados</h4>
+                <h4>O que vai acontecer</h4>
                 <p>
-                  Esta ação reprocessará as regras de validação, efetuará a conversão para <code>MDSYS.SDO_GEOMETRY</code> (SRID 4674) e persistirá todos os registros aprovados na tabela <strong>SILVER.IMOVEL_RURAL</strong>.
+                  Vamos conferir os registros de novo e salvar os que estiverem certos na Silver, onde ficam prontos para os cruzamentos e indicadores.
                 </p>
                 <p class="destaque-quarentena">
-                  ✓ As pendências deste lote na quarentena serão atualizadas para <strong>CORRIGIDO_REPROCESSADO</strong>.
+                  ✓ Os itens deste lote na Quarentena serão marcados como resolvidos.
                 </p>
               </div>
             </div>
@@ -533,7 +532,7 @@ onMounted(() => {
           <footer class="modal-footer">
             <button class="btn-cancelar" @click="fecharModalLiberacao">Cancelar</button>
             <button class="btn-confirmar-liberar" @click="confirmarLiberacao">
-              Confirmar e Liberar para Silver
+              Enviar para a Silver
             </button>
           </footer>
         </template>
@@ -542,10 +541,10 @@ onMounted(() => {
         <template v-else-if="faseLiberacao === 'PROCESSANDO'">
           <header class="modal-header">
             <div>
-              <span class="modal-etiqueta etiqueta-azul">PIPELINE EM EXECUÇÃO</span>
-              <h2 class="modal-titulo">Promovendo Lote #{{ loteParaLiberar.id }} para Silver...</h2>
+              <span class="modal-etiqueta etiqueta-azul">ENVIANDO</span>
+              <h2 class="modal-titulo">Enviando o lote #{{ loteParaLiberar.id }}...</h2>
               <p class="modal-sub">
-                Processando {{ (loteParaLiberar.quantidadeRegistros || 0).toLocaleString('pt-BR') }} registros com persistência atômica
+                Isso pode levar alguns segundos.
               </p>
             </div>
           </header>
@@ -554,7 +553,7 @@ onMounted(() => {
             <!-- Barra de Progresso Animada -->
             <div class="progresso-wrapper">
               <div class="progresso-topo">
-                <span class="progresso-label">Progresso da Transição</span>
+                <span class="progresso-label">Progresso</span>
                 <span class="progresso-porcentagem">{{ progressoPercentual }}%</span>
               </div>
               <div class="barra-trilho">
@@ -573,8 +572,8 @@ onMounted(() => {
                   <span v-else>1</span>
                 </div>
                 <div class="step-conteudo">
-                  <h5>Validação de Regras & Deduplicação</h5>
-                  <p>Checagem de chaves de negócio e integridade referencial</p>
+                  <h5>Conferindo os dados</h5>
+                  <p>Checando regras e removendo registros repetidos</p>
                 </div>
               </div>
 
@@ -585,8 +584,8 @@ onMounted(() => {
                   <span v-else>2</span>
                 </div>
                 <div class="step-conteudo">
-                  <h5>Conversão Espacial MDSYS.SDO_GEOMETRY</h5>
-                  <p>Reprojeção WKT e integridade topológica SRID 4674 (SIRGAS 2000)</p>
+                  <h5>Preparando os mapas</h5>
+                  <p>Ajustando as geometrias dos imóveis</p>
                 </div>
               </div>
 
@@ -597,8 +596,8 @@ onMounted(() => {
                   <span v-else>3</span>
                 </div>
                 <div class="step-conteudo">
-                  <h5>Persistência Otimizada na Camada Silver</h5>
-                  <p>Upsert atômico dos registros com resolução de municípios em memória</p>
+                  <h5>Salvando na Silver</h5>
+                  <p>Gravando os registros aprovados</p>
                 </div>
               </div>
 
@@ -608,8 +607,8 @@ onMounted(() => {
                   <div v-else class="step-circulo-vazio">4</div>
                 </div>
                 <div class="step-conteudo">
-                  <h5>Baixa na Quarentena & Conclusão</h5>
-                  <p>Atualização de status para PROMOVIDO_SILVER no schema CONTROLE</p>
+                  <h5>Finalizando</h5>
+                  <p>Atualizando o status do lote</p>
                 </div>
               </div>
             </div>
@@ -617,7 +616,7 @@ onMounted(() => {
 
           <footer class="modal-footer">
             <span class="texto-aviso-processando">
-              <span class="spinner-pequeno"></span> Executando transação atômica no Oracle Database...
+              <span class="spinner-pequeno"></span> Quase lá, não feche esta janela...
             </span>
           </footer>
         </template>
@@ -626,8 +625,8 @@ onMounted(() => {
         <template v-else-if="faseLiberacao === 'SUCESSO'">
           <header class="modal-header modal-header--sucesso">
             <div>
-              <span class="modal-etiqueta etiqueta-verde">TRANSIÇÃO CONCLUÍDA</span>
-              <h2 class="modal-titulo">Lote #{{ loteParaLiberar.id }} Promovido com Sucesso!</h2>
+              <span class="modal-etiqueta etiqueta-verde">ENVIO CONCLUÍDO</span>
+              <h2 class="modal-titulo">Pronto! O lote #{{ loteParaLiberar.id }} está na Silver</h2>
             </div>
             <button class="btn-fechar" @click="fecharModalLiberacao">✕</button>
           </header>
@@ -639,9 +638,9 @@ onMounted(() => {
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
             </div>
-            <h3>Dados Disponíveis na Silver</h3>
+            <h3>Dados disponíveis na Silver</h3>
             <p class="sub-sucesso">
-              Todos os registros válidos do lote foram promovidos para a camada Silver e estão disponíveis para cruzamentos geoespaciais.
+              Os registros já podem ser usados nos cruzamentos e indicadores.
             </p>
             <div class="barra-trilho">
               <div class="barra-preenchimento barra--100"></div>
@@ -914,27 +913,6 @@ onMounted(() => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-/* Bordas laterais fixas dos KPIs de Lotes */
-.card-metrica:first-child {
-  border-left: 5px solid #0284c7 !important; /* Total de Lotes */
-}
-
-.card-metrica--promovido {
-  border-left: 5px solid #16a34a !important;
-}
-
-.card-metrica--retido {
-  border-left: 5px solid #f59e0b !important;
-}
-
-.card-metrica--descartado {
-  border-left: 5px solid #dc2626 !important;
-}
-
-.card-metrica--neutro {
-  border-left: 5px solid #64748b !important;
-}
-
 /* Números acompanhando as cores das caixas */
 .card-metrica:first-child .metrica-valor {
   color: #0284c7;
@@ -965,22 +943,6 @@ onMounted(() => {
 .metrica-sub {
   font-size: 0.74rem;
   color: #94a3b8;
-}
-
-.card-metrica--promovido {
-  border-left: 4px solid #16a34a;
-}
-
-.card-metrica--retido {
-  border-left: 4px solid #f59e0b;
-}
-
-.card-metrica--descartado {
-  border-left: 4px solid #dc2626;
-}
-
-.card-metrica--neutro {
-  border-left: 4px solid #94a3b8;
 }
 
 /* Alertas */
