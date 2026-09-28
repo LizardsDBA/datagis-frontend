@@ -1,11 +1,10 @@
-# Imagem de DESENVOLVIMENTO — roda o servidor Vite com o codigo montado do host
-# (bind mount via docker-compose). Nao empacota nada; e so a toolchain Node.
-# Dockerfile de build/producao (empacotado) fica para quando hospedagem entrar.
+# Imagem de desenvolvimento: roda o Vite com o codigo montado do host, nao
+# empacota nada. So a toolchain do Node.
 FROM node:22-slim
 
 WORKDIR /app
 
-# node_modules fica em volume nomeado (docker-compose), nunca bind mount do host.
+# node_modules fica em volume nomeado, nunca vem do bind mount do host.
 EXPOSE 5173
 
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
