@@ -1,5 +1,6 @@
 <script setup>
 import { reactive, ref, watch, onMounted, onUnmounted } from 'vue'
+import { apiFetch } from '../services/http'
 import { useRouter } from 'vue-router'
 import ConstrutorCron from './ConstrutorCron.vue'
 import ModalMapeamentoColunas from './ModalMapeamentoColunas.vue'
@@ -135,7 +136,7 @@ function iniciarSondagemDeProgresso(fonte) {
   if (est.sondagem) return
   est.sondagem = setInterval(async () => {
     try {
-      const resposta = await fetch(`/api/fontes/${fonte.id}/progresso`)
+      const resposta = await apiFetch(`/api/fontes/${fonte.id}/progresso`)
       if (!resposta.ok) return
       const corpo = await resposta.json()
       if (!corpo.fase) return
@@ -161,7 +162,7 @@ function pararSondagemDeProgresso(fonte) {
 async function carregarFontes() {
   carregandoLista.value = true
   try {
-    const resposta = await fetch('/api/fontes')
+    const resposta = await apiFetch('/api/fontes')
     fontes.value = await resposta.json()
   } catch (e) {
     erro.value = 'Não deu pra carregar a lista de fontes.'
@@ -196,7 +197,7 @@ async function salvar() {
   try {
     const url = editandoId.value ? `/api/fontes/${editandoId.value}` : '/api/fontes'
     const metodo = editandoId.value ? 'PUT' : 'POST'
-    const resposta = await fetch(url, {
+    const resposta = await apiFetch(url, {
       method: metodo,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value),
@@ -226,7 +227,7 @@ async function executar(fonte) {
   iniciarSondagemDeProgresso(fonte)
 
   try {
-    const resposta = await fetch(`/api/fontes/${fonte.id}/executar`, { method: 'POST' })
+    const resposta = await apiFetch(`/api/fontes/${fonte.id}/executar`, { method: 'POST' })
     const corpo = await resposta.json().catch(() => null)
     if (!resposta.ok) {
       throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)

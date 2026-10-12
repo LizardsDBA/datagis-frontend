@@ -9,6 +9,7 @@
  * propósito, só a mesma ideia visual (cards, tabela, badges).
  */
 import { ref, computed, onMounted } from 'vue'
+import { apiFetch } from '../services/http'
 import { useRoute } from 'vue-router'
 import {
   buscarUltimoLote,
@@ -194,7 +195,7 @@ function formatarData(iso) {
 onMounted(async () => {
   try {
     const [fonteResp, loteResp] = await Promise.all([
-      fetch(`/api/fontes/${fonteId}`).then((r) => (r.ok ? r.json() : null)),
+      apiFetch(`/api/fontes/${fonteId}`).then((r) => (r.ok ? r.json() : null)),
       buscarUltimoLote(fonteId),
     ])
     loteResumo.value = { ...loteResp, fonteDadoNomeExibicao: fonteResp?.nome || loteResp.fonteDadoNome }

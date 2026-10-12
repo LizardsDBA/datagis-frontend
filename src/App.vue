@@ -11,6 +11,7 @@ function obterNomePagina() {
   if (route.path.startsWith('/lotes')) return 'Lotes e Pipeline'
   if (route.path.startsWith('/quarentena')) return 'Quarentena e Qualidade'
   if (route.path.startsWith('/gold')) return 'Indicadores e Imóveis'
+  if (route.path.startsWith('/admin/usuarios')) return 'Usuários e Acessos'
   return 'DataGIS'
 }
 </script>
