@@ -22,6 +22,8 @@ import {
 } from '../services/conjuntosDadosService'
 import ModalVisualizarGeometria from './ModalVisualizarGeometria.vue'
 import ModalRegistroCamada from './ModalRegistroCamada.vue'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 
 const route = useRoute()
 const fonteId = route.params.fonteId
@@ -71,7 +73,12 @@ const colunasDinamicas = computed(() => {
   return Array.from(chaves)
 })
 
-const outrasCamadas = computed(() => CAMADAS.map((c) => c.valor).filter((v) => v !== camadaAtiva.value))
+// A aba Quarentena le /api/quarentena: so aparece pra quem tem quarentena:visualizar.
+// O Analista ve Bronze e Silver; o Operador e o Auditor veem as tres (LIZARDS-46).
+const camadasPermitidas = CAMADAS.filter(
+  (c) => c.valor !== 'QUARENTENA' || temPermissao(PERMISSOES.QUARENTENA_VISUALIZAR),
+)
+const outrasCamadas = computed(() => camadasPermitidas.map((c) => c.valor).filter((v) => v !== camadaAtiva.value))
 
 function normalizarItemQuarentena(item) {
   const dados = {}
@@ -231,7 +238,7 @@ onMounted(async () => {
     <template v-else>
       <div class="seletor-camadas">
         <button
-          v-for="camada in CAMADAS"
+          v-for="camada in camadasPermitidas"
           :key="camada.valor"
           class="botao-camada"
           :class="{ 'botao-camada--ativo': camadaAtiva === camada.valor }"
