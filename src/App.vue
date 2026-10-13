@@ -12,6 +12,7 @@ function obterNomePagina() {
   if (route.path.startsWith('/quarentena')) return 'Quarentena e Qualidade'
   if (route.path.startsWith('/gold')) return 'Indicadores e Imóveis'
   if (route.path.startsWith('/admin/usuarios')) return 'Usuários e Acessos'
+  if (route.path.startsWith('/auditoria')) return 'Logs de Auditoria'
   return 'DataGIS'
 }
 </script>

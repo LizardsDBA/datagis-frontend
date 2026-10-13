@@ -52,6 +52,13 @@ const itens = [
   //   permissao: PERMISSOES.INDICADOR_VISUALIZAR,
   // },
   {
+    rota: '/auditoria',
+    rotulo: 'Logs de Auditoria',
+    icone: 'auditoria',
+    descricao: 'Quem fez o quê e quando',
+    permissao: PERMISSOES.AUDITORIA_VISUALIZAR,
+  },
+  {
     rota: '/admin/usuarios',
     rotulo: 'Usuários e Acessos',
     icone: 'usuarios',
@@ -153,6 +160,13 @@ function navegar() {
               <path d="M4 5h11l-2 3 2 3H4" />
               <path d="M16 15h4" />
               <path d="M18 13v4" />
+            </svg>
+            <!-- Ícone para Logs de Auditoria -->
+            <svg v-else-if="item.icone === 'auditoria'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="8" y1="13" x2="16" y2="13" />
+              <line x1="8" y1="17" x2="13" y2="17" />
             </svg>
             <!-- Ícone para Usuários e Acessos -->
             <svg v-else-if="item.icone === 'usuarios'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
