@@ -7,6 +7,8 @@ import {
   adicionarValorDominio,
   buscarTiposAreaProtegida,
 } from '../services/quarentenaService'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 
 const props = defineProps({
   item: {
@@ -188,7 +190,12 @@ function gerarSlug(texto) {
     .slice(0, 40)
 }
 
+// Corrigir, revalidar, descartar e cadastrar domínio exigem quarentena:tratar (LIZARDS-45);
+// quem só visualiza (ex.: Auditor) inspeciona o registro sem os botões de ação.
+const podeTratar = temPermissao(PERMISSOES.QUARENTENA_TRATAR)
+
 const podeAdicionarAoDominio = computed(() => {
+  if (!podeTratar) return false
   if (props.item.tipoErroCodigo !== 'VALOR_FORA_DO_DOMINIO') return false
   if (props.item.statusAnaliseCodigo === 'DESCARTADO' || props.item.statusAnaliseCodigo === 'CORRIGIDO_REPROCESSADO') return false
   const tab = props.item.tabelaReferencia
@@ -614,7 +621,7 @@ async function onReprocessar() {
               <button class="btn-copiar-json" @click="copiarPayload" title="Copiar JSON para a área de transferência">
                 {{ copiado ? '✓ Copiado!' : 'Copiar JSON' }}
               </button>
-              <button class="btn-secundario-sm" @click="modoEdicao = !modoEdicao">
+              <button v-if="podeTratar" class="btn-secundario-sm" @click="modoEdicao = !modoEdicao">
                 {{ modoEdicao ? 'Visualizar Formatado' : 'Editar Correção Manual' }}
               </button>
             </div>
@@ -658,7 +665,7 @@ async function onReprocessar() {
           Fechar
         </button>
 
-        <div class="acoes-direita">
+        <div v-if="podeTratar" class="acoes-direita">
           <button
             v-if="podeAdicionarAoDominio && !modoAdicionarDominio"
             type="button"

@@ -4,8 +4,15 @@ import { apiFetch } from '../services/http'
 import { useRouter } from 'vue-router'
 import ConstrutorCron from './ConstrutorCron.vue'
 import ModalMapeamentoColunas from './ModalMapeamentoColunas.vue'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 
 const router = useRouter()
+
+// Quem so visualiza fontes (ex.: Analista, Auditor) ve a lista sem os botoes de alterar,
+// executar ou enviar arquivo (LIZARDS-45); o backend barra com 403 de qualquer jeito.
+const podeGerenciar = temPermissao(PERMISSOES.FONTE_GERENCIAR)
+const podeVerDados = temPermissao(PERMISSOES.DADOS_VISUALIZAR)
 const fonteParaMapeamento = ref(null)
 
 const fontes = ref([])
@@ -389,7 +396,7 @@ onUnmounted(() => {
           <span>Atualizar</span>
         </button>
 
-        <button class="btn-adicionar-fonte" @click="abrirCadastro">
+        <button v-if="podeGerenciar" class="btn-adicionar-fonte" @click="abrirCadastro">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14" />
             <path d="M5 12h14" />
@@ -658,6 +665,7 @@ onUnmounted(() => {
                 <td class="celula-acoes">
                   <div class="grupo-botoes-acoes">
                     <button
+                      v-if="podeGerenciar"
                       class="btn-acao-circulo btn-editar"
                       title="Editar configurações da fonte"
                       @click="editar(fonte)"
@@ -684,7 +692,7 @@ onUnmounted(() => {
                     </button>
 
                     <button
-                      v-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
+                      v-if="podeGerenciar && fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
                       class="btn-acao-circulo btn-executar"
                       :disabled="estadoDe(fonte.id).estado === 'executando'"
                       title="Enviar arquivo (.zip / shapefile / csv) e executar ingestão"
@@ -700,7 +708,7 @@ onUnmounted(() => {
                     </button>
 
                     <button
-                      v-else
+                      v-else-if="podeGerenciar"
                       class="btn-acao-circulo btn-executar"
                       :disabled="estadoDe(fonte.id).estado === 'executando'"
                       :title="'Disparar ingestão remota de ' + fonte.nome"
@@ -714,6 +722,7 @@ onUnmounted(() => {
                     </button>
 
                     <button
+                      v-if="podeVerDados"
                       class="btn-acao-circulo btn-conjunto-dados"
                       title="Ver Conjunto de Dados (Bronze / Silver / Quarentena)"
                       @click="router.push('/conjuntos-dados/' + fonte.id)"

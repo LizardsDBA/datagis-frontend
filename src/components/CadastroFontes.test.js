@@ -5,6 +5,15 @@ import CadastroFontes from './CadastroFontes.vue'
 // A tela usa router.push nos atalhos de lote/quarentena; nos testes basta um espiao.
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
+// Sessão de mentira: por padrão o usuário pode tudo (Operador); cada teste pode restringir.
+const { sessaoTeste } = vi.hoisted(() => ({ sessaoTeste: { permissoes: [] } }))
+vi.mock('../auth/autenticacao', () => ({
+    temPermissao: (p) => !p || sessaoTeste.permissoes.includes(p),
+    obterToken: async () => null,
+    entrarNovamente: () => {},
+}))
+const PERMISSOES_OPERADOR = ['fonte:visualizar', 'fonte:gerenciar', 'dados:visualizar']
+
 // Fontes de mentira cobrindo os quatro casos de agendamento que a coluna precisa mostrar.
 const FONTES = [
     { id: 1, nome: 'CAR - Imóveis (PR)', orgao: 'SICAR', tipoAquisicao: 'API_REST', formatoEsperado: 'GEOJSON', cronExpressao: '0 0 2 * * ?', ativo: true },
@@ -19,6 +28,7 @@ let wrapper
 beforeEach(() => {
     // A tela busca /api/fontes no onMounted; sem isso o teste bateria no backend.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => FONTES }))
+    sessaoTeste.permissoes = PERMISSOES_OPERADOR
 })
 
 afterEach(() => {
@@ -58,6 +68,27 @@ describe('CadastroFontes — modal de cadastro/edição', () => {
         const modal = wrapper.get('.modal-dialog')
         expect(modal.text()).toContain('Editar Fonte #1')
         expect(modal.get('input').element.value).toBe('CAR - Imóveis (PR)')
+    })
+})
+
+describe('CadastroFontes — permissões (LIZARDS-45)', () => {
+    it('quem só visualiza fontes vê a lista sem os botões de alterar, executar ou enviar arquivo', async () => {
+        sessaoTeste.permissoes = ['fonte:visualizar']
+        await abrirTela()
+        expect(wrapper.text()).toContain('Fontes Cadastradas (5)')
+        expect(wrapper.find('.btn-adicionar-fonte').exists()).toBe(false)
+        expect(wrapper.find('.btn-editar').exists()).toBe(false)
+        expect(wrapper.find('.btn-executar').exists()).toBe(false)
+        expect(wrapper.find('.btn-conjunto-dados').exists()).toBe(false)
+        // O de-para continua consultável (o modal esconde a edição)
+        expect(wrapper.find('.btn-mapeamento').exists()).toBe(true)
+    })
+
+    it('o Operador vê executar e enviar arquivo em todas as fontes', async () => {
+        await abrirTela()
+        // 4 fontes executáveis + 1 de upload manual
+        expect(wrapper.findAll('.btn-executar')).toHaveLength(5)
+        expect(wrapper.findAll('.btn-conjunto-dados')).toHaveLength(5)
     })
 })
 
