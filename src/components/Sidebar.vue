@@ -8,38 +8,56 @@ defineProps({
 
 const emit = defineEmits(['fechar'])
 
-const itens = [
+// Estrutura agrupada por categorias (LIZARDS-36)
+const categorias = [
   {
-    rota: '/fontes',
-    rotulo: 'Cadastro de Fontes',
-    icone: 'fontes',
-    descricao: 'Ingestão e schemas',
+    titulo: 'Ingestão & Qualidade (Bronze)',
+    itens: [
+      {
+        rota: '/fontes',
+        rotulo: 'Cadastro de Fontes',
+        icone: 'fontes',
+        descricao: 'Ingestão e schemas',
+      },
+      {
+        rota: '/lotes',
+        rotulo: 'Lotes e Pipeline',
+        icone: 'lotes',
+        descricao: 'Monitoramento e Transição',
+      },
+      {
+        rota: '/quarentena',
+        rotulo: 'Quarentena e Qualidade',
+        icone: 'quarentena',
+        descricao: 'Auditoria e Correção',
+      },
+    ],
   },
   {
-    rota: '/lotes',
-    rotulo: 'Lotes e Pipeline',
-    icone: 'lotes',
-    descricao: 'Monitoramento e Transição',
+    titulo: 'Processamento & Linhagem (Silver)',
+    itens: [
+      {
+        rota: '/conjuntos',
+        rotulo: 'Conjuntos e Cobertura',
+        icone: 'conjuntos',
+        descricao: 'Cadastro e Mapa Territorial',
+      },
+    ],
   },
+  // Categoria Gold mantida comentada conforme histórico (LIZARDS-27)
+  /*
   {
-    rota: '/quarentena',
-    rotulo: 'Quarentena e Qualidade',
-    icone: 'quarentena',
-    descricao: 'Auditoria e Correção',
+    titulo: 'Publicação & Indicadores (Gold)',
+    itens: [
+      {
+        rota: '/gold',
+        rotulo: 'Indicadores e Imóveis',
+        icone: 'gold',
+        descricao: 'Camada Gold',
+      },
+    ],
   },
-  {
-    rota: '/conjuntos',
-    rotulo: 'Conjuntos e Cobertura',
-    icone: 'conjuntos',
-    descricao: 'Cadastro e Mapa Territorial',
-  },
-  // Oculto do menu por enquanto (LIZARDS-27). A rota /gold continua existindo; para voltar, é só descomentar.
-  // {
-  //   rota: '/gold',
-  //   rotulo: 'Indicadores e Imóveis',
-  //   icone: 'gold',
-  //   descricao: 'Camada Gold',
-  // },
+  */
 ]
 
 function navegar() {
@@ -81,52 +99,60 @@ function navegar() {
       </div>
 
       <nav class="menu">
-        <div class="menu-secao-rotulo">Módulos do Sistema</div>
-        <router-link
-          v-for="item in itens"
-          :key="item.rota"
-          :to="item.rota"
-          class="item-menu"
-          active-class="item-menu--ativo"
-          @click="navegar"
+        <!-- Renderização por Categorias -->
+        <div 
+          v-for="categoria in categorias" 
+          :key="categoria.titulo" 
+          class="menu-categoria"
         >
-          <div class="icone-wrapper">
-            <!-- Ícone para Fontes -->
-            <svg v-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <ellipse cx="12" cy="5" rx="8" ry="3" />
-              <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
-              <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
-            </svg>
-            <!-- Ícone para Lotes e Pipeline -->
-            <svg v-else-if="item.icone === 'lotes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
-            <!-- Ícone para Quarentena / Qualidade -->
-            <svg v-else-if="item.icone === 'quarentena'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-            <!-- Ícone para Conjuntos e Cobertura -->
-            <svg v-else-if="item.icone === 'conjuntos'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <!-- Ícone para a camada Gold -->
-            <svg v-else-if="item.icone === 'gold'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 19V5" />
-              <path d="M4 5h11l-2 3 2 3H4" />
-              <path d="M16 15h4" />
-              <path d="M18 13v4" />
-            </svg>
-          </div>
-          <div class="item-texto">
-            <span class="item-rotulo">{{ item.rotulo }}</span>
-            <span class="item-desc">{{ item.descricao }}</span>
-          </div>
-        </router-link>
+          <div class="menu-secao-rotulo">{{ categoria.titulo }}</div>
+
+          <router-link
+            v-for="item in categoria.itens"
+            :key="item.rota"
+            :to="item.rota"
+            class="item-menu"
+            active-class="item-menu--ativo"
+            @click="navegar"
+          >
+            <div class="icone-wrapper">
+              <!-- Ícone para Fontes -->
+              <svg v-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <ellipse cx="12" cy="5" rx="8" ry="3" />
+                <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+                <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+              </svg>
+              <!-- Ícone para Lotes e Pipeline -->
+              <svg v-else-if="item.icone === 'lotes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                <polyline points="2 17 12 22 22 17" />
+                <polyline points="2 12 12 17 22 12" />
+              </svg>
+              <!-- Ícone para Quarentena / Qualidade -->
+              <svg v-else-if="item.icone === 'quarentena'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="M12 8v4" />
+                <path d="M12 16h.01" />
+              </svg>
+              <!-- Ícone para Conjuntos e Cobertura -->
+              <svg v-else-if="item.icone === 'conjuntos'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <!-- Ícone para a camada Gold -->
+              <svg v-else-if="item.icone === 'gold'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19V5" />
+                <path d="M4 5h11l-2 3 2 3H4" />
+                <path d="M16 15h4" />
+                <path d="M18 13v4" />
+              </svg>
+            </div>
+            <div class="item-texto">
+              <span class="item-rotulo">{{ item.rotulo }}</span>
+              <span class="item-desc">{{ item.descricao }}</span>
+            </div>
+          </router-link>
+        </div>
       </nav>
 
       <div class="rodape">
@@ -243,18 +269,24 @@ function navegar() {
 .menu {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 1.25rem;
   flex: 1;
 }
 
+.menu-categoria {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 .menu-secao-rotulo {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #94a3b8;
-  padding: 0.4rem 0.6rem;
-  margin-bottom: 0.2rem;
+  padding: 0.2rem 0.6rem;
+  margin-bottom: 0.1rem;
 }
 
 .item-menu {
