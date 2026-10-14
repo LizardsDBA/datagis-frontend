@@ -7,6 +7,7 @@ const { api } = vi.hoisted(() => ({
     post: vi.fn(),
     put: vi.fn(),
     delete: vi.fn(),
+    interceptors: { request: { use: vi.fn() } },
   },
 }))
 

@@ -2,6 +2,8 @@
  * Serviço de comunicação com os endpoints da Quarentena do DataGIS.
  */
 
+import { apiFetch } from './http'
+
 export async function buscarItensQuarentena(params = {}) {
   const query = new URLSearchParams()
   if (params.entidade && params.entidade !== 'todas' && params.entidade !== 'todos') query.set('entidade', params.entidade)
@@ -12,7 +14,7 @@ export async function buscarItensQuarentena(params = {}) {
   if (params.pagina !== undefined) query.set('pagina', params.pagina)
   if (params.tamanho !== undefined) query.set('tamanho', params.tamanho)
 
-  const resp = await fetch(`/api/quarentena?${query.toString()}`)
+  const resp = await apiFetch(`/api/quarentena?${query.toString()}`)
   if (!resp.ok) {
     const corpoErro = await resp.json().catch(() => null)
     throw new Error(corpoErro?.erro || `Falha ao carregar itens da quarentena: ${resp.statusText}`)
@@ -26,31 +28,31 @@ export async function buscarItensQuarentena(params = {}) {
 }
 
 export async function buscarMetricasQuarentena() {
-  const resp = await fetch('/api/quarentena/metricas')
+  const resp = await apiFetch('/api/quarentena/metricas')
   if (!resp.ok) throw new Error('Falha ao carregar métricas da quarentena')
   return resp.json()
 }
 
 export async function buscarTiposErro() {
-  const resp = await fetch('/api/quarentena/tipos-erro')
+  const resp = await apiFetch('/api/quarentena/tipos-erro')
   if (!resp.ok) throw new Error('Falha ao carregar tipos de erro')
   return resp.json()
 }
 
 export async function buscarStatusAnalise() {
-  const resp = await fetch('/api/quarentena/status-analise')
+  const resp = await apiFetch('/api/quarentena/status-analise')
   if (!resp.ok) throw new Error('Falha ao carregar status de análise')
   return resp.json()
 }
 
 export async function buscarDetalheItem(entidade, id) {
-  const resp = await fetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}`)
+  const resp = await apiFetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}`)
   if (!resp.ok) throw new Error('Falha ao carregar detalhe do item')
   return resp.json()
 }
 
 export async function descartarItem(entidade, id, motivo, analistaId = 1) {
-  const resp = await fetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}/descartar`, {
+  const resp = await apiFetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}/descartar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ motivo, analistaId }),
@@ -60,7 +62,7 @@ export async function descartarItem(entidade, id, motivo, analistaId = 1) {
 }
 
 export async function iniciarAnaliseItem(entidade, id, analistaId = 1) {
-  const resp = await fetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}/iniciar-analise`, {
+  const resp = await apiFetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}/iniciar-analise`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ analistaId }),
@@ -70,7 +72,7 @@ export async function iniciarAnaliseItem(entidade, id, analistaId = 1) {
 }
 
 export async function reprocessarItem(entidade, id, payloadCorrigido, analistaId = 1, geometriaCorrigida = null) {
-  const resp = await fetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}/reprocessar`, {
+  const resp = await apiFetch(`/api/quarentena/${encodeURIComponent(entidade)}/${id}/reprocessar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payloadCorrigido, analistaId, geometriaCorrigida }),
@@ -83,7 +85,7 @@ export async function reprocessarItem(entidade, id, payloadCorrigido, analistaId
 }
 
 export async function liberarLote(loteId, analistaId = 1) {
-  const resp = await fetch(`/api/quarentena/lotes/${loteId}/liberar`, {
+  const resp = await apiFetch(`/api/quarentena/lotes/${loteId}/liberar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ analistaId }),
@@ -96,7 +98,7 @@ export async function liberarLote(loteId, analistaId = 1) {
 }
 
 export async function descartarLote(loteId, motivo, analistaId = 1) {
-  const resp = await fetch(`/api/quarentena/lotes/${loteId}/descartar`, {
+  const resp = await apiFetch(`/api/quarentena/lotes/${loteId}/descartar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ motivo, analistaId }),
@@ -106,13 +108,13 @@ export async function descartarLote(loteId, motivo, analistaId = 1) {
 }
 
 export async function buscarMapeamentos(fonteId) {
-  const resp = await fetch(`/api/fontes/${fonteId}/mapeamentos`)
+  const resp = await apiFetch(`/api/fontes/${fonteId}/mapeamentos`)
   if (!resp.ok) throw new Error('Falha ao carregar mapeamentos da fonte')
   return resp.json()
 }
 
 export async function salvarMapeamentos(fonteId, mapeamentos) {
-  const resp = await fetch(`/api/fontes/${fonteId}/mapeamentos`, {
+  const resp = await apiFetch(`/api/fontes/${fonteId}/mapeamentos`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(mapeamentos),
@@ -122,7 +124,7 @@ export async function salvarMapeamentos(fonteId, mapeamentos) {
 }
 
 export async function excluirMapeamento(fonteId, id) {
-  const resp = await fetch(`/api/fontes/${fonteId}/mapeamentos/${id}`, {
+  const resp = await apiFetch(`/api/fontes/${fonteId}/mapeamentos/${id}`, {
     method: 'DELETE',
   })
   if (!resp.ok) throw new Error('Falha ao excluir mapeamento')
@@ -135,13 +137,13 @@ export async function buscarDiagnostico(params = {}) {
   if (params.dataInicio) query.set('dataInicio', params.dataInicio)
   if (params.dataFim) query.set('dataFim', params.dataFim)
 
-  const resp = await fetch(`/api/quarentena/diagnostico?${query.toString()}`)
+  const resp = await apiFetch(`/api/quarentena/diagnostico?${query.toString()}`)
   if (!resp.ok) throw new Error(`Falha ao carregar diagnóstico da quarentena: ${resp.statusText}`)
   return resp.json()
 }
 
 export async function adicionarValorDominio(dados) {
-  const resp = await fetch('/api/quarentena/dominios', {
+  const resp = await apiFetch('/api/quarentena/dominios', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(dados),
@@ -154,7 +156,7 @@ export async function adicionarValorDominio(dados) {
 }
 
 export async function buscarTiposAreaProtegida() {
-  const resp = await fetch('/api/quarentena/dominios/tipos-area-protegida')
+  const resp = await apiFetch('/api/quarentena/dominios/tipos-area-protegida')
   if (!resp.ok) throw new Error('Falha ao listar tipos de áreas protegidas')
   return resp.json()
 }

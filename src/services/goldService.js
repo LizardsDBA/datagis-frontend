@@ -1,6 +1,7 @@
 import axios from 'axios'
+import { autenticarAxios } from './http'
 
-const api = axios.create({ baseURL: '/api' })
+const api = autenticarAxios(axios.create({ baseURL: '/api' }))
 
 function mensagemDoErro(error, fallback) {
   const data = error?.response?.data

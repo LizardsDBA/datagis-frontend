@@ -4,6 +4,11 @@ import L from 'leaflet'
 import ConjuntosView from './ConjuntosView.vue'
 import { buscarConjuntos, buscarFontes, criarConjunto } from '../services/conjuntoService'
 
+// Sessão de mentira: por padrão o Analista (pode gerenciar conjuntos).
+const { sessaoTeste } = vi.hoisted(() => ({ sessaoTeste: { permissoes: [] } }))
+vi.mock('../auth/autenticacao', () => ({ temPermissao: (p) => !p || sessaoTeste.permissoes.includes(p) }))
+const PERMISSOES_ANALISTA = ['conjunto:visualizar', 'conjunto:gerenciar', 'indicador:visualizar', 'indicador:publicar', 'fonte:visualizar', 'dados:visualizar']
+
 vi.mock('../services/conjuntoService', () => ({
   buscarConjuntos: vi.fn(), buscarFontes: vi.fn(), criarConjunto: vi.fn(),
 }))
@@ -21,6 +26,7 @@ vi.mock('leaflet', () => ({ default: {
 
 let wrapper
 beforeEach(() => {
+  sessaoTeste.permissoes = PERMISSOES_ANALISTA
   vi.resetAllMocks()
   buscarConjuntos.mockResolvedValue([])
   buscarFontes.mockResolvedValue([{ id: 7, nome: 'CAR PR', orgao: 'SICAR' }])
@@ -129,5 +135,19 @@ describe('ConjuntosView', () => {
     wrapper.unmount()
     wrapper = null
     expect(mapa.remove).toHaveBeenCalledOnce()
+  })
+})
+
+describe('ConjuntosView — permissões (LIZARDS-46)', () => {
+  it('quem só visualiza vê conjuntos e mapa, sem o formulário de cadastro', async () => {
+    sessaoTeste.permissoes = ['conjunto:visualizar', 'fonte:visualizar']
+    await abrir()
+    expect(wrapper.find('.card-form').exists()).toBe(false)
+    expect(wrapper.find('.btn-cadastrar').exists()).toBe(false)
+  })
+
+  it('o Analista vê o formulário de cadastro', async () => {
+    await abrir()
+    expect(wrapper.find('.card-form').exists()).toBe(true)
   })
 })

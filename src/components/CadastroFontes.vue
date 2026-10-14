@@ -1,10 +1,18 @@
 <script setup>
 import { reactive, ref, watch, onMounted, onUnmounted } from 'vue'
+import { apiFetch } from '../services/http'
 import { useRouter } from 'vue-router'
 import ConstrutorCron from './ConstrutorCron.vue'
 import ModalMapeamentoColunas from './ModalMapeamentoColunas.vue'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 
 const router = useRouter()
+
+// Quem so visualiza fontes (ex.: Analista, Auditor) ve a lista sem os botoes de alterar,
+// executar ou enviar arquivo (LIZARDS-45); o backend barra com 403 de qualquer jeito.
+const podeGerenciar = temPermissao(PERMISSOES.FONTE_GERENCIAR)
+const podeVerDados = temPermissao(PERMISSOES.DADOS_VISUALIZAR)
 const fonteParaMapeamento = ref(null)
 
 const fontes = ref([])
@@ -135,7 +143,7 @@ function iniciarSondagemDeProgresso(fonte) {
   if (est.sondagem) return
   est.sondagem = setInterval(async () => {
     try {
-      const resposta = await fetch(`/api/fontes/${fonte.id}/progresso`)
+      const resposta = await apiFetch(`/api/fontes/${fonte.id}/progresso`)
       if (!resposta.ok) return
       const corpo = await resposta.json()
       if (!corpo.fase) return
@@ -161,7 +169,7 @@ function pararSondagemDeProgresso(fonte) {
 async function carregarFontes() {
   carregandoLista.value = true
   try {
-    const resposta = await fetch('/api/fontes')
+    const resposta = await apiFetch('/api/fontes')
     fontes.value = await resposta.json()
   } catch (e) {
     erro.value = 'Não deu pra carregar a lista de fontes.'
@@ -196,7 +204,7 @@ async function salvar() {
   try {
     const url = editandoId.value ? `/api/fontes/${editandoId.value}` : '/api/fontes'
     const metodo = editandoId.value ? 'PUT' : 'POST'
-    const resposta = await fetch(url, {
+    const resposta = await apiFetch(url, {
       method: metodo,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value),
@@ -226,7 +234,7 @@ async function executar(fonte) {
   iniciarSondagemDeProgresso(fonte)
 
   try {
-    const resposta = await fetch(`/api/fontes/${fonte.id}/executar`, { method: 'POST' })
+    const resposta = await apiFetch(`/api/fontes/${fonte.id}/executar`, { method: 'POST' })
     const corpo = await resposta.json().catch(() => null)
     if (!resposta.ok) {
       throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)
@@ -388,7 +396,7 @@ onUnmounted(() => {
           <span>Atualizar</span>
         </button>
 
-        <button class="btn-adicionar-fonte" @click="abrirCadastro">
+        <button v-if="podeGerenciar" class="btn-adicionar-fonte" @click="abrirCadastro">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14" />
             <path d="M5 12h14" />
@@ -657,6 +665,7 @@ onUnmounted(() => {
                 <td class="celula-acoes">
                   <div class="grupo-botoes-acoes">
                     <button
+                      v-if="podeGerenciar"
                       class="btn-acao-circulo btn-editar"
                       title="Editar configurações da fonte"
                       @click="editar(fonte)"
@@ -683,7 +692,7 @@ onUnmounted(() => {
                     </button>
 
                     <button
-                      v-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
+                      v-if="podeGerenciar && fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
                       class="btn-acao-circulo btn-executar"
                       :disabled="estadoDe(fonte.id).estado === 'executando'"
                       title="Enviar arquivo (.zip / shapefile / csv) e executar ingestão"
@@ -699,7 +708,7 @@ onUnmounted(() => {
                     </button>
 
                     <button
-                      v-else
+                      v-else-if="podeGerenciar"
                       class="btn-acao-circulo btn-executar"
                       :disabled="estadoDe(fonte.id).estado === 'executando'"
                       :title="'Disparar ingestão remota de ' + fonte.nome"
@@ -713,6 +722,7 @@ onUnmounted(() => {
                     </button>
 
                     <button
+                      v-if="podeVerDados"
                       class="btn-acao-circulo btn-conjunto-dados"
                       title="Ver Conjunto de Dados (Bronze / Silver / Quarentena)"
                       @click="router.push('/conjuntos-dados/' + fonte.id)"
