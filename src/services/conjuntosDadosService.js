@@ -61,3 +61,19 @@ export async function buscarRegistroSilverPorId(registroBrutoId) {
   }
   return resp.json()
 }
+
+/**
+ * Diff de um registro entre camadas vizinhas, no estilo "git diff". Pares aceitos pelo
+ * backend: BRONZE→SILVER e SILVER→GOLD. Quando o registro não existe na camada de destino
+ * a resposta é 200 com `destinoEncontrado: false` e a explicação em `mensagem`.
+ */
+export async function buscarComparacaoCamadas(registroBrutoId, origem, destino) {
+  const resp = await apiFetch(
+    `/api/conjuntos-dados/registros/${registroBrutoId}/comparacao?origem=${origem}&destino=${destino}`,
+  )
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => null)
+    throw new Error(data?.erro || `Falha ao comparar o registro ${registroBrutoId} entre ${origem} e ${destino}`)
+  }
+  return resp.json()
+}
