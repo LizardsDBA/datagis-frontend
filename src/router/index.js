@@ -4,6 +4,7 @@ import QuarentenaView from '../components/QuarentenaView.vue'
 import LotesView from '../components/LotesView.vue'
 import ConjuntosView from '../components/ConjuntosView.vue'
 import GoldView from '../components/GoldView.vue'
+import IndicadoresView from '../components/IndicadoresView.vue'
 import ConjuntosDadosView from '../components/ConjuntosDadosView.vue'
 import UsuariosView from '../components/UsuariosView.vue'
 import AuditoriaView from '../components/AuditoriaView.vue'
@@ -17,6 +18,7 @@ import { PERMISSOES } from '../auth/permissoes'
 // - /quarentena: Triagem, auditoria e resolução de inconsistências (Fase 3)
 // - /conjuntos-dados/:fonteId: comparação Bronze/Silver/Quarentena linha a linha
 //   (não confundir com /conjuntos, que é cadastro de cobertura territorial)
+// - /indicadores: consulta dos dados finais em tabela, por município e por imóvel
 // - /auditoria: log de auditoria das ações (somente leitura)
 // - /admin/usuarios: cadastro de usuários e atribuição de perfis/permissões
 //
@@ -35,6 +37,7 @@ const routes = [
     meta: { permissao: PERMISSOES.DADOS_VISUALIZAR },
   },
   { path: '/gold', name: 'gold', component: GoldView, meta: { permissao: PERMISSOES.INDICADOR_VISUALIZAR } },
+  { path: '/indicadores', name: 'indicadores', component: IndicadoresView, meta: { permissao: PERMISSOES.INDICADOR_VISUALIZAR } },
   { path: '/auditoria', name: 'auditoria', component: AuditoriaView, meta: { permissao: PERMISSOES.AUDITORIA_VISUALIZAR } },
   { path: '/admin/usuarios', name: 'usuarios', component: UsuariosView, meta: { permissao: PERMISSOES.USUARIO_GERENCIAR } },
   { path: '/sem-acesso', name: 'sem-acesso', component: SemAcessoView },

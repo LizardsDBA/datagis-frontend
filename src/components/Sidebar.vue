@@ -43,6 +43,13 @@ const itens = [
     descricao: 'Cadastro e Mapa Territorial',
     permissao: PERMISSOES.CONJUNTO_VISUALIZAR,
   },
+  {
+    rota: '/indicadores',
+    rotulo: 'Indicadores e Resultados',
+    icone: 'indicadores',
+    descricao: 'Consulta por município e imóvel',
+    permissao: PERMISSOES.INDICADOR_VISUALIZAR,
+  },
   // Oculto do menu por enquanto (LIZARDS-27). A rota /gold continua existindo; para voltar, é só descomentar.
   // {
   //   rota: '/gold',
@@ -153,6 +160,13 @@ function navegar() {
             <svg v-else-if="item.icone === 'conjuntos'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
+            </svg>
+            <!-- Ícone para Indicadores e Resultados -->
+            <svg v-else-if="item.icone === 'indicadores'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="9" y1="9" x2="9" y2="21" />
+              <line x1="3" y1="15" x2="21" y2="15" />
             </svg>
             <!-- Ícone para a camada Gold -->
             <svg v-else-if="item.icone === 'gold'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
