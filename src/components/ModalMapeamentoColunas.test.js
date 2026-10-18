@@ -9,7 +9,12 @@ vi.mock('../auth/autenticacao', () => ({
   entrarNovamente: () => {},
 }))
 
-const { mockMapeamentos, mockAtualizarEntidadeSilver } = vi.hoisted(() => ({
+const {
+  mockMapeamentos,
+  mockAtualizarEntidadeSilver,
+  mockLimparTodosMapeamentos,
+  mockSalvarMapeamentos,
+} = vi.hoisted(() => ({
   mockMapeamentos: [
     {
       id: 101,
@@ -18,15 +23,22 @@ const { mockMapeamentos, mockAtualizarEntidadeSilver } = vi.hoisted(() => ({
       destinoTipo: 'COLUNA',
       tipoDado: 'texto',
       obrigatorio: true,
+      tabelaDestino: 'imovel_rural',
     },
   ],
   mockAtualizarEntidadeSilver: vi.fn().mockResolvedValue({ id: 1, entidadeSilver: 'imovel_rural' }),
+  mockLimparTodosMapeamentos: vi.fn().mockResolvedValue(true),
+  mockSalvarMapeamentos: vi.fn().mockImplementation((fonteId, lista) => Promise.resolve(lista)),
 }))
 
 vi.mock('../services/quarentenaService', () => ({
-  buscarMapeamentos: vi.fn().mockImplementation(() => Promise.resolve(mockMapeamentos)),
-  salvarMapeamentos: vi.fn().mockImplementation(() => Promise.resolve(mockMapeamentos)),
+  buscarMapeamentos: vi.fn().mockImplementation((fonteId) => {
+    if (fonteId === 1 || fonteId === 5) return Promise.resolve([])
+    return Promise.resolve([...mockMapeamentos])
+  }),
+  salvarMapeamentos: mockSalvarMapeamentos,
   excluirMapeamento: vi.fn().mockResolvedValue(true),
+  limparTodosMapeamentosFonte: mockLimparTodosMapeamentos,
   buscarEsquemasSilver: vi.fn().mockResolvedValue([
     {
       id: 'imovel_rural',
@@ -61,10 +73,11 @@ let wrapper
 afterEach(() => {
   wrapper?.unmount()
   wrapper = null
+  vi.clearAllMocks()
 })
 
 describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
-  it('exibe bloqueio de campos quando a fonte não tem Tabela Silver definida', async () => {
+  it('exibe aviso orientativo e oculta formulário e tabela quando a fonte não tem Tabela Silver definida', async () => {
     wrapper = mount(ModalMapeamentoColunas, {
       props: {
         fonte: { id: 1, nome: 'Fonte Sem Silver', entidadeSilver: null },
@@ -74,11 +87,15 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
 
     expect(wrapper.text()).toContain('ETAPA 1')
     expect(wrapper.text()).toContain('Tabela Silver de Destino')
-    expect(wrapper.text()).toContain('Mapeamento de Campos Bloqueado')
-    expect(wrapper.find('.bloqueio-aviso').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Selecione uma Tabela Silver para Iniciar o Mapeamento')
+    expect(wrapper.find('.silver-orientacao-inicial').exists()).toBe(true)
+
+    // Formulário (Etapa 2) e Tabela (Etapa 3) devem estar completamente ocultos
+    expect(wrapper.find('.card-formulario').exists()).toBe(false)
+    expect(wrapper.find('.secao-tabela').exists()).toBe(false)
   })
 
-  it('desbloqueia o formulário e carrega as colunas canônicas quando a fonte já possui Tabela Silver', async () => {
+  it('desbloqueia o formulário e a tabela e carrega as colunas canônicas quando a fonte já possui Tabela Silver', async () => {
     wrapper = mount(ModalMapeamentoColunas, {
       props: {
         fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
@@ -86,7 +103,9 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     })
     await flushPromises()
 
-    expect(wrapper.find('.bloqueio-aviso').exists()).toBe(false)
+    expect(wrapper.find('.silver-orientacao-inicial').exists()).toBe(false)
+    expect(wrapper.find('.card-formulario').exists()).toBe(true)
+    expect(wrapper.find('.secao-tabela').exists()).toBe(true)
     expect(wrapper.text()).toContain('ETAPA 2')
     expect(wrapper.text()).toContain('Mapear Novo Campo')
 
@@ -108,14 +127,13 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     })
     await flushPromises()
 
-    // O select de validação de domínio deve ter 'situacao_imovel' e NÃO ter domínios de embargo
     const selectDominio = wrapper.findAll('.select-form').find((s) => s.text().includes('Nenhuma tabela de domínio'))
     expect(selectDominio).toBeDefined()
     expect(selectDominio.text()).toContain('situacao_imovel')
     expect(selectDominio.text()).not.toContain('tipo_area_embargo')
   })
 
-  it('permite selecionar a tabela Silver e persiste via atualizarEntidadeSilverFonte', async () => {
+  it('permite selecionar a tabela Silver inicialmente e salva via atualizarEntidadeSilverFonte', async () => {
     const fonte = { id: 5, nome: 'Nova Fonte', entidadeSilver: '' }
 
     wrapper = mount(ModalMapeamentoColunas, {
@@ -129,6 +147,155 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     await flushPromises()
 
     expect(mockAtualizarEntidadeSilver).toHaveBeenCalledWith(5, 'imovel_rural')
-    expect(wrapper.find('.bloqueio-aviso').exists()).toBe(false)
+    expect(wrapper.find('.silver-orientacao-inicial').exists()).toBe(false)
+    expect(wrapper.find('.card-formulario').exists()).toBe(true)
+  })
+
+  it('envia tabelaDestino preenchida ao salvar um mapeamento de coluna', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
+      },
+    })
+    await flushPromises()
+
+    // Preenche campos do formulário
+    const inputOrigem = wrapper.find('.card-formulario input[placeholder*="Ex: cod_municipio_ibge"]')
+    await inputOrigem.setValue('num_car')
+
+    const selectAtributo = wrapper.find('.atributo-select-wrapper select')
+    await selectAtributo.setValue('cod_imovel')
+    await selectAtributo.trigger('change')
+
+    // Submete o form
+    await wrapper.find('.card-formulario form').trigger('submit')
+    await flushPromises()
+
+    expect(mockSalvarMapeamentos).toHaveBeenCalledTimes(1)
+    const payloadEnviado = mockSalvarMapeamentos.mock.calls[0][1]
+    expect(payloadEnviado[0]).toMatchObject({
+      colunaOrigem: 'num_car',
+      atributoDestino: 'cod_imovel',
+      tabelaDestino: 'imovel_rural',
+      fonteDadoId: 2,
+    })
+  })
+
+  it('abre popup de confirmação e cancela a troca de Tabela Silver quando o usuário clica em Cancelar', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
+      },
+    })
+    await flushPromises()
+
+    const selectSilver = wrapper.find('.select-silver-destaque')
+    await selectSilver.setValue('embargo_ambiental')
+    await selectSilver.trigger('change')
+    await flushPromises()
+
+    // O popup deve estar aberto na tela
+    const popupPerigo = wrapper.find('.popup-card--perigo')
+    expect(popupPerigo.exists()).toBe(true)
+    expect(popupPerigo.text()).toContain('Trocar Tabela Silver de Destino?')
+    expect(popupPerigo.text()).toContain('todos os mapeamentos atuais serão excluídos permanentemente')
+
+    // Clica no botão Cancelar do popup
+    const btnCancelar = popupPerigo.find('.btn-popup-cancelar')
+    await btnCancelar.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.popup-card--perigo').exists()).toBe(false)
+    expect(mockLimparTodosMapeamentos).not.toHaveBeenCalled()
+    expect(mockAtualizarEntidadeSilver).not.toHaveBeenCalled()
+
+    // Seletor deve permanecer no valor anterior
+    expect(wrapper.vm.tabelaSilverSelecionada).toBe('imovel_rural')
+  })
+
+  it('limpa mapeamentos existentes e atualiza a Tabela Silver quando o usuário confirma no popup', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
+      },
+    })
+    await flushPromises()
+
+    const selectSilver = wrapper.find('.select-silver-destaque')
+    await selectSilver.setValue('embargo_ambiental')
+    await selectSilver.trigger('change')
+    await flushPromises()
+
+    const popupPerigo = wrapper.find('.popup-card--perigo')
+    expect(popupPerigo.exists()).toBe(true)
+
+    // Clica no botão de confirmação do popup
+    const btnConfirmar = popupPerigo.find('.btn-popup-confirmar--perigo')
+    await btnConfirmar.trigger('click')
+    await flushPromises()
+
+    expect(mockLimparTodosMapeamentos).toHaveBeenCalledWith(2)
+    expect(mockAtualizarEntidadeSilver).toHaveBeenCalledWith(2, 'embargo_ambiental')
+    expect(wrapper.find('.popup-card--perigo').exists()).toBe(false)
+    expect(wrapper.vm.tabelaSilverSelecionada).toBe('embargo_ambiental')
+    expect(wrapper.vm.mapeamentos).toEqual([])
+  })
+
+  it('abre popup de confirmação ao clicar em excluir mapeamento e remove ao confirmar', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
+      },
+    })
+    await flushPromises()
+
+    const btnExcluir = wrapper.find('.btn-excluir')
+    expect(btnExcluir.exists()).toBe(true)
+    await btnExcluir.trigger('click')
+    await flushPromises()
+
+    // Popup de exclusão deve estar visível
+    const popupExcluir = wrapper.find('.popup-icone-wrapper--lixeira')
+    expect(popupExcluir.exists()).toBe(true)
+    expect(wrapper.text()).toContain('Remover Mapeamento de Coluna')
+
+    // Confirmar exclusão no popup
+    const btnConfirmarExclusao = wrapper.findAll('.btn-popup-confirmar--perigo').find(b => b.text().includes('Remover Campo'))
+    expect(btnConfirmarExclusao).toBeDefined()
+    await btnConfirmarExclusao.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.popup-icone-wrapper--lixeira').exists()).toBe(false)
+  })
+
+  it('limpa mensagens de sucesso e erro ao fechar o modal ou trocar de fonte', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
+      },
+    })
+    await flushPromises()
+
+    // Simula mensagem de sucesso ativa
+    wrapper.vm.sucesso = 'Tabela Silver definida como "Área Protegida" com sucesso!'
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.alerta--sucesso').exists()).toBe(true)
+
+    // Clica no botão fechar do modal
+    const btnFechar = wrapper.find('.btn-fechar')
+    await btnFechar.trigger('click')
+
+    // Deve emitir fechar e limpar a mensagem de sucesso
+    expect(wrapper.emitted('fechar')).toBeTruthy()
+    expect(wrapper.vm.sucesso).toBeNull()
+
+    // Ao mudar a prop fonte para outra fonte, mensagem permanece limpa
+    await wrapper.setProps({
+      fonte: { id: 3, nome: 'Outra Fonte', entidadeSilver: 'embargo_ambiental' },
+    })
+    await flushPromises()
+
+    expect(wrapper.vm.sucesso).toBeNull()
+    expect(wrapper.find('.alerta--sucesso').exists()).toBe(false)
   })
 })

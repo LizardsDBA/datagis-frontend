@@ -131,6 +131,14 @@ export async function excluirMapeamento(fonteId, id) {
   return true
 }
 
+export async function limparTodosMapeamentosFonte(fonteId) {
+  const resp = await apiFetch(`/api/fontes/${fonteId}/mapeamentos`, {
+    method: 'DELETE',
+  })
+  if (!resp.ok) throw new Error('Falha ao limpar mapeamentos da fonte')
+  return true
+}
+
 export async function buscarEsquemasSilver() {
   const resp = await apiFetch('/api/fontes/esquemas-silver')
   if (!resp.ok) throw new Error('Falha ao carregar catálogo de esquemas Silver')

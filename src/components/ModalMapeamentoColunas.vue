@@ -4,6 +4,7 @@ import {
   buscarMapeamentos,
   salvarMapeamentos,
   excluirMapeamento,
+  limparTodosMapeamentosFonte,
   buscarEsquemasSilver,
   atualizarEntidadeSilverFonte,
 } from '../services/quarentenaService'
@@ -250,7 +251,17 @@ const sucesso = ref(null)
 const esquemasSilver = ref(CATALOGO_SILVER_FALLBACK)
 const carregandoEsquemas = ref(false)
 const tabelaSilverSelecionada = ref('')
+const tabelaSilverAnterior = ref('')
 const salvandoTabelaSilver = ref(false)
+
+// Popups de Confirmação In-App (substituindo alerts/confirms nativos do navegador)
+const popupTrocaSilverAberto = ref(false)
+const tabelaPendenteTroca = ref('')
+const limpandoEAlterandoSilver = ref(false)
+
+const popupExcluirCampoAberto = ref(false)
+const mapeamentoParaExcluir = ref(null)
+const excluindoCampo = ref(false)
 
 // Controle do Atributo Destino Canônico vs Customizado
 const atributoDestinoSelecionado = ref('')
@@ -280,6 +291,18 @@ const esquemaAtivo = computed(() => {
       (e) => e.id.toLowerCase() === tabelaSilverSelecionada.value.toLowerCase()
     ) || null
   )
+})
+
+const nomeTabelaAntiga = computed(() => {
+  const id = tabelaSilverAnterior.value
+  if (!id) return ''
+  return esquemasSilver.value.find((e) => e.id.toLowerCase() === id.toLowerCase())?.nome || id
+})
+
+const nomeNovaTabela = computed(() => {
+  const id = tabelaPendenteTroca.value
+  if (!id) return ''
+  return esquemasSilver.value.find((e) => e.id.toLowerCase() === id.toLowerCase())?.nome || id
 })
 
 const colunasSilverDisponiveis = computed(() => esquemaAtivo.value?.colunas || [])
@@ -313,17 +336,48 @@ async function carregarMapeamentos() {
   }
 }
 
+let timerSucesso = null
+
+function definirMensagemSucesso(msg) {
+  sucesso.value = msg
+  if (timerSucesso) clearTimeout(timerSucesso)
+  timerSucesso = setTimeout(() => {
+    sucesso.value = null
+  }, 4500)
+}
+
+function fechar() {
+  if (timerSucesso) clearTimeout(timerSucesso)
+  sucesso.value = null
+  erro.value = null
+  popupTrocaSilverAberto.value = false
+  popupExcluirCampoAberto.value = false
+  tabelaPendenteTroca.value = ''
+  mapeamentoParaExcluir.value = null
+  cancelarEdicao()
+  emit('fechar')
+}
+
 watch(
   () => props.fonte,
   async (novaFonte) => {
+    if (timerSucesso) clearTimeout(timerSucesso)
+    sucesso.value = null
+    erro.value = null
     if (novaFonte) {
       tabelaSilverSelecionada.value = novaFonte.entidadeSilver || ''
+      tabelaSilverAnterior.value = novaFonte.entidadeSilver || ''
       cancelarEdicao()
       await carregarEsquemas()
       await carregarMapeamentos()
     } else {
       mapeamentos.value = []
       tabelaSilverSelecionada.value = ''
+      tabelaSilverAnterior.value = ''
+      popupTrocaSilverAberto.value = false
+      popupExcluirCampoAberto.value = false
+      tabelaPendenteTroca.value = ''
+      mapeamentoParaExcluir.value = null
     }
   },
   { immediate: true }
@@ -337,12 +391,64 @@ async function salvarSelecaoTabelaSilver() {
   try {
     await atualizarEntidadeSilverFonte(props.fonte.id, tabelaSilverSelecionada.value)
     props.fonte.entidadeSilver = tabelaSilverSelecionada.value
-    sucesso.value = `Tabela Silver definida como "${esquemaAtivo.value?.nome || tabelaSilverSelecionada.value}" com sucesso!`
+    definirMensagemSucesso(`Tabela Silver definida como "${esquemaAtivo.value?.nome || tabelaSilverSelecionada.value}" com sucesso!`)
   } catch (e) {
     erro.value = e.message || 'Falha ao vincular tabela Silver à fonte.'
   } finally {
     salvandoTabelaSilver.value = false
   }
+}
+
+function aoAlterarTabelaSilver(evento) {
+  const novaTabela = evento.target.value
+  const tabelaAntiga = tabelaSilverAnterior.value
+
+  if (!novaTabela || novaTabela === tabelaAntiga) return
+
+  // Se já existem mapeamentos e está alterando a tabela Silver, abre o popup in-app
+  if (mapeamentos.value && mapeamentos.value.length > 0) {
+    tabelaPendenteTroca.value = novaTabela
+    popupTrocaSilverAberto.value = true
+    return
+  }
+
+  // Sem mapeamentos anteriores: altera diretamente
+  executarTrocaTabelaSilver(novaTabela)
+}
+
+function cancelarTrocaTabelaSilver() {
+  tabelaSilverSelecionada.value = tabelaSilverAnterior.value
+  tabelaPendenteTroca.value = ''
+  popupTrocaSilverAberto.value = false
+}
+
+async function confirmarTrocaTabelaSilver() {
+  if (!tabelaPendenteTroca.value) return
+  const novaTabela = tabelaPendenteTroca.value
+  limpandoEAlterandoSilver.value = true
+  erro.value = null
+
+  try {
+    await limparTodosMapeamentosFonte(props.fonte.id)
+    mapeamentos.value = []
+    cancelarEdicao()
+    tabelaSilverSelecionada.value = novaTabela
+    await salvarSelecaoTabelaSilver()
+    tabelaSilverAnterior.value = novaTabela
+    popupTrocaSilverAberto.value = false
+    tabelaPendenteTroca.value = ''
+  } catch (e) {
+    erro.value = e.message || 'Falha ao limpar mapeamentos anteriores da fonte.'
+    tabelaSilverSelecionada.value = tabelaSilverAnterior.value
+  } finally {
+    limpandoEAlterandoSilver.value = false
+  }
+}
+
+async function executarTrocaTabelaSilver(novaTabela) {
+  tabelaSilverSelecionada.value = novaTabela
+  await salvarSelecaoTabelaSilver()
+  tabelaSilverAnterior.value = novaTabela
 }
 
 function aoTrocarAtributoDestino() {
@@ -372,7 +478,7 @@ function aoTrocarAtributoDestino() {
   }
 }
 
-function voltarParaColunasCanonicas() {
+function voltarParaColunasPadrao() {
   modoAtributoCustomizado.value = false
   atributoDestinoSelecionado.value = ''
   novoMapeamento.value.atributoDestino = ''
@@ -447,6 +553,7 @@ async function salvarCampo() {
       ...novoMapeamento.value,
       colunaOrigem: novoMapeamento.value.colunaOrigem.trim(),
       atributoDestino: novoMapeamento.value.atributoDestino.trim(),
+      tabelaDestino: tabelaSilverSelecionada.value || null,
       referenciaEntidadeSilver: novoMapeamento.value.referenciaEntidadeSilver?.trim() || null,
       tabelaReferencia: novoMapeamento.value.tabelaReferencia?.trim() || null,
       valorMinimo:
@@ -457,9 +564,11 @@ async function salvarCampo() {
     }
 
     await salvarMapeamentos(props.fonte.id, [item])
-    sucesso.value = novoMapeamento.value.id
-      ? `Mapeamento do campo "${item.colunaOrigem}" atualizado com sucesso!`
-      : `Novo mapeamento para "${item.colunaOrigem}" criado com sucesso!`
+    definirMensagemSucesso(
+      novoMapeamento.value.id
+        ? `Mapeamento do campo "${item.colunaOrigem}" atualizado com sucesso!`
+        : `Novo mapeamento para "${item.colunaOrigem}" criado com sucesso!`
+    )
 
     cancelarEdicao()
     await carregarMapeamentos()
@@ -470,37 +579,69 @@ async function salvarCampo() {
   }
 }
 
-async function remover(id) {
-  if (!confirm('Deseja realmente remover este mapeamento de coluna?')) return
+function solicitarRemover(map) {
+  mapeamentoParaExcluir.value = map
+  popupExcluirCampoAberto.value = true
+}
+
+function cancelarRemoverCampo() {
+  mapeamentoParaExcluir.value = null
+  popupExcluirCampoAberto.value = false
+}
+
+async function confirmarRemoverCampo() {
+  if (!mapeamentoParaExcluir.value) return
+  const map = mapeamentoParaExcluir.value
+  excluindoCampo.value = true
+  erro.value = null
+
   try {
-    await excluirMapeamento(props.fonte.id, id)
-    if (novoMapeamento.value.id === id) {
+    await excluirMapeamento(props.fonte.id, map.id)
+    if (novoMapeamento.value.id === map.id) {
       cancelarEdicao()
     }
     await carregarMapeamentos()
+    definirMensagemSucesso(`Mapeamento da coluna "${map.colunaOrigem}" removido com sucesso.`)
+    popupExcluirCampoAberto.value = false
+    mapeamentoParaExcluir.value = null
   } catch (e) {
     erro.value = e.message || 'Erro ao remover mapeamento.'
+  } finally {
+    excluindoCampo.value = false
+  }
+}
+
+function remover(id) {
+  const map = mapeamentos.value.find((m) => m.id === id)
+  if (map) {
+    solicitarRemover(map)
   }
 }
 </script>
 
 <template>
-  <div v-if="fonte" class="modal-backdrop" @click.self="emit('fechar')">
+  <div v-if="fonte" class="modal-backdrop" @click.self="fechar">
     <div class="modal-dialog">
       <header class="modal-header">
         <div>
-          <span class="modal-etiqueta">DE-PARA DE ATRIBUTOS (BRONZE → SILVER)</span>
+          <span class="modal-etiqueta">MAPEAMENTO DE DADOS (BRONZE → SILVER)</span>
           <h2 class="modal-titulo">Mapeamento de Colunas — {{ fonte.nome }}</h2>
           <p class="modal-sub">
-            Configure a tabela Silver de destino, regras de conversão, tipos de dados e validações (domínio, integridade, geometrias e CPF/CNPJ).
+            Defina a tabela de destino na camada Silver e configure as regras de conversão e validação de cada campo.
           </p>
         </div>
-        <button class="btn-fechar" @click="emit('fechar')">✕</button>
+        <button class="btn-fechar" title="Fechar modal" @click="fechar">✕</button>
       </header>
 
       <div class="modal-body">
-        <div v-if="erro" class="alerta alerta--erro">{{ erro }}</div>
-        <div v-if="sucesso" class="alerta alerta--sucesso">{{ sucesso }}</div>
+        <div v-if="erro" class="alerta alerta--erro alerta--dispensavel">
+          <span>{{ erro }}</span>
+          <button type="button" class="btn-fechar-alerta" title="Dispensar aviso" @click="erro = null">✕</button>
+        </div>
+        <div v-if="sucesso" class="alerta alerta--sucesso alerta--dispensavel">
+          <span>{{ sucesso }}</span>
+          <button type="button" class="btn-fechar-alerta" title="Dispensar aviso" @click="sucesso = null">✕</button>
+        </div>
 
         <!-- 1. SELEÇÃO DA TABELA SILVER DE DESTINO (PRÉ-REQUISITO OBRIGATÓRIO) -->
         <section class="card-etapa-silver" :class="{ 'card-etapa-silver--ativo': tabelaSilverSelecionada }">
@@ -509,26 +650,28 @@ async function remover(id) {
               <div class="silver-passo-tag">
                 <span class="etapa-numero">ETAPA 1</span>
                 <span class="etapa-status" :class="tabelaSilverSelecionada ? 'status-ok' : 'status-pendente'">
-                  {{ tabelaSilverSelecionada ? '✓ Tabela Silver Definida' : 'Obrigatório para iniciar' }}
+                  <svg v-if="tabelaSilverSelecionada" class="mini-svg-status" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  {{ tabelaSilverSelecionada ? 'Tabela Silver Definida' : 'Obrigatório para iniciar' }}
                 </span>
               </div>
-              <h3 class="silver-titulo">Tabela Silver de Destino (Fenômeno Canônico)</h3>
+              <h3 class="silver-titulo">Tabela Silver de Destino</h3>
               <p class="silver-desc">
-                Selecione a tabela da camada Silver para onde os registros tratados desta fonte serão promovidos.
-                O de-para de campos e os domínios de validação serão contextualmente adaptados à tabela escolhida.
+                Selecione a tabela da camada Silver para onde os registros desta fonte serão promovidos. As opções de colunas e regras de validação serão adaptadas automaticamente.
               </p>
             </div>
           </div>
 
           <div class="silver-seletor-linha">
             <div class="campo-silver-select">
-              <label class="rotulo-campo">Tabela Canônica Silver *</label>
+              <label class="rotulo-campo">Tabela Silver de Destino *</label>
               <div class="select-com-status">
                 <select
                   v-model="tabelaSilverSelecionada"
                   :disabled="!podeEditar || salvandoTabelaSilver"
                   class="select-form select-silver-destaque"
-                  @change="salvarSelecaoTabelaSilver"
+                  @change="aoAlterarTabelaSilver"
                 >
                   <option value="" disabled>-- Selecione a Tabela Silver de Destino --</option>
                   <option
@@ -546,215 +689,233 @@ async function remover(id) {
             <div v-if="esquemaAtivo" class="silver-badge-card">
               <div class="silver-badge-header">
                 <span class="silver-schema-tag">SILVER.{{ esquemaAtivo.id.toUpperCase() }}</span>
-                <span class="silver-cols-count">{{ colunasSilverDisponiveis.length }} colunas canônicas</span>
+                <span class="silver-cols-count">{{ colunasSilverDisponiveis.length }} colunas disponíveis</span>
               </div>
               <p class="silver-badge-desc">{{ esquemaAtivo.descricao }}</p>
             </div>
           </div>
         </section>
 
-        <!-- 2. FORMULÁRIO DE MAPEAMENTO (BLOQUEADO ENQUANTO NÃO HOUVER TABELA SILVER) -->
+        <!-- AVISO ORIENTATIVO QUANDO NÃO HÁ TABELA SILVER SELECIONADA -->
+        <div v-if="!tabelaSilverSelecionada" class="silver-orientacao-inicial">
+          <div class="orientacao-icone-wrapper">
+            <svg class="orientacao-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <ellipse cx="12" cy="5" rx="9" ry="3" />
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+            </svg>
+          </div>
+          <div class="orientacao-conteudo">
+            <h4 class="orientacao-titulo">Selecione uma Tabela Silver para Iniciar o Mapeamento</h4>
+            <p class="orientacao-desc">
+              Para mapear os atributos e definir as regras de conversão e validação, escolha a <strong>Tabela Silver de Destino</strong> na Etapa 1 acima.
+              Os campos de configuração e a listagem de colunas serão exibidos automaticamente após a seleção.
+            </p>
+          </div>
+        </div>
+
+        <!-- 2. FORMULÁRIO DE MAPEAMENTO (EXIBIDO APENAS QUANDO HOUVER TABELA SILVER) -->
         <section
-          v-if="podeEditar"
+          v-if="podeEditar && tabelaSilverSelecionada"
           class="card-formulario"
-          :class="{
-            'card-formulario--editando': novoMapeamento.id,
-            'card-formulario--bloqueado': !tabelaSilverSelecionada
-          }"
+          :class="{ 'card-formulario--editando': novoMapeamento.id }"
         >
-          <!-- Estado Bloqueado: Exibe aviso orientativo -->
-          <div v-if="!tabelaSilverSelecionada" class="bloqueio-aviso">
-            <div class="bloqueio-icone">🔒</div>
-            <div class="bloqueio-conteudo">
-              <h4 class="bloqueio-titulo">Mapeamento de Campos Bloqueado</h4>
-              <p class="bloqueio-desc">
-                Para configurar o de-para dos atributos, você deve primeiro selecionar a <strong>Tabela Silver de Destino</strong> na <strong>Etapa 1</strong> acima.
-                Isso carregará automaticamente a lista de atributos canônicos e as regras de domínio permitidas.
-              </p>
+          <div class="secao-topo-form">
+            <div class="form-titulo-grupo">
+              <span class="etapa-numero">ETAPA 2</span>
+              <h3 class="secao-titulo">
+                {{ novoMapeamento.id ? `Editar Mapeamento: ${novoMapeamento.colunaOrigem}` : 'Mapear Novo Campo' }}
+              </h3>
             </div>
+            <span v-if="novoMapeamento.id" class="badge-editando">Modo Edição (ID: {{ novoMapeamento.id }})</span>
           </div>
 
-          <!-- Estado Desbloqueado: Formulário Ativo -->
-          <template v-else>
-            <div class="secao-topo-form">
-              <div class="form-titulo-grupo">
-                <span class="etapa-numero">ETAPA 2</span>
-                <h3 class="secao-titulo">
-                  {{ novoMapeamento.id ? `Editar Mapeamento: ${novoMapeamento.colunaOrigem}` : 'Mapear Novo Campo' }}
-                </h3>
-              </div>
-              <span v-if="novoMapeamento.id" class="badge-editando">Modo Edição (ID: {{ novoMapeamento.id }})</span>
+          <form class="grid-form" @submit.prevent="salvarCampo">
+            <div class="campo">
+              <label class="rotulo-campo">Coluna de Origem (Dado Bruto) *</label>
+              <input
+                v-model="novoMapeamento.colunaOrigem"
+                required
+                placeholder="Ex: cod_municipio_ibge, num_tad, cpf_cnpj"
+                class="input-form"
+              />
             </div>
 
-            <form class="grid-form" @submit.prevent="salvarCampo">
-              <div class="campo">
-                <label class="rotulo-campo">Coluna de Origem (Bronze/Payload) *</label>
-                <input
-                  v-model="novoMapeamento.colunaOrigem"
+            <!-- Coluna de Destino -->
+            <div class="campo">
+              <label class="rotulo-campo">
+                Coluna de Destino (Silver: {{ esquemaAtivo?.nome || tabelaSilverSelecionada }}) *
+              </label>
+              <div v-if="!modoAtributoCustomizado" class="atributo-select-wrapper">
+                <select
+                  v-model="atributoDestinoSelecionado"
+                  class="select-form"
                   required
-                  placeholder="Ex: cod_municipio_ibge, num_tad, cpf_cnpj"
-                  class="input-form"
-                />
-              </div>
-
-              <!-- Atributo Destino: Select inteligente das colunas canônicas da Silver -->
-              <div class="campo">
-                <label class="rotulo-campo">
-                  Atributo Destino (Silver: {{ esquemaAtivo?.nome || tabelaSilverSelecionada }}) *
-                </label>
-                <div v-if="!modoAtributoCustomizado" class="atributo-select-wrapper">
-                  <select
-                    v-model="atributoDestinoSelecionado"
-                    class="select-form"
-                    required
-                    @change="aoTrocarAtributoDestino"
-                  >
-                    <option value="" disabled>-- Selecione a coluna canônica da Silver --</option>
-                    <option
-                      v-for="col in colunasSilverDisponiveis"
-                      :key="col.nome"
-                      :value="col.nome"
-                    >
-                      {{ col.label }} ({{ col.nome }})
-                    </option>
-                    <option value="__customizado__">+ Outro / Atributo JSON Livre...</option>
-                  </select>
-                </div>
-                <div v-else class="custom-atributo-wrapper">
-                  <input
-                    v-model="novoMapeamento.atributoDestino"
-                    required
-                    placeholder="Nome do atributo no JSON"
-                    class="input-form"
-                  />
-                  <button
-                    type="button"
-                    class="btn-voltar-select"
-                    title="Voltar para a lista de colunas canônicas"
-                    @click="voltarParaColunasCanonicas"
-                  >
-                    ← Voltar às colunas padrão
-                  </button>
-                </div>
-              </div>
-
-              <div class="campo">
-                <label class="rotulo-campo">Destino</label>
-                <select v-model="novoMapeamento.destinoTipo" class="select-form">
-                  <option value="COLUNA">Coluna Tabela Silver</option>
-                  <option value="GEOMETRIA">Geometria Espacial</option>
-                  <option value="JSON">Atributos JSON (Metadados)</option>
-                </select>
-              </div>
-
-              <div class="campo">
-                <label class="rotulo-campo">Tipo de Dado</label>
-                <select v-model="novoMapeamento.tipoDado" class="select-form">
-                  <option value="texto">Texto (String)</option>
-                  <option value="numero">Numérico (Inteiro / Decimal)</option>
-                  <option value="cpf_cnpj">Documento (CPF / CNPJ)</option>
-                  <option value="data_iso">Data ISO / Timestamp</option>
-                  <option value="wkt">Geometria WKT</option>
-                  <option value="booleano">Booleano</option>
-                </select>
-              </div>
-
-              <!-- Regra de Integridade Cruzada (Referência Silver) -->
-              <div class="campo">
-                <label class="rotulo-campo">
-                  Integridade Cruzada (Ref. Silver)
-                  <span class="dica-info" title="Valida se o valor existe na tabela canônica da Silver indicada. Se não existir, rejeita para a Quarentena.">ℹ</span>
-                </label>
-                <select v-model="novoMapeamento.referenciaEntidadeSilver" class="select-form">
-                  <option value="">(Nenhuma validação cruzada)</option>
-                  <option value="municipio">municipio — Valida código em SILVER.MUNICIPIO</option>
-                  <option value="imovel_rural">imovel_rural — Valida chave em SILVER.IMOVEL_RURAL</option>
-                  <option value="area_protegida">area_protegida — Valida código em SILVER.AREA_PROTEGIDA</option>
-                  <option value="auto_infracao">auto_infracao — Valida número em SILVER.AUTO_INFRACAO</option>
-                  <option value="embargo_ambiental">embargo_ambiental — Valida termo em SILVER.EMBARGO_AMBIENTAL</option>
-                </select>
-              </div>
-
-              <!-- Regra de Domínio (Tabela Referência) - FILTRADA PELA TABELA SILVER SELECIONADA -->
-              <div class="campo">
-                <label class="rotulo-campo">
-                  Validação de Domínio (Lookup)
-                  <span class="dica-info" title="Valida se o código/descrição pertence à tabela de domínio cadastrada da entidade selecionada.">ℹ</span>
-                </label>
-                <select v-model="novoMapeamento.tabelaReferencia" class="select-form">
-                  <option value="">(Nenhuma tabela de domínio)</option>
-                  <option
-                    v-for="dom in dominiosDisponiveis"
-                    :key="dom.tabela"
-                    :value="dom.tabela"
-                  >
-                    {{ dom.label }}
-                  </option>
-                </select>
-                <span v-if="dominiosDisponiveis.length === 0" class="dica-sem-dominio">
-                  ℹ Nenhuma tabela de domínio aplicável a {{ esquemaAtivo?.nome }}.
-                </span>
-              </div>
-
-              <!-- Valor Mínimo -->
-              <div class="campo">
-                <label class="rotulo-campo">
-                  Valor Mínimo (Limite Inferior)
-                  <span class="dica-info" title="Rejeita valores numéricos menores que este limite (ex.: área > 0).">ℹ</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  v-model.number="novoMapeamento.valorMinimo"
-                  placeholder="Ex: 0.0, 1980"
-                  class="input-form"
-                />
-              </div>
-
-              <!-- Checkboxes de Validação -->
-              <div class="campo-checks">
-                <label class="check-item">
-                  <input type="checkbox" v-model="novoMapeamento.obrigatorio" />
-                  <span>Obrigatório</span>
-                </label>
-                <label class="check-item">
-                  <input type="checkbox" v-model="novoMapeamento.validarGeometria" />
-                  <span>Validar Geometria</span>
-                </label>
-                <label class="check-item">
-                  <input type="checkbox" v-model="novoMapeamento.validarCpfCnpj" />
-                  <span>Validar CPF/CNPJ (Módulo 11)</span>
-                </label>
-                <label class="check-item">
-                  <input type="checkbox" v-model="novoMapeamento.validarRecortePr" />
-                  <span>Validar Limite PR</span>
-                </label>
-                <label class="check-item">
-                  <input type="checkbox" v-model="novoMapeamento.impedirRegressao" />
-                  <span>Bloquear Regressão</span>
-                </label>
-              </div>
-
-              <!-- Botões de Ação do Form -->
-              <div class="campo-btn">
-                <button
-                  v-if="novoMapeamento.id"
-                  type="button"
-                  class="btn-cancelar"
-                  @click="cancelarEdicao"
+                  @change="aoTrocarAtributoDestino"
                 >
-                  Cancelar
-                </button>
-                <button type="submit" class="btn-adicionar" :disabled="salvando">
-                  {{ salvando ? 'Gravando...' : novoMapeamento.id ? 'Salvar Alterações' : '+ Mapear Campo' }}
+                  <option value="" disabled>-- Selecione a coluna de destino --</option>
+                  <option
+                    v-for="col in colunasSilverDisponiveis"
+                    :key="col.nome"
+                    :value="col.nome"
+                  >
+                    {{ col.label }} ({{ col.nome }})
+                  </option>
+                  <option value="__customizado__">+ Outro / Atributo Personalizado (JSON)...</option>
+                </select>
+              </div>
+              <div v-else class="custom-atributo-wrapper">
+                <input
+                  v-model="novoMapeamento.atributoDestino"
+                  required
+                  placeholder="Nome do atributo no JSON"
+                  class="input-form"
+                />
+                <button
+                  type="button"
+                  class="btn-voltar-select"
+                  title="Voltar para a lista de colunas padrão"
+                  @click="voltarParaColunasPadrao"
+                >
+                  ← Voltar às colunas padrão
                 </button>
               </div>
-            </form>
-          </template>
+            </div>
+
+            <div class="campo">
+              <label class="rotulo-campo">Destino</label>
+              <select v-model="novoMapeamento.destinoTipo" class="select-form">
+                <option value="COLUNA">Coluna da Tabela Silver</option>
+                <option value="GEOMETRIA">Geometria Espacial</option>
+                <option value="JSON">Atributos Adicionais (JSON)</option>
+              </select>
+            </div>
+
+            <div class="campo">
+              <label class="rotulo-campo">Tipo de Dado</label>
+              <select v-model="novoMapeamento.tipoDado" class="select-form">
+                <option value="texto">Texto (String)</option>
+                <option value="numero">Numérico (Inteiro / Decimal)</option>
+                <option value="cpf_cnpj">Documento (CPF / CNPJ)</option>
+                <option value="data_iso">Data / Hora (ISO)</option>
+                <option value="wkt">Geometria WKT</option>
+                <option value="booleano">Booleano (Sim / Não)</option>
+              </select>
+            </div>
+
+            <!-- Validação Cruzada (Referência Silver) -->
+            <div class="campo">
+              <label class="rotulo-campo">
+                Validação Cruzada (Ref. Silver)
+                <span class="dica-info" title="Valida se o valor existe na tabela Silver indicada. Se não existir, o registro vai para a Quarentena.">
+                  <svg class="icone-info-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                </span>
+              </label>
+              <select v-model="novoMapeamento.referenciaEntidadeSilver" class="select-form">
+                <option value="">(Nenhuma validação cruzada)</option>
+                <option value="municipio">municipio — Código em SILVER.MUNICIPIO</option>
+                <option value="imovel_rural">imovel_rural — Chave em SILVER.IMOVEL_RURAL</option>
+                <option value="area_protegida">area_protegida — Código em SILVER.AREA_PROTEGIDA</option>
+                <option value="auto_infracao">auto_infracao — Número em SILVER.AUTO_INFRACAO</option>
+                <option value="embargo_ambiental">embargo_ambiental — Termo em SILVER.EMBARGO_AMBIENTAL</option>
+              </select>
+            </div>
+
+            <!-- Validação de Domínio -->
+            <div class="campo">
+              <label class="rotulo-campo">
+                Validação de Domínio
+                <span class="dica-info" title="Valida se o valor pertence à lista oficial de valores aceitos para este campo.">
+                  <svg class="icone-info-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                </span>
+              </label>
+              <select v-model="novoMapeamento.tabelaReferencia" class="select-form">
+                <option value="">(Nenhuma tabela de domínio)</option>
+                <option
+                  v-for="dom in dominiosDisponiveis"
+                  :key="dom.tabela"
+                  :value="dom.tabela"
+                >
+                  {{ dom.label }}
+                </option>
+              </select>
+              <span v-if="dominiosDisponiveis.length === 0" class="dica-sem-dominio">
+                Nenhuma tabela de domínio aplicável a esta tabela.
+              </span>
+            </div>
+
+            <!-- Valor Mínimo -->
+            <div class="campo">
+              <label class="rotulo-campo">
+                Valor Mínimo Aceito
+                <span class="dica-info" title="Envia para a Quarentena valores numéricos menores que este limite (ex.: área > 0).">
+                  <svg class="icone-info-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                </span>
+              </label>
+              <input
+                type="number"
+                step="any"
+                v-model.number="novoMapeamento.valorMinimo"
+                placeholder="Ex: 0.0, 1980"
+                class="input-form"
+              />
+            </div>
+
+            <!-- Checkboxes de Validação -->
+            <div class="campo-checks">
+              <label class="check-item">
+                <input type="checkbox" v-model="novoMapeamento.obrigatorio" />
+                <span>Obrigatório</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" v-model="novoMapeamento.validarGeometria" />
+                <span>Validar Geometria</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" v-model="novoMapeamento.validarCpfCnpj" />
+                <span>Validar CPF / CNPJ</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" v-model="novoMapeamento.validarRecortePr" />
+                <span>Validar Limite PR</span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" v-model="novoMapeamento.impedirRegressao" />
+                <span>Bloquear Regressão</span>
+              </label>
+            </div>
+
+            <!-- Botões de Ação do Form -->
+            <div class="campo-btn">
+              <button
+                v-if="novoMapeamento.id"
+                type="button"
+                class="btn-cancelar"
+                @click="cancelarEdicao"
+              >
+                Cancelar
+              </button>
+              <button type="submit" class="btn-adicionar" :disabled="salvando">
+                {{ salvando ? 'Gravando...' : novoMapeamento.id ? 'Salvar Alterações' : '+ Mapear Campo' }}
+              </button>
+            </div>
+          </form>
         </section>
 
-        <!-- 3. TABELA DE MAPEAMENTOS CADASTRADOS -->
-        <section class="secao-tabela">
+        <!-- 3. TABELA DE MAPEAMENTOS CADASTRADOS (EXIBIDA APENAS QUANDO HOUVER TABELA SILVER) -->
+        <section v-if="tabelaSilverSelecionada" class="secao-tabela">
           <div class="secao-topo">
             <h3 class="secao-titulo">Colunas Atualmente Mapeadas ({{ mapeamentos.length }})</h3>
             <span v-if="carregando" class="spinner-sm"></span>
@@ -845,7 +1006,7 @@ async function remover(id) {
                     <button
                       class="btn-excluir"
                       title="Excluir mapeamento"
-                      @click="remover(map.id)"
+                      @click="solicitarRemover(map)"
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6" />
@@ -861,8 +1022,110 @@ async function remover(id) {
       </div>
 
       <footer class="modal-footer">
-        <button class="btn-fechar-modal" @click="emit('fechar')">Fechar</button>
+        <button class="btn-fechar-modal" @click="fechar">Fechar</button>
       </footer>
+    </div>
+
+    <!-- POPUP MODAL: CONFIRMAÇÃO DE TROCA DE TABELA SILVER -->
+    <div
+      v-if="popupTrocaSilverAberto"
+      class="popup-overlay"
+      @click.self="cancelarTrocaTabelaSilver"
+    >
+      <div class="popup-card popup-card--perigo">
+        <div class="popup-icone-wrapper">
+          <svg class="popup-svg-aviso" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </div>
+        <div class="popup-conteudo">
+          <h3 class="popup-titulo">Trocar Tabela Silver de Destino?</h3>
+          <p class="popup-mensagem">
+            A fonte já possui <strong>{{ mapeamentos.length }} coluna(s) mapeada(s)</strong> para a tabela
+            <span class="tag-silver-destaque">{{ nomeTabelaAntiga }}</span>.
+          </p>
+          <div class="popup-alerta-box">
+            <svg class="alerta-box-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <p class="alerta-box-texto">
+              Ao mudar para <strong>{{ nomeNovaTabela }}</strong>, <strong>todos os mapeamentos atuais serão excluídos permanentemente</strong>, pois cada tabela Silver possui suas próprias colunas e validações.
+            </p>
+          </div>
+          <p class="popup-pergunta">Deseja realmente continuar com a alteração?</p>
+        </div>
+        <div class="popup-acoes">
+          <button
+            type="button"
+            class="btn-popup-cancelar"
+            :disabled="limpandoEAlterandoSilver"
+            @click="cancelarTrocaTabelaSilver"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn-popup-confirmar btn-popup-confirmar--perigo"
+            :disabled="limpandoEAlterandoSilver"
+            @click="confirmarTrocaTabelaSilver"
+          >
+            <span v-if="limpandoEAlterandoSilver" class="spinner-sm"></span>
+            <span>{{ limpandoEAlterandoSilver ? 'Limpando e Alterando...' : 'Sim, Trocar e Limpar Campos' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- POPUP MODAL: CONFIRMAÇÃO DE EXCLUSÃO DE CAMPO -->
+    <div
+      v-if="popupExcluirCampoAberto && mapeamentoParaExcluir"
+      class="popup-overlay"
+      @click.self="cancelarRemoverCampo"
+    >
+      <div class="popup-card">
+        <div class="popup-icone-wrapper popup-icone-wrapper--lixeira">
+          <svg class="popup-svg-lixeira" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </div>
+        <div class="popup-conteudo">
+          <h3 class="popup-titulo">Remover Mapeamento de Coluna</h3>
+          <p class="popup-mensagem">
+            Deseja realmente remover o de-para da coluna
+            <code>{{ mapeamentoParaExcluir.colunaOrigem }}</code>
+            <span v-if="mapeamentoParaExcluir.atributoDestino">
+              → <strong>{{ mapeamentoParaExcluir.atributoDestino }}</strong>
+            </span>?
+          </p>
+          <p class="popup-subtexto">
+            Os dados desta coluna bruta deixarão de ser promovidos para a camada Silver e ficarão apenas nos metadados gerais.
+          </p>
+        </div>
+        <div class="popup-acoes">
+          <button
+            type="button"
+            class="btn-popup-cancelar"
+            :disabled="excluindoCampo"
+            @click="cancelarRemoverCampo"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn-popup-confirmar btn-popup-confirmar--perigo"
+            :disabled="excluindoCampo"
+            @click="confirmarRemoverCampo"
+          >
+            <span v-if="excluindoCampo" class="spinner-sm"></span>
+            <span>{{ excluindoCampo ? 'Removendo...' : 'Remover Campo' }}</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -955,6 +1218,30 @@ async function remover(id) {
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.alerta--dispensavel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.btn-fechar-alerta {
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.btn-fechar-alerta:hover {
+  opacity: 1;
 }
 
 .alerta--erro {
@@ -1116,38 +1403,88 @@ async function remover(id) {
   box-shadow: 0 4px 12px rgba(22, 101, 52, 0.08);
 }
 
-.card-formulario--bloqueado {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  opacity: 0.9;
-}
-
-.bloqueio-aviso {
+.silver-orientacao-inicial {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 8px;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #334155;
 }
 
-.bloqueio-icone {
-  font-size: 2rem;
+.orientacao-icone-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.bloqueio-titulo {
-  margin: 0 0 0.25rem;
-  font-size: 0.92rem;
+.orientacao-svg {
+  width: 26px;
+  height: 26px;
+  color: #0284c7;
+}
+
+.mini-svg-status {
+  width: 13px;
+  height: 13px;
+  display: inline-block;
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+
+.icone-info-svg {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  vertical-align: -2px;
+  color: #94a3b8;
+  transition: color 0.15s ease;
+}
+
+.dica-info:hover .icone-info-svg {
+  color: #0284c7;
+}
+
+.popup-svg-aviso {
+  width: 26px;
+  height: 26px;
+  color: #dc2626;
+}
+
+.popup-svg-lixeira {
+  width: 24px;
+  height: 24px;
+  color: #475569;
+}
+
+.alerta-box-svg {
+  width: 18px;
+  height: 18px;
+  color: #e11d48;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.orientacao-titulo {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
   font-weight: 800;
-  color: #92400e;
+  color: #0f172a;
 }
 
-.bloqueio-desc {
+.orientacao-desc {
   margin: 0;
-  font-size: 0.82rem;
-  color: #78350f;
-  line-height: 1.4;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.45;
 }
 
 .secao-topo-form {
@@ -1562,6 +1899,186 @@ async function remover(id) {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Popups de Confirmação In-App */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 1.5rem;
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.popup-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(226, 232, 240, 0.8);
+  width: 100%;
+  max-width: 480px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.popup-card--perigo {
+  border-top: 4px solid #ef4444;
+}
+
+.popup-icone-wrapper {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.popup-icone-wrapper--lixeira {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.popup-icone {
+  font-size: 1.75rem;
+}
+
+.popup-conteudo {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.popup-titulo {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.popup-mensagem {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.popup-subtexto {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.tag-silver-destaque {
+  font-weight: 700;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.popup-alerta-box {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  text-align: left;
+}
+
+.alerta-box-texto {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #9f1239;
+  line-height: 1.4;
+}
+
+.popup-pergunta {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.popup-acoes {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btn-popup-cancelar {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #475569;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-popup-cancelar:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.btn-popup-confirmar {
+  background: #0f172a;
+  border: 1.5px solid #0f172a;
+  color: #ffffff;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+}
+
+.btn-popup-confirmar--perigo {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.btn-popup-confirmar--perigo:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
