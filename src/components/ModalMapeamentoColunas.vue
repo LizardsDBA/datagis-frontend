@@ -765,21 +765,26 @@ function remover(id) {
 
         <!-- CARD DE STATUS E PRONTIDÃO PARA INGESTÃO -->
         <div v-if="tabelaSilverSelecionada && esquemaAtivo" class="card-prontidao-ingestao">
-          <div class="prontidao-topo">
-            <div class="prontidao-status-badge" :class="statusMapeamentoSilver.completo ? 'badge-prontidao-liberada' : 'badge-prontidao-bloqueada'">
-              <svg v-if="statusMapeamentoSilver.completo" class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <svg v-else class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-              </svg>
-              <span>{{ statusMapeamentoSilver.completo ? 'Ingestão Liberada' : 'Ingestão Bloqueada' }}</span>
-            </div>
-            <div class="prontidao-contador">
-              <strong>{{ statusMapeamentoSilver.totalMapeadas }} de {{ statusMapeamentoSilver.totalEsperadas }}</strong> colunas da tabela Silver preenchidas ({{ statusMapeamentoSilver.porcentagem }}%)
-            </div>
+          <div v-if="carregando" class="prontidao-topo prontidao-carregando">
+            <span class="spinner-sm"></span>
+            <span>Carregando integridade do mapeamento...</span>
           </div>
+          <template v-else>
+            <div class="prontidao-topo">
+              <div class="prontidao-status-badge" :class="statusMapeamentoSilver.completo ? 'badge-prontidao-liberada' : 'badge-prontidao-bloqueada'">
+                <svg v-if="statusMapeamentoSilver.completo" class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <svg v-else class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                </svg>
+                <span>{{ statusMapeamentoSilver.completo ? 'Ingestão Liberada' : 'Ingestão Bloqueada' }}</span>
+              </div>
+              <div class="prontidao-contador">
+                <strong>{{ statusMapeamentoSilver.totalMapeadas }} de {{ statusMapeamentoSilver.totalEsperadas }}</strong> colunas da tabela Silver preenchidas ({{ statusMapeamentoSilver.porcentagem }}%)
+              </div>
+            </div>
 
           <div class="barra-prontidao-trilho">
             <div
@@ -804,12 +809,13 @@ function remover(id) {
               </span>
             </div>
           </div>
-          <div v-else class="prontidao-concluida">
-            <svg class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>Todas as colunas necessárias da tabela Silver foram preenchidas. Esta fonte está apta para ingestão!</span>
-          </div>
+            <div v-else class="prontidao-concluida">
+              <svg class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>Todas as colunas necessárias da tabela Silver foram preenchidas. Esta fonte está apta para ingestão!</span>
+            </div>
+          </template>
         </div>
 
         <!-- AVISO ORIENTATIVO QUANDO NÃO HÁ TABELA SILVER SELECIONADA -->

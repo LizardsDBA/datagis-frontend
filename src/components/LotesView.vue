@@ -112,6 +112,16 @@ function fecharModalLiberacao() {
   etapaAtual.value = 1
 }
 
+function irParaQuarentenaLote() {
+  const loteId = loteParaLiberar.value?.id
+  fecharModalLiberacao()
+  if (loteId) {
+    verNaQuarentena(loteId)
+  } else {
+    router.push('/quarentena')
+  }
+}
+
 async function confirmarLiberacao() {
   if (!loteParaLiberar.value) return
 
@@ -161,6 +171,7 @@ async function confirmarLiberacao() {
     if (timerProgresso) clearInterval(timerProgresso)
     faseLiberacao.value = 'ERRO'
     mensagemErroLiberacao.value = e.message || 'Não foi possível enviar o lote para a Silver.'
+    carregarLotes()
   }
 }
 
@@ -512,12 +523,12 @@ onMounted(() => {
                 </svg>
               </div>
               <div class="info-texto">
-                <h4>O que vai acontecer</h4>
+                <h4>Revalidação Completa do Lote</h4>
                 <p>
-                  Vamos conferir os registros de novo e salvar os que estiverem certos na Silver, onde ficam prontos para os cruzamentos e indicadores.
+                  Ao liberar, todos os registros do lote passarão por uma nova revalidação. Os registros válidos e já corrigidos serão enviados à Silver se 100% dos dados estiverem em conformidade.
                 </p>
-                <p class="destaque-quarentena">
-                  ✓ Os itens deste lote na Quarentena serão marcados como resolvidos.
+                <p class="destaque-quarentena destaque-quarentena--aviso">
+                  Atenção: Se algum item ainda contiver erro, a liberação será bloqueada e as inconsistências permanecerão retidas na Quarentena.
                 </p>
               </div>
             </div>
@@ -667,8 +678,8 @@ onMounted(() => {
         <template v-else-if="faseLiberacao === 'ERRO'">
           <header class="modal-header">
             <div>
-              <span class="modal-etiqueta etiqueta-vermelha">FALHA NA TRANSIÇÃO</span>
-              <h2 class="modal-titulo">Erro ao Liberar Lote #{{ loteParaLiberar.id }}</h2>
+              <span class="modal-etiqueta etiqueta-vermelha">LIBERAÇÃO BLOQUEADA</span>
+              <h2 class="modal-titulo">Lote #{{ loteParaLiberar.id }} Retido na Quarentena</h2>
             </div>
             <button class="btn-fechar" @click="fecharModalLiberacao">✕</button>
           </header>
@@ -681,7 +692,7 @@ onMounted(() => {
                 <line x1="9" y1="9" x2="15" y2="15" />
               </svg>
               <div>
-                <strong>Ocorreu uma falha no processamento:</strong>
+                <strong>A liberação para a Silver não pôde ser concluída:</strong>
                 <p>{{ mensagemErroLiberacao }}</p>
               </div>
             </div>
@@ -689,6 +700,13 @@ onMounted(() => {
 
           <footer class="modal-footer">
             <button class="btn-cancelar" @click="fecharModalLiberacao">Fechar</button>
+            <button
+              v-if="podeVerQuarentena"
+              class="btn-atalho-quarentena"
+              @click="irParaQuarentenaLote"
+            >
+              Inspecionar na Quarentena →
+            </button>
           </footer>
         </template>
 
@@ -1473,6 +1491,10 @@ onMounted(() => {
   color: #15803d;
 }
 
+.destaque-quarentena--aviso {
+  color: #b45309;
+}
+
 .resumo-lote {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1645,6 +1667,25 @@ onMounted(() => {
   border: none;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.btn-atalho-quarentena {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: #b45309;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background 0.15s ease;
+}
+
+.btn-atalho-quarentena:hover {
+  background: #92400e;
 }
 
 .modal-body--centro {

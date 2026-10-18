@@ -327,10 +327,7 @@ function enviarUpload(fonte, arquivo) {
 
 function podeExecutar(fonte) {
   if (!fonte) return false
-  if (fonte.mapeamentoCompleto !== undefined) {
-    return fonte.mapeamentoCompleto === true
-  }
-  return true
+  return fonte.mapeamentoCompleto === true && !!fonte.entidadeSilver
 }
 
 function obterTooltipExecucao(fonte, tipo) {
