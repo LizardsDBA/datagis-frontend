@@ -131,6 +131,25 @@ export async function excluirMapeamento(fonteId, id) {
   return true
 }
 
+export async function buscarEsquemasSilver() {
+  const resp = await apiFetch('/api/fontes/esquemas-silver')
+  if (!resp.ok) throw new Error('Falha ao carregar catálogo de esquemas Silver')
+  return resp.json()
+}
+
+export async function atualizarEntidadeSilverFonte(fonteId, entidadeSilver) {
+  const resp = await apiFetch(`/api/fontes/${fonteId}/entidade-silver`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entidadeSilver }),
+  })
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || 'Falha ao vincular tabela Silver à fonte')
+  }
+  return resp.json()
+}
+
 export async function buscarDiagnostico(params = {}) {
   const query = new URLSearchParams()
   if (params.loteIngestaoId) query.set('loteIngestaoId', params.loteIngestaoId)
