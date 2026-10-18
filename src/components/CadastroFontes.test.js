@@ -114,3 +114,36 @@ describe('CadastroFontes — coluna de agendamento', () => {
         expect(linhas[4].text()).not.toContain('às')
     })
 })
+
+describe('CadastroFontes — bloqueio de execução por mapeamento incompleto', () => {
+    it('desabilita os botões de execução e upload quando o mapeamento da tabela Silver estiver incompleto', async () => {
+        const fontesComStatus = [
+            { id: 1, nome: 'Fonte Completa', tipoAquisicao: 'API_REST', entidadeSilver: 'imovel_rural', mapeamentoCompleto: true, totalColunasSilver: 3, totalColunasMapeadas: 3 },
+            { id: 2, nome: 'Fonte Incompleta', tipoAquisicao: 'API_REST', entidadeSilver: 'imovel_rural', mapeamentoCompleto: false, totalColunasSilver: 5, totalColunasMapeadas: 2, colunasSilverFaltantes: ['area_ha', 'geometria', 'situacao'] },
+            { id: 3, nome: 'Fonte Upload Incompleta', tipoAquisicao: 'UPLOAD_MANUAL', entidadeSilver: 'area_protegida', mapeamentoCompleto: false, totalColunasSilver: 4, totalColunasMapeadas: 1, colunasSilverFaltantes: ['campo_b'] },
+        ]
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => fontesComStatus }))
+        await abrirTela()
+
+        const botoes = wrapper.findAll('.btn-executar')
+        expect(botoes).toHaveLength(3)
+
+        // Fonte 1 (completa) -> habilitado
+        expect(botoes[0].attributes('disabled')).toBeUndefined()
+
+        // Fonte 2 (incompleta) -> desabilitado
+        expect(botoes[1].attributes('disabled')).toBeDefined()
+        expect(botoes[1].attributes('title')).toContain('Mapeamento incompleto: faltam 3 colunas')
+        expect(botoes[1].attributes('title')).toContain('area_ha')
+
+        // Fonte 3 (upload manual incompleto) -> desabilitado
+        expect(botoes[2].attributes('disabled')).toBeDefined()
+        expect(botoes[2].attributes('title')).toContain('Mapeamento incompleto')
+
+        // Badges na tabela
+        const badges = wrapper.findAll('.badge-mapeamento-status')
+        expect(badges[0].text()).toContain('Mapeamento OK')
+        expect(badges[1].text()).toContain('Mapeamento Incompleto (2/5)')
+        expect(badges[2].text()).toContain('Mapeamento Incompleto (1/4)')
+    })
+})

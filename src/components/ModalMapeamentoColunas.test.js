@@ -159,12 +159,12 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     })
     await flushPromises()
 
-    // Preenche campos do formulário
+    // Preenche campos do formulário com coluna Silver ainda não mapeada
     const inputOrigem = wrapper.find('.card-formulario input[placeholder*="Ex: cod_municipio_ibge"]')
-    await inputOrigem.setValue('num_car')
+    await inputOrigem.setValue('sit_cadastral')
 
     const selectAtributo = wrapper.find('.atributo-select-wrapper select')
-    await selectAtributo.setValue('cod_imovel')
+    await selectAtributo.setValue('situacao_imovel')
     await selectAtributo.trigger('change')
 
     // Submete o form
@@ -174,11 +174,40 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     expect(mockSalvarMapeamentos).toHaveBeenCalledTimes(1)
     const payloadEnviado = mockSalvarMapeamentos.mock.calls[0][1]
     expect(payloadEnviado[0]).toMatchObject({
-      colunaOrigem: 'num_car',
-      atributoDestino: 'cod_imovel',
+      colunaOrigem: 'sit_cadastral',
+      atributoDestino: 'situacao_imovel',
       tabelaDestino: 'imovel_rural',
       fonteDadoId: 2,
     })
+  })
+
+  it('desabilita opção de coluna Silver já mapeada e exibe pendências no card de prontidão', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
+      },
+    })
+    await flushPromises()
+
+    // 1. O card de prontidão deve mostrar que a ingestão está bloqueada e faltam colunas
+    const cardProntidao = wrapper.find('.card-prontidao-ingestao')
+    expect(cardProntidao.exists()).toBe(true)
+    expect(cardProntidao.text()).toContain('Ingestão Bloqueada')
+    expect(cardProntidao.text()).toContain('1 de 3 colunas da tabela Silver preenchidas')
+    expect(cardProntidao.text()).toContain('situacao_imovel')
+    expect(cardProntidao.text()).toContain('area_ha')
+
+    // 2. No select de atributos, a coluna 'cod_imovel' já mapeada deve estar desabilitada
+    const selectAtributo = wrapper.find('.atributo-select-wrapper select')
+    const opcoes = selectAtributo.findAll('option')
+    const optCodImovel = opcoes.find((o) => o.attributes('value') === 'cod_imovel')
+    expect(optCodImovel).toBeDefined()
+    expect(optCodImovel.attributes('disabled')).toBeDefined()
+    expect(optCodImovel.text()).toContain('já mapeado')
+
+    // 3. Coluna não mapeada ('situacao_imovel') deve estar habilitada
+    const optSituacao = opcoes.find((o) => o.attributes('value') === 'situacao_imovel')
+    expect(optSituacao.attributes('disabled')).toBeUndefined()
   })
 
   it('abre popup de confirmação e cancela a troca de Tabela Silver quando o usuário clica em Cancelar', async () => {

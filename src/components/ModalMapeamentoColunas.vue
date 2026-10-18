@@ -239,7 +239,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['fechar'])
+const emit = defineEmits(['fechar', 'atualizado'])
 
 const mapeamentos = ref([])
 const carregando = ref(false)
@@ -307,6 +307,62 @@ const nomeNovaTabela = computed(() => {
 
 const colunasSilverDisponiveis = computed(() => esquemaAtivo.value?.colunas || [])
 const dominiosDisponiveis = computed(() => esquemaAtivo.value?.dominios || [])
+
+const colunasSilverMapeadasNomes = computed(() => {
+  const set = new Set()
+  for (const m of mapeamentos.value) {
+    if (m.destinoTipo !== 'JSON' && m.atributoDestino) {
+      set.add(m.atributoDestino.trim().toLowerCase())
+    }
+  }
+  return set
+})
+
+const colunasSilverUtilizadasParaBloqueio = computed(() => {
+  const set = new Set()
+  for (const m of mapeamentos.value) {
+    if (novoMapeamento.value.id && m.id === novoMapeamento.value.id) {
+      continue
+    }
+    if (m.destinoTipo !== 'JSON' && m.atributoDestino) {
+      set.add(m.atributoDestino.trim().toLowerCase())
+    }
+  }
+  return set
+})
+
+function isColunaSilverUtilizada(nomeColuna) {
+  if (!nomeColuna) return false
+  return colunasSilverUtilizadasParaBloqueio.value.has(nomeColuna.trim().toLowerCase())
+}
+
+const statusMapeamentoSilver = computed(() => {
+  const esperadas = colunasSilverDisponiveis.value
+  const totalEsperadas = esperadas.length
+  if (totalEsperadas === 0) {
+    return {
+      completo: false,
+      totalEsperadas: 0,
+      totalMapeadas: 0,
+      faltantes: [],
+      porcentagem: 0,
+    }
+  }
+
+  const mapeadasSet = colunasSilverMapeadasNomes.value
+  const faltantes = esperadas.filter((c) => !mapeadasSet.has(c.nome.trim().toLowerCase()))
+  const totalMapeadas = totalEsperadas - faltantes.length
+  const completo = faltantes.length === 0
+  const porcentagem = Math.round((totalMapeadas / totalEsperadas) * 100)
+
+  return {
+    completo,
+    totalEsperadas,
+    totalMapeadas,
+    faltantes,
+    porcentagem,
+  }
+})
 
 async function carregarEsquemas() {
   carregandoEsquemas.value = true
@@ -437,6 +493,7 @@ async function confirmarTrocaTabelaSilver() {
     tabelaSilverAnterior.value = novaTabela
     popupTrocaSilverAberto.value = false
     tabelaPendenteTroca.value = ''
+    emit('atualizado')
   } catch (e) {
     erro.value = e.message || 'Falha ao limpar mapeamentos anteriores da fonte.'
     tabelaSilverSelecionada.value = tabelaSilverAnterior.value
@@ -544,6 +601,14 @@ async function salvarCampo() {
     return
   }
 
+  if (
+    novoMapeamento.value.destinoTipo !== 'JSON' &&
+    isColunaSilverUtilizada(novoMapeamento.value.atributoDestino)
+  ) {
+    erro.value = `A coluna Silver "${novoMapeamento.value.atributoDestino}" já está mapeada nesta fonte e não pode ser preenchida novamente.`
+    return
+  }
+
   salvando.value = true
   erro.value = null
   sucesso.value = null
@@ -572,6 +637,7 @@ async function salvarCampo() {
 
     cancelarEdicao()
     await carregarMapeamentos()
+    emit('atualizado')
   } catch (e) {
     erro.value = e.message || 'Falha ao salvar mapeamento.'
   } finally {
@@ -604,6 +670,7 @@ async function confirmarRemoverCampo() {
     definirMensagemSucesso(`Mapeamento da coluna "${map.colunaOrigem}" removido com sucesso.`)
     popupExcluirCampoAberto.value = false
     mapeamentoParaExcluir.value = null
+    emit('atualizado')
   } catch (e) {
     erro.value = e.message || 'Erro ao remover mapeamento.'
   } finally {
@@ -696,6 +763,55 @@ function remover(id) {
           </div>
         </section>
 
+        <!-- CARD DE STATUS E PRONTIDÃO PARA INGESTÃO -->
+        <div v-if="tabelaSilverSelecionada && esquemaAtivo" class="card-prontidao-ingestao">
+          <div class="prontidao-topo">
+            <div class="prontidao-status-badge" :class="statusMapeamentoSilver.completo ? 'badge-prontidao-liberada' : 'badge-prontidao-bloqueada'">
+              <svg v-if="statusMapeamentoSilver.completo" class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <svg v-else class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+              </svg>
+              <span>{{ statusMapeamentoSilver.completo ? 'Ingestão Liberada' : 'Ingestão Bloqueada' }}</span>
+            </div>
+            <div class="prontidao-contador">
+              <strong>{{ statusMapeamentoSilver.totalMapeadas }} de {{ statusMapeamentoSilver.totalEsperadas }}</strong> colunas da tabela Silver preenchidas ({{ statusMapeamentoSilver.porcentagem }}%)
+            </div>
+          </div>
+
+          <div class="barra-prontidao-trilho">
+            <div
+              class="barra-prontidao-preenchimento"
+              :class="{ 'barra-prontidao-preenchimento--completo': statusMapeamentoSilver.completo }"
+              :style="{ width: statusMapeamentoSilver.porcentagem + '%' }"
+            ></div>
+          </div>
+
+          <div v-if="!statusMapeamentoSilver.completo" class="prontidao-pendencias">
+            <span class="prontidao-aviso-texto">
+              A ingestão desta fonte só será liberada quando todas as colunas da tabela Silver forem mapeadas. Colunas pendentes ({{ statusMapeamentoSilver.faltantes.length }}):
+            </span>
+            <div class="chips-colunas-pendentes">
+              <span
+                v-for="col in statusMapeamentoSilver.faltantes"
+                :key="col.nome"
+                class="chip-coluna-pendente"
+                :title="col.label"
+              >
+                {{ col.nome }}
+              </span>
+            </div>
+          </div>
+          <div v-else class="prontidao-concluida">
+            <svg class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>Todas as colunas necessárias da tabela Silver foram preenchidas. Esta fonte está apta para ingestão!</span>
+          </div>
+        </div>
+
         <!-- AVISO ORIENTATIVO QUANDO NÃO HÁ TABELA SILVER SELECIONADA -->
         <div v-if="!tabelaSilverSelecionada" class="silver-orientacao-inicial">
           <div class="orientacao-icone-wrapper">
@@ -758,8 +874,9 @@ function remover(id) {
                     v-for="col in colunasSilverDisponiveis"
                     :key="col.nome"
                     :value="col.nome"
+                    :disabled="isColunaSilverUtilizada(col.nome)"
                   >
-                    {{ col.label }} ({{ col.nome }})
+                    {{ col.label }} ({{ col.nome }}){{ isColunaSilverUtilizada(col.nome) ? ' — já mapeado' : '' }}
                   </option>
                   <option value="__customizado__">+ Outro / Atributo Personalizado (JSON)...</option>
                 </select>
@@ -2089,5 +2206,121 @@ function remover(id) {
   .grid-form {
     grid-template-columns: 1fr;
   }
+}
+
+/* Painel de Prontidão e Completude para Ingestão */
+.card-prontidao-ingestao {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.15rem 1.35rem;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.prontidao-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.prontidao-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge-prontidao-liberada {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-prontidao-bloqueada {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.prontidao-contador {
+  font-size: 0.86rem;
+  color: #475569;
+}
+
+.prontidao-contador strong {
+  color: #0f172a;
+}
+
+.barra-prontidao-trilho {
+  width: 100%;
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.barra-prontidao-preenchimento {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.barra-prontidao-preenchimento--completo {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.prontidao-pendencias {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.prontidao-aviso-texto {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.chips-colunas-pendentes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip-coluna-pendente {
+  display: inline-block;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #475569;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.prontidao-concluida {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #047857;
+}
+
+.prontidao-concluida .mini-svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 </style>
