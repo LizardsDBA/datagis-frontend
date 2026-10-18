@@ -204,4 +204,75 @@ describe('goldService', () => {
       'Falha ao carregar os imóveis publicados.',
     )
   })
+
+  it('publicarGold chama POST /gold/publicar e retorna o resultado', async () => {
+    const { publicarGold } = await carregarGoldService()
+
+    const mockResultado = {
+      totalImoveis: 10,
+      imoveisPublicados: 10,
+      imoveisComFalha: [],
+      camadasPublicadas: ['MUNICIPIO'],
+      camadasComFalha: [],
+    }
+    api.post.mockResolvedValueOnce({ data: mockResultado })
+
+    const resultado = await publicarGold()
+    expect(api.post).toHaveBeenCalledWith('/gold/publicar')
+    expect(resultado).toEqual(mockResultado)
+  })
+
+  it('publicarGold com loteId chama POST /gold/publicar?loteId=ID', async () => {
+    const { publicarGold } = await carregarGoldService()
+
+    const mockResultado = { totalImoveis: 5, imoveisPublicados: 5 }
+    api.post.mockResolvedValueOnce({ data: mockResultado })
+
+    const resultado = await publicarGold(42)
+    expect(api.post).toHaveBeenCalledWith('/gold/publicar?loteId=42')
+    expect(resultado).toEqual(mockResultado)
+  })
+
+  it('obterStatusGold chama GET /gold/status e retorna status consolidado', async () => {
+    const { obterStatusGold } = await carregarGoldService()
+
+    const mockStatus = {
+      algumEmAndamento: false,
+      indicadores: { status: 'CONCLUIDA', totalProcessado: 5 },
+      camadasMapa: [],
+    }
+    api.get.mockResolvedValueOnce({ data: mockStatus })
+
+    const resultado = await obterStatusGold()
+    expect(api.get).toHaveBeenCalledWith('/gold/status')
+    expect(resultado).toEqual(mockStatus)
+  })
+
+  it('obterStatusIndicadores chama GET /gold/publicacoes-indicadores/status', async () => {
+    const { obterStatusIndicadores } = await carregarGoldService()
+
+    api.get.mockResolvedValueOnce({ data: { status: 'CONCLUIDA' } })
+
+    const resultado = await obterStatusIndicadores()
+    expect(api.get).toHaveBeenCalledWith('/gold/publicacoes-indicadores/status')
+    expect(resultado).toEqual({ status: 'CONCLUIDA' })
+  })
+
+  it('publicarCamadaMapa chama POST /gold/mapa-camadas/:codigo/publicar', async () => {
+    const { publicarCamadaMapa } = await carregarGoldService()
+
+    api.post.mockResolvedValueOnce({})
+
+    await publicarCamadaMapa('MUNICIPIO')
+    expect(api.post).toHaveBeenCalledWith('/gold/mapa-camadas/MUNICIPIO/publicar')
+  })
+
+  it('recalcularImovel chama POST /gold/imoveis/:codImovel/recalcular', async () => {
+    const { recalcularImovel } = await carregarGoldService()
+
+    api.post.mockResolvedValueOnce({})
+
+    await recalcularImovel('PR-1234')
+    expect(api.post).toHaveBeenCalledWith('/gold/imoveis/PR-1234/recalcular')
+  })
 })

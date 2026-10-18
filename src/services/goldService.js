@@ -76,3 +76,47 @@ export async function buscarImovelPublicado(codImovel) {
     throw new Error(mensagemDoErro(error, `Falha ao carregar o imóvel ${codImovel}.`))
   }
 }
+
+export async function publicarGold(loteId = null) {
+  try {
+    const url = loteId ? `/gold/publicar?loteId=${encodeURIComponent(loteId)}` : '/gold/publicar'
+    const { data } = await api.post(url)
+    return data
+  } catch (error) {
+    throw new Error(mensagemDoErro(error, 'Falha ao executar a publicação da camada Gold.'))
+  }
+}
+
+export async function obterStatusGold() {
+  try {
+    const { data } = await api.get('/gold/status')
+    return data
+  } catch (error) {
+    throw new Error(mensagemDoErro(error, 'Falha ao consultar o status da publicação Gold.'))
+  }
+}
+
+export async function obterStatusIndicadores() {
+  try {
+    const { data } = await api.get('/gold/publicacoes-indicadores/status')
+    return data
+  } catch (error) {
+    throw new Error(mensagemDoErro(error, 'Falha ao consultar o status dos indicadores.'))
+  }
+}
+
+export async function publicarCamadaMapa(codigo) {
+  try {
+    await api.post(`/gold/mapa-camadas/${encodeURIComponent(codigo)}/publicar`)
+  } catch (error) {
+    throw new Error(mensagemDoErro(error, `Falha ao publicar a camada de mapa ${codigo}.`))
+  }
+}
+
+export async function recalcularImovel(codImovel) {
+  try {
+    await api.post(`/gold/imoveis/${encodeURIComponent(codImovel)}/recalcular`)
+  } catch (error) {
+    throw new Error(mensagemDoErro(error, `Falha ao recalcular indicadores do imóvel ${codImovel}.`))
+  }
+}

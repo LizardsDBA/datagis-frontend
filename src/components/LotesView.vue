@@ -1,13 +1,15 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { buscarLotes, liberarLote, descartarLote } from '../services/loteService'
+import { publicarGold, obterStatusGold } from '../services/goldService'
 import { temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 
 // Acoes de governanca do lote so pra quem pode (LIZARDS-45); o backend barra com 403 de qualquer jeito
 const podeGerenciarLote = temPermissao(PERMISSOES.LOTE_GERENCIAR)
 const podeVerQuarentena = temPermissao(PERMISSOES.QUARENTENA_VISUALIZAR)
+const podePublicarGold = temPermissao(PERMISSOES.INDICADOR_PUBLICAR)
 
 const router = useRouter()
 
@@ -67,11 +69,12 @@ const lotesFiltrados = computed(() => {
 
 const metricas = computed(() => {
   const total = lotes.value.length
+  const migradosGold = lotes.value.filter(l => l.status === 'PROMOVIDO_GOLD').length
   const promovidos = lotes.value.filter(l => l.status === 'PROMOVIDO_SILVER').length
   const retidos = lotes.value.filter(l => l.status === 'RETIDO_QUARENTENA').length
   const descartados = lotes.value.filter(l => l.status === 'DESCARTADO').length
   const semMudanca = lotes.value.filter(l => l.status === 'SEM_MUDANCA').length
-  return { total, promovidos, retidos, descartados, semMudanca }
+  return { total, migradosGold, promovidos, retidos, descartados, semMudanca }
 })
 
 function formatarData(iso) {
@@ -208,10 +211,151 @@ async function confirmarDescarte() {
   }
 }
 
+const lotesNaSilver = computed(() => lotes.value.filter(l => l.status === 'PROMOVIDO_SILVER'))
+
+// Modal de Migração Silver -> Gold
+const modalGoldAberto = ref(false)
+const loteAlvoGold = ref(null)
+const faseGold = ref('CONFIRMACAO') // 'CONFIRMACAO' | 'PROCESSANDO' | 'SUCESSO' | 'ERRO'
+const statusGold = ref(null)
+const resultadoPublicacaoTudo = ref(null)
+const erroGold = ref('')
+let timerPollingGold = null
+
+const ehLoteImovelRural = computed(() => {
+  if (!loteAlvoGold.value) return false
+  const ent = (loteAlvoGold.value.entidadeSilver || '').toLowerCase()
+  if (ent === 'imovel_rural' || ent === 'car') return true
+  const nome = (loteAlvoGold.value.fonteDadoNome || '').toLowerCase()
+  return nome.includes('car') || nome.includes('imóvel') || nome.includes('imovel')
+})
+
+const nomeCamadaLote = computed(() => {
+  if (!loteAlvoGold.value) return 'Camada de Dados'
+  const ent = (loteAlvoGold.value.entidadeSilver || '').toLowerCase()
+  const nome = (loteAlvoGold.value.fonteDadoNome || '').toLowerCase()
+  if (ent === 'desmatamento' || nome.includes('desmatamento') || nome.includes('prodes')) {
+    return 'Desmatamento (PRODES)'
+  }
+  if (ent === 'embargo_ambiental' || ent === 'embargo' || nome.includes('embargo')) {
+    return 'Embargos Ambientais (IBAMA)'
+  }
+  if (ent === 'area_protegida' || nome.includes('conservação') || nome.includes('protegida') || nome.includes('uc')) {
+    return 'Áreas Protegidas e Unidades de Conservação'
+  }
+  if (ent === 'municipio' || nome.includes('município') || nome.includes('ibge')) {
+    return 'Malha Municipal (IBGE)'
+  }
+  if (ent === 'foco_calor' || nome.includes('foco') || nome.includes('queimada')) {
+    return 'Focos de Calor (INPE)'
+  }
+  return loteAlvoGold.value.fonteDadoNome || 'Camada de Dados'
+})
+
+function abrirModalGold(lote = null) {
+  let alvo = lote
+  if (!alvo) {
+    if (lotesNaSilver.value.length === 1) {
+      alvo = lotesNaSilver.value[0]
+    } else {
+      erro.value = 'Selecione diretamente na tabela o lote específico que deseja migrar para a Gold.'
+      return
+    }
+  }
+
+  if (alvo.status === 'PROMOVIDO_GOLD') {
+    erro.value = `O lote #${alvo.id} já foi migrado para a Gold e não pode ser migrado novamente.`
+    return
+  }
+
+  if (alvo.status !== 'PROMOVIDO_SILVER') {
+    erro.value = `O lote #${alvo.id} não está apto para migração (status atual: ${alvo.status}).`
+    return
+  }
+
+  loteAlvoGold.value = alvo
+  faseGold.value = 'CONFIRMACAO'
+  statusGold.value = null
+  resultadoPublicacaoTudo.value = null
+  erroGold.value = ''
+  modalGoldAberto.value = true
+}
+
+function fecharModalGold() {
+  if (faseGold.value === 'PROCESSANDO') return
+  if (timerPollingGold) {
+    clearInterval(timerPollingGold)
+    timerPollingGold = null
+  }
+  modalGoldAberto.value = false
+  loteAlvoGold.value = null
+}
+
+async function confirmarPublicacaoGold() {
+  if (!loteAlvoGold.value || !loteAlvoGold.value.id) {
+    erro.value = 'Selecione um lote específico para migrar para a Gold.'
+    fecharModalGold()
+    return
+  }
+
+  const loteIdAlvo = loteAlvoGold.value.id
+  faseGold.value = 'PROCESSANDO'
+  erroGold.value = ''
+
+  if (ehLoteImovelRural.value) {
+    try {
+      statusGold.value = await obterStatusGold()
+    } catch (e) {
+      // ignora falha inicial de status
+    }
+
+    timerPollingGold = setInterval(async () => {
+      try {
+        statusGold.value = await obterStatusGold()
+      } catch (e) {
+        // ignora falhas intermediarias de polling
+      }
+    }, 2000)
+  }
+
+  try {
+    const res = await publicarGold(loteIdAlvo)
+    if (timerPollingGold) {
+      clearInterval(timerPollingGold)
+      timerPollingGold = null
+    }
+    resultadoPublicacaoTudo.value = res
+    faseGold.value = 'SUCESSO'
+
+    const item = lotes.value.find(l => l.id === loteIdAlvo)
+    if (item) {
+      item.status = 'PROMOVIDO_GOLD'
+    }
+    sucesso.value = `Pronto! O lote #${loteIdAlvo} (${loteAlvoGold.value.fonteDadoNome}) foi migrado para a Gold.`
+
+    await carregarLotes()
+  } catch (e) {
+    if (timerPollingGold) {
+      clearInterval(timerPollingGold)
+      timerPollingGold = null
+    }
+    faseGold.value = 'ERRO'
+    erroGold.value = e.message || 'Falha ao executar a migração para a camada Gold.'
+  }
+}
+
 onMounted(() => {
   carregarLotes()
 })
+
+onUnmounted(() => {
+  if (timerPollingGold) {
+    clearInterval(timerPollingGold)
+    timerPollingGold = null
+  }
+})
 </script>
+
 
 <template>
   <div class="pagina-lotes">
@@ -225,23 +369,45 @@ onMounted(() => {
         </p>
       </div>
 
-      <button class="btn-atualizar" @click="carregarLotes" :disabled="carregando" title="Recarregar lotes de ingestão">
-        <svg class="icone-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 2v6h-6" />
-          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-          <path d="M3 22v-6h6" />
-          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-        </svg>
-        <span>Atualizar</span>
-      </button>
+      <div class="acoes-topo">
+        <button
+          v-if="podePublicarGold"
+          class="btn-migrar-gold"
+          :disabled="carregando || lotesNaSilver.length === 0 || faseGold === 'PROCESSANDO'"
+          @click="abrirModalGold(null)"
+          title="Migrar dados consolidados da Silver para a Gold"
+        >
+          <svg class="icone-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+          <span>Migrar para Gold</span>
+          <span v-if="lotesNaSilver.length > 0" class="badge-contador-gold">{{ lotesNaSilver.length }} na Silver</span>
+        </button>
+
+        <button class="btn-atualizar" @click="carregarLotes" :disabled="carregando" title="Recarregar lotes de ingestão">
+          <svg class="icone-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 2v6h-6" />
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+            <path d="M3 22v-6h6" />
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+          <span>Atualizar</span>
+        </button>
+      </div>
     </header>
 
-    <!-- Grid de Métricas Responsivo e Alinhado (5 KPIs) -->
+    <!-- Grid de Métricas Responsivo e Alinhado (6 KPIs) -->
     <section class="grid-metricas">
       <div class="card-metrica">
         <span class="metrica-label">Total de Lotes</span>
         <span class="metrica-valor">{{ metricas.total }}</span>
         <span class="metrica-sub">Execuções de ingestão</span>
+      </div>
+
+      <div class="card-metrica card-metrica--gold">
+        <span class="metrica-label">Migrados para Gold</span>
+        <span class="metrica-valor">{{ metricas.migradosGold }}</span>
+        <span class="metrica-sub">Publicados no mapa</span>
       </div>
 
       <div class="card-metrica card-metrica--promovido">
@@ -297,6 +463,7 @@ onMounted(() => {
             <label class="rotulo-filtro">Filtrar por Status:</label>
             <select v-model="filtroStatus" class="select-filtro">
               <option value="TODOS">Todos os Status</option>
+              <option value="PROMOVIDO_GOLD">Migrado para Gold</option>
               <option value="PROMOVIDO_SILVER">Promovido para Silver</option>
               <option value="RETIDO_QUARENTENA">Retido na Quarentena</option>
               <option value="DESCARTADO">Descartado</option>
@@ -400,6 +567,7 @@ onMounted(() => {
                       <span
                         class="badge-status"
                         :class="{
+                          'badge--gold': lote.status === 'PROMOVIDO_GOLD',
                           'badge--promovido': lote.status === 'PROMOVIDO_SILVER',
                           'badge--retido': lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'),
                           'badge--processando': loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO',
@@ -412,6 +580,7 @@ onMounted(() => {
                         </template>
                         <template v-else>
                           {{
+                            lote.status === 'PROMOVIDO_GOLD' ? 'Migrado para Gold' :
                             lote.status === 'PROMOVIDO_SILVER' ? 'Promovido para Silver' :
                             lote.status === 'RETIDO_QUARENTENA' ? 'Retido na Quarentena' :
                             lote.status === 'DESCARTADO' ? 'Descartado' :
@@ -420,7 +589,10 @@ onMounted(() => {
                         </template>
                       </span>
 
-                      <span v-if="lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO')" class="regra-aviso">
+                      <span v-if="lote.status === 'PROMOVIDO_GOLD'" class="regra-aviso regra-aviso--gold">
+                        Publicado e consolidado na Gold
+                      </span>
+                      <span v-else-if="lote.status === 'RETIDO_QUARENTENA' && !(loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO')" class="regra-aviso">
                         Integridade lote: 0 registros em Silver
                       </span>
                       <span v-else-if="loteParaLiberar?.id === lote.id && faseLiberacao === 'PROCESSANDO'" class="regra-aviso texto-azul">
@@ -479,9 +651,28 @@ onMounted(() => {
                       </template>
                     </div>
 
-                    <div v-else-if="lote.status === 'PROMOVIDO_SILVER'" class="texto-concluido">
-                      <span class="icone-check">✓</span>
-                      <span>Disponível na Silver</span>
+                    <div v-else-if="lote.status === 'PROMOVIDO_GOLD'" class="texto-concluido texto-concluido--gold">
+                      <span class="icone-check icone-check--gold">✓</span>
+                      <span>Publicado na Gold</span>
+                    </div>
+
+                    <div v-else-if="lote.status === 'PROMOVIDO_SILVER'" class="acoes-silver">
+                      <button
+                        v-if="podePublicarGold"
+                        class="btn-acao btn-acao--gold"
+                        title="Migrar dados consolidados deste lote para a camada Gold"
+                        :disabled="processandoAcao || faseGold === 'PROCESSANDO'"
+                        @click="abrirModalGold(lote)"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                        <span>Migrar para Gold</span>
+                      </button>
+                      <div v-else class="texto-concluido">
+                        <span class="icone-check">✓</span>
+                        <span>Disponível na Silver</span>
+                      </div>
                     </div>
 
                     <span v-else class="texto-apagado">—</span>
@@ -760,6 +951,246 @@ onMounted(() => {
         </footer>
       </div>
     </div>
+
+    <!-- Modal de Migração Silver -> Gold -->
+    <div v-if="modalGoldAberto" class="modal-backdrop" @click.self="fecharModalGold">
+      <div class="modal-dialog modal-dialog--gold">
+        
+        <!-- Fase 1: Confirmação -->
+        <template v-if="faseGold === 'CONFIRMACAO'">
+          <header class="modal-header">
+            <div>
+              <span class="modal-etiqueta etiqueta-gold">TRANSIÇÃO SILVER → GOLD</span>
+              <h2 class="modal-titulo">
+                Migrar dados do Lote #{{ loteAlvoGold?.id }} para a Gold
+              </h2>
+              <p class="modal-sub">
+                {{ ehLoteImovelRural ? 'Execução dos 7 indicadores socioambientais via PL/SQL e publicação da camada no mapa.' : `Publicação e consolidação da camada ${nomeCamadaLote} na Gold.` }}
+              </p>
+            </div>
+            <button class="btn-fechar" @click="fecharModalGold">✕</button>
+          </header>
+
+          <div class="modal-body">
+            <div class="card-info-gold">
+              <div class="icone-info-wrapper icone-info-wrapper--gold">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </div>
+              <div class="info-texto">
+                <template v-if="ehLoteImovelRural">
+                  <h4>Cálculo de Indicadores e Publicação de Imóveis (CAR)</h4>
+                  <p>
+                    A migração aciona as rotinas em banco (PL/SQL) que realizam os cruzamentos espaciais entre os imóveis rurais e as restrições territoriais, ambientais e de conservação.
+                  </p>
+                  <div class="lista-detalhes-gold">
+                    <div class="item-detalhe-gold">
+                      <strong>1. Cálculo dos 7 Indicadores:</strong>
+                      <span>ISAP, IAE, IRL, IAPP, IDesmat, IFC e ICV via Oracle Spatial.</span>
+                    </div>
+                    <div class="item-detalhe-gold">
+                      <strong>2. Publicação das Camadas de Mapa:</strong>
+                      <span>Generalização geométrica (Douglas-Peucker) das 6 camadas cartográficas.</span>
+                    </div>
+                    <div class="item-detalhe-gold">
+                      <strong>3. Rastreabilidade Total:</strong>
+                      <span>Geração de hash SHA-256 e versionamento imutável dos indicadores.</span>
+                    </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <h4>Publicação da Camada: {{ nomeCamadaLote }}</h4>
+                  <p>
+                    A migração deste lote consolidará e publicará exclusivamente as geometrias e atributos da fonte <strong>{{ loteAlvoGold?.fonteDadoNome }}</strong> na camada Gold.
+                  </p>
+                  <div class="lista-detalhes-gold">
+                    <div class="item-detalhe-gold">
+                      <strong>1. Publicação Cartográfica:</strong>
+                      <span>Disponibilização da camada para visualização e consulta no mapa interativo.</span>
+                    </div>
+                    <div class="item-detalhe-gold">
+                      <strong>2. Cruzamentos Analíticos:</strong>
+                      <span>Os dados consolidados ficam ativos para cruzamento com os imóveis da plataforma.</span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="resumo-lote">
+              <div class="resumo-item">
+                <span class="resumo-rotulo">Lote Selecionado</span>
+                <span class="resumo-valor">#{{ loteAlvoGold?.id }} ({{ loteAlvoGold?.fonteDadoNome }})</span>
+              </div>
+              <div class="resumo-item">
+                <span class="resumo-rotulo">Camada Alvo</span>
+                <span class="resumo-valor">{{ nomeCamadaLote }}</span>
+              </div>
+              <div class="resumo-item">
+                <span class="resumo-rotulo">Destino</span>
+                <span class="badge-status badge--gold">Camada Gold</span>
+              </div>
+            </div>
+          </div>
+
+          <footer class="modal-footer">
+            <button class="btn-cancelar" @click="fecharModalGold">Cancelar</button>
+            <button class="btn-confirmar-gold" @click="confirmarPublicacaoGold">
+              Iniciar Migração para Gold
+            </button>
+          </footer>
+        </template>
+
+        <!-- Fase 2: Processando / Polling -->
+        <template v-else-if="faseGold === 'PROCESSANDO'">
+          <header class="modal-header">
+            <div>
+              <span class="modal-etiqueta etiqueta-gold">PROCESSAMENTO EM ANDAMENTO</span>
+              <h2 class="modal-titulo">
+                {{ ehLoteImovelRural ? 'Calculando e Publicando na Gold...' : `Publicando ${nomeCamadaLote} na Gold...` }}
+              </h2>
+              <p class="modal-sub">
+                {{ ehLoteImovelRural ? 'Executando cruzamentos geoespaciais em PL/SQL e simplificação de geometrias.' : `Consolidando e publicando geometrias da camada ${nomeCamadaLote}.` }}
+              </p>
+            </div>
+          </header>
+
+          <div class="modal-body modal-body--centro">
+            <div class="spinner-grande spinner-grande--gold"></div>
+            <h3 class="progresso-titulo">
+              {{ ehLoteImovelRural ? 'Calculando Indicadores e Publicando Camadas' : `Publicando ${nomeCamadaLote}` }}
+            </h3>
+            <p class="progresso-sub">
+              Por favor, aguarde. Este processo consolida as geometrias e publica na camada Gold.
+            </p>
+
+            <div v-if="ehLoteImovelRural && statusGold?.indicadores" class="progresso-detalhe-card">
+              <div class="linha-status-indicador">
+                <span class="rotulo-indicador">Imóveis Analisados:</span>
+                <strong class="valor-indicador">
+                  {{ statusGold.indicadores.totalProcessado || 0 }}
+                  <template v-if="statusGold.indicadores.totalEstimado">
+                    de {{ statusGold.indicadores.totalEstimado }}
+                  </template>
+                </strong>
+              </div>
+              <div class="linha-status-indicador">
+                <span class="rotulo-indicador">Sucessos:</span>
+                <span class="texto-sucesso-valor">{{ statusGold.indicadores.totalSucesso || 0 }}</span>
+              </div>
+              <div v-if="statusGold.indicadores.totalFalha > 0" class="linha-status-indicador">
+                <span class="rotulo-indicador">Falhas resilientes:</span>
+                <span class="texto-falha-valor">{{ statusGold.indicadores.totalFalha }}</span>
+              </div>
+            </div>
+
+            <div v-if="ehLoteImovelRural && statusGold?.camadasMapa && statusGold.camadasMapa.length > 0" class="camadas-status-grid">
+              <div
+                v-for="camada in statusGold.camadasMapa"
+                :key="camada.codigoCamada"
+                class="camada-status-chip"
+                :class="{ 'camada-status-chip--concluida': camada.status === 'CONCLUIDA' }"
+              >
+                <span class="chip-dot"></span>
+                <span>{{ camada.codigoCamada }}</span>
+                <span v-if="camada.status === 'CONCLUIDA'" class="chip-check">✓</span>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Fase 3: Sucesso -->
+        <template v-else-if="faseGold === 'SUCESSO'">
+          <header class="modal-header">
+            <div>
+              <span class="modal-etiqueta etiqueta-verde">PUBLICAÇÃO CONCLUÍDA</span>
+              <h2 class="modal-titulo">Migração para a Gold Finalizada</h2>
+            </div>
+            <button class="btn-fechar" @click="fecharModalGold">✕</button>
+          </header>
+
+          <div class="modal-body modal-body--centro">
+            <div class="icone-sucesso-animado">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
+            <h3>Dados consolidados e disponíveis na Gold</h3>
+            <p class="sub-sucesso">
+              {{ ehLoteImovelRural ? 'Os indicadores foram calculados e as camadas cartográficas estão prontas para visualização no mapa e consultas analíticas.' : `A camada ${nomeCamadaLote} foi consolidada e publicada com sucesso na Gold.` }}
+            </p>
+
+            <div v-if="resultadoPublicacaoTudo" class="resultado-gold-resumo">
+              <template v-if="ehLoteImovelRural">
+                <div class="resumo-item">
+                  <span class="resumo-rotulo">Imóveis Calculados</span>
+                  <span class="resumo-valor">{{ resultadoPublicacaoTudo.totalImoveis }}</span>
+                </div>
+                <div class="resumo-item">
+                  <span class="resumo-rotulo">Publicados com Sucesso</span>
+                  <span class="resumo-valor texto-verde">{{ resultadoPublicacaoTudo.imoveisPublicados }}</span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="resumo-item">
+                  <span class="resumo-rotulo">Lote Migrado</span>
+                  <span class="resumo-valor">#{{ loteAlvoGold?.id }}</span>
+                </div>
+                <div class="resumo-item">
+                  <span class="resumo-rotulo">Camada Publicada</span>
+                  <span class="resumo-valor texto-verde">{{ nomeCamadaLote }}</span>
+                </div>
+              </template>
+              <div class="resumo-item">
+                <span class="resumo-rotulo">Status Final</span>
+                <span class="badge-status badge--gold">Migrado para Gold</span>
+              </div>
+            </div>
+          </div>
+
+          <footer class="modal-footer">
+            <button class="btn-concluir" @click="fecharModalGold">
+              Concluir
+            </button>
+          </footer>
+        </template>
+
+        <!-- Fase 4: Erro -->
+        <template v-else-if="faseGold === 'ERRO'">
+          <header class="modal-header">
+            <div>
+              <span class="modal-etiqueta etiqueta-vermelha">FALHA NA MIGRAÇÃO</span>
+              <h2 class="modal-titulo">Não foi possível concluir a publicação</h2>
+            </div>
+            <button class="btn-fechar" @click="fecharModalGold">✕</button>
+          </header>
+
+          <div class="modal-body">
+            <div class="aviso-descarte">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+              <div>
+                <strong>Erro durante a execução da transição:</strong>
+                <p>{{ erroGold }}</p>
+              </div>
+            </div>
+          </div>
+
+          <footer class="modal-footer">
+            <button class="btn-cancelar" @click="fecharModalGold">Fechar</button>
+            <button class="btn-confirmar-gold" @click="confirmarPublicacaoGold">
+              Tentar Novamente
+            </button>
+          </footer>
+        </template>
+
+      </div>
+    </div>
   </div>
 </template>
 
@@ -772,11 +1203,11 @@ onMounted(() => {
 
 .grid-metricas {
   display: grid;
-  grid-template-columns: repeat(5, 1fr); /* Força os 5 cards na mesma linha */
+  grid-template-columns: repeat(6, 1fr); /* Força os 6 cards na mesma linha */
   gap: 1rem;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1300px) {
   .grid-metricas {
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   }
@@ -943,6 +1374,10 @@ onMounted(() => {
 /* Números acompanhando as cores das caixas */
 .card-metrica:first-child .metrica-valor {
   color: #0284c7;
+}
+
+.card-metrica--gold .metrica-valor {
+  color: #d97706;
 }
 
 .card-metrica--promovido .metrica-valor {
@@ -1245,6 +1680,28 @@ onMounted(() => {
   padding: 0.35rem 0.65rem;
   border-radius: 6px;
   border: 1px solid #dcfce7;
+}
+
+.texto-concluido--gold {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.icone-check--gold {
+  background: #fef3c7;
+  color: #b45309;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.75rem;
+}
+
+.regra-aviso--gold {
+  color: #b45309;
 }
 
 .col-acao-th {
@@ -1778,8 +2235,235 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.btn-confirmar-descarte:hover:not(:disabled) {
-  background: #b91c1c;
+/* Ações do Topo e Botão Migrar para Gold */
+.acoes-topo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-migrar-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.15rem;
+  background: linear-gradient(135deg, #d97706, #b45309);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(217, 119, 6, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-migrar-gold:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b45309, #92400e);
+  box-shadow: 0 4px 8px rgba(217, 119, 6, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-migrar-gold:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.badge-contador-gold {
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  margin-left: 0.25rem;
+}
+
+/* Ações Silver na Tabela */
+.acoes-silver {
+  display: flex;
+  align-items: center;
+}
+
+.btn-acao--gold {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.btn-acao--gold:hover:not(:disabled) {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #f59e0b;
+}
+
+/* Modal Gold */
+.modal-dialog--gold {
+  max-width: 650px;
+}
+
+.etiqueta-gold {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge--gold {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.card-info-gold {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+}
+
+.icone-info-wrapper--gold {
+  color: #d97706;
+}
+
+.lista-detalhes-gold {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.item-detalhe-gold {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.item-detalhe-gold strong {
+  color: #1e293b;
+  margin-right: 0.3rem;
+}
+
+.btn-confirmar-gold {
+  padding: 0.65rem 1.4rem;
+  background: #d97706;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-confirmar-gold:hover:not(:disabled) {
+  background: #b45309;
+}
+
+.spinner-grande--gold {
+  border: 4px solid #fef3c7;
+  border-top-color: #d97706;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 1.5rem auto 1rem;
+}
+
+.progresso-detalhe-card {
+  margin-top: 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+.linha-status-indicador {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.88rem;
+}
+
+.rotulo-indicador {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.valor-indicador {
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.texto-sucesso-valor {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.texto-falha-valor {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.camadas-status-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: center;
+}
+
+.camada-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.camada-status-chip--concluida {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.chip-check {
+  font-weight: 800;
+}
+
+.resultado-gold-resumo {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  width: 100%;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.texto-verde {
+  color: #16a34a;
 }
 
 @media (max-width: 768px) {
@@ -1788,11 +2472,18 @@ onMounted(() => {
     align-items: stretch;
   }
 
+  .acoes-topo {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-migrar-gold,
   .btn-atualizar {
     justify-content: center;
   }
 
-  .resumo-lote {
+  .resumo-lote,
+  .resultado-gold-resumo {
     grid-template-columns: 1fr;
   }
 }
