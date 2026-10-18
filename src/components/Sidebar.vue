@@ -1,4 +1,8 @@
 <script setup>
+import { computed } from 'vue'
+import { nomeDoPerfil, sair, sessao, temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
+
 defineProps({
   abertoNoMobile: {
     type: Boolean,
@@ -8,7 +12,7 @@ defineProps({
 
 const emit = defineEmits(['fechar'])
 
-// Estrutura agrupada por categorias (LIZARDS-36)
+// Estrutura completa de itens com permissões da sprint-2, agrupada pelas categorias Medalhão (LIZARDS-36)
 const categorias = [
   {
     titulo: 'Ingestão & Qualidade (Bronze)',
@@ -18,18 +22,21 @@ const categorias = [
         rotulo: 'Cadastro de Fontes',
         icone: 'fontes',
         descricao: 'Ingestão e schemas',
+        permissao: PERMISSOES.FONTE_VISUALIZAR,
       },
       {
         rota: '/lotes',
         rotulo: 'Lotes e Pipeline',
         icone: 'lotes',
         descricao: 'Monitoramento e Transição',
+        permissao: PERMISSOES.LOTE_VISUALIZAR,
       },
       {
         rota: '/quarentena',
         rotulo: 'Quarentena e Qualidade',
         icone: 'quarentena',
         descricao: 'Auditoria e Correção',
+        permissao: PERMISSOES.QUARENTENA_VISUALIZAR,
       },
     ],
   },
@@ -41,24 +48,73 @@ const categorias = [
         rotulo: 'Conjuntos e Cobertura',
         icone: 'conjuntos',
         descricao: 'Cadastro e Mapa Territorial',
+        permissao: PERMISSOES.CONJUNTO_VISUALIZAR,
       },
     ],
   },
-  // Categoria Gold mantida comentada conforme histórico (LIZARDS-27)
-  /*
   {
-    titulo: 'Publicação & Indicadores (Gold)',
+    titulo: 'Publicação & Resultados (Gold)',
     itens: [
       {
-        rota: '/gold',
-        rotulo: 'Indicadores e Imóveis',
-        icone: 'gold',
-        descricao: 'Camada Gold',
+        rota: '/indicadores',
+        rotulo: 'Indicadores e Resultados',
+        icone: 'indicadores',
+        descricao: 'Consulta por município e imóvel',
+        permissao: PERMISSOES.INDICADOR_VISUALIZAR,
+      },
+      // Oculto do menu por enquanto (LIZARDS-27). A rota /gold continua existindo; para voltar, é só descomentar.
+      // {
+      //   rota: '/gold',
+      //   rotulo: 'Indicadores e Imóveis',
+      //   icone: 'gold',
+      //   descricao: 'Camada Gold',
+      //   permissao: PERMISSOES.INDICADOR_VISUALIZAR,
+      // },
+    ],
+  },
+  {
+    titulo: 'Administração & Governança',
+    itens: [
+      {
+        rota: '/auditoria',
+        rotulo: 'Logs de Auditoria',
+        icone: 'auditoria',
+        descricao: 'Quem fez o quê e quando',
+        permissao: PERMISSOES.AUDITORIA_VISUALIZAR,
+      },
+      {
+        rota: '/admin/usuarios',
+        rotulo: 'Usuários e Acessos',
+        icone: 'usuarios',
+        descricao: 'Perfis e Permissões',
+        permissao: PERMISSOES.USUARIO_GERENCIAR,
       },
     ],
   },
-  */
 ]
+
+// Mantém a regra rigorosa da sprint-2: filtra apenas os itens que o perfil atual tem permissão para visualizar
+const categoriasVisiveis = computed(() => {
+  return categorias
+    .map((categoria) => ({
+      ...categoria,
+      itens: categoria.itens.filter((item) => temPermissao(item.permissao)),
+    }))
+    .filter((categoria) => categoria.itens.length > 0)
+})
+
+const iniciais = computed(() =>
+  (sessao.nome || sessao.login || '?')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0].toUpperCase())
+    .join(''),
+)
+
+const descricaoPerfis = computed(() =>
+  sessao.perfis.length ? sessao.perfis.map(nomeDoPerfil).join(' · ') : 'Sem perfil',
+)
 
 function navegar() {
   emit('fechar')
@@ -99,9 +155,9 @@ function navegar() {
       </div>
 
       <nav class="menu">
-        <!-- Renderização por Categorias -->
+        <!-- Renderização agrupada por categorias da Arquitetura Medalhão (LIZARDS-36) -->
         <div 
-          v-for="categoria in categorias" 
+          v-for="categoria in categoriasVisiveis" 
           :key="categoria.titulo" 
           class="menu-categoria"
         >
@@ -139,12 +195,33 @@ function navegar() {
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                 <circle cx="12" cy="10" r="3" />
               </svg>
-              <!-- Ícone para a camada Gold -->
+              <!-- Ícone para Indicadores e Resultados -->
+              <svg v-else-if="item.icone === 'indicadores'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="9" y1="9" x2="9" y2="21" />
+                <line x1="3" y1="15" x2="21" y2="15" />
+              </svg>
+              <!-- Ícone para a camada Gold (Oculto/Comentado LIZARDS-27) -->
               <svg v-else-if="item.icone === 'gold'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M4 19V5" />
                 <path d="M4 5h11l-2 3 2 3H4" />
                 <path d="M16 15h4" />
                 <path d="M18 13v4" />
+              </svg>
+              <!-- Ícone para Logs de Auditoria -->
+              <svg v-else-if="item.icone === 'auditoria'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="8" y1="13" x2="16" y2="13" />
+                <line x1="8" y1="17" x2="13" y2="17" />
+              </svg>
+              <!-- Ícone para Usuários e Acessos -->
+              <svg v-else-if="item.icone === 'usuarios'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
             </div>
             <div class="item-texto">
@@ -156,11 +233,18 @@ function navegar() {
       </nav>
 
       <div class="rodape">
-        <div class="avatar" aria-hidden="true">EQ</div>
+        <div class="avatar" aria-hidden="true">{{ iniciais }}</div>
         <div class="rodape-info">
-          <p class="rodape-nome">Equipe de Dados</p>
-          <p class="rodape-perfil">Operador Ativo</p>
+          <p class="rodape-nome">{{ sessao.nome || sessao.login }}</p>
+          <p class="rodape-perfil">{{ descricaoPerfis }}</p>
         </div>
+        <button class="btn-sair" title="Sair do DataGIS" aria-label="Sair" @click="sair">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
       </div>
     </aside>
   </div>
@@ -387,6 +471,34 @@ function navegar() {
 .rodape-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.btn-sair {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-sair:hover {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.btn-sair svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .rodape-nome {

@@ -1,6 +1,11 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { buscarMapeamentos, salvarMapeamentos, excluirMapeamento } from '../services/quarentenaService'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
+
+// Quem so visualiza fontes ve o de-para, mas nao edita (fonte:gerenciar, LIZARDS-45)
+const podeEditar = temPermissao(PERMISSOES.FONTE_GERENCIAR)
 
 const props = defineProps({
   fonte: {
@@ -171,7 +176,7 @@ async function remover(id) {
         <div v-if="sucesso" class="alerta alerta--sucesso">{{ sucesso }}</div>
 
         <!-- Formulário para Adicionar / Editar Mapeamento -->
-        <section class="card-formulario" :class="{ 'card-formulario--editando': novoMapeamento.id }">
+        <section v-if="podeEditar" class="card-formulario" :class="{ 'card-formulario--editando': novoMapeamento.id }">
           <div class="secao-topo-form">
             <h3 class="secao-titulo">
               {{ novoMapeamento.id ? `Editar Mapeamento: ${novoMapeamento.colunaOrigem}` : 'Adicionar Novo Campo' }}
@@ -359,7 +364,7 @@ async function remover(id) {
                   <th>Destino</th>
                   <th>Tipo</th>
                   <th>Regras Ativas</th>
-                  <th class="col-acoes">Ações</th>
+                  <th v-if="podeEditar" class="col-acoes">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -417,7 +422,7 @@ async function remover(id) {
                       ≥ {{ map.valorMinimo }}
                     </span>
                   </td>
-                  <td class="col-acoes">
+                  <td v-if="podeEditar" class="col-acoes">
                     <button
                       class="btn-editar"
                       title="Editar regras deste campo"

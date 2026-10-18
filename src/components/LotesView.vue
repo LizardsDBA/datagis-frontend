@@ -2,6 +2,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { buscarLotes, liberarLote, descartarLote } from '../services/loteService'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
+
+// Acoes de governanca do lote so pra quem pode (LIZARDS-45); o backend barra com 403 de qualquer jeito
+const podeGerenciarLote = temPermissao(PERMISSOES.LOTE_GERENCIAR)
+const podeVerQuarentena = temPermissao(PERMISSOES.QUARENTENA_VISUALIZAR)
 
 const router = useRouter()
 
@@ -422,6 +428,7 @@ onMounted(() => {
                       </template>
                       <template v-else>
                         <button
+                          v-if="podeVerQuarentena"
                           class="btn-acao btn-ver-erros"
                           title="Inspecionar inconsistências deste lote na Quarentena"
                           @click="verNaQuarentena(lote.id)"
@@ -433,6 +440,7 @@ onMounted(() => {
                           <span>Inspecionar Erros</span>
                         </button>
                         <button
+                          v-if="podeGerenciarLote"
                           class="btn-acao btn-liberar"
                           title="Liberar lote para Silver após validação do analista"
                           :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
@@ -445,6 +453,7 @@ onMounted(() => {
                           <span>Liberar para Silver</span>
                         </button>
                         <button
+                          v-if="podeGerenciarLote"
                           class="btn-acao btn-descartar"
                           title="Descartar lote e não promover nenhum registro"
                           :disabled="processandoAcao || faseLiberacao === 'PROCESSANDO'"
