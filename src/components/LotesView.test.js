@@ -247,6 +247,28 @@ describe('LotesView.vue - Liberação e Quarentena', () => {
     expect(acaoConcluidaGold.text()).toContain('Publicado na Gold')
   })
 
+  it('abre modal para lote de Reserva Legal exibindo texto de recálculo de indicadores ambientais', async () => {
+    buscarLotes.mockResolvedValue([
+      {
+        id: 35,
+        fonteDadoNome: 'IAT/PR - Reserva Legal (CAR)',
+        entidadeSilver: 'reserva_legal',
+        status: 'PROMOVIDO_SILVER',
+        quantidadeRegistros: 120,
+        criadoEm: '2026-10-18T10:00:00Z',
+      },
+    ])
+
+    wrapper = mount(LotesView)
+    await flushPromises()
+
+    await wrapper.find('.btn-acao--gold').trigger('click')
+
+    expect(wrapper.text()).toContain('Recálculo de Indicadores Ambientais: Reserva Legal (CAR)')
+    expect(wrapper.text()).toContain('Recálculo dos Indicadores Afetados')
+    expect(wrapper.text()).toContain('Reserva Legal (CAR)')
+  })
+
   it('renderiza corretamente lote com status PROMOVIDO_GOLD já existente', async () => {
     buscarLotes.mockResolvedValue([
       {

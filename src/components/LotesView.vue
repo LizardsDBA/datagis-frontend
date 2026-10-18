@@ -222,18 +222,38 @@ const resultadoPublicacaoTudo = ref(null)
 const erroGold = ref('')
 let timerPollingGold = null
 
+const ehLoteAtributoCar = computed(() => {
+  if (!loteAlvoGold.value) return false
+  const ent = (loteAlvoGold.value.entidadeSilver || '').toLowerCase()
+  if (ent === 'reserva_legal' || ent === 'app_declarada' || ent === 'vegetacao_nativa_declarada') return true
+  const nome = (loteAlvoGold.value.fonteDadoNome || '').toLowerCase()
+  return nome.includes('reserva') || nome.includes('app') || nome.includes('vegeta') || nome.includes('cobertura')
+})
+
 const ehLoteImovelRural = computed(() => {
   if (!loteAlvoGold.value) return false
+  if (ehLoteAtributoCar.value) return false
   const ent = (loteAlvoGold.value.entidadeSilver || '').toLowerCase()
   if (ent === 'imovel_rural' || ent === 'car') return true
   const nome = (loteAlvoGold.value.fonteDadoNome || '').toLowerCase()
-  return nome.includes('car') || nome.includes('imóvel') || nome.includes('imovel')
+  return nome.includes('imóvel') || nome.includes('imovel') || (nome.includes('car') && !nome.includes('reserva') && !nome.includes('app') && !nome.includes('vegeta'))
 })
+
+const ehLoteComIndicadores = computed(() => ehLoteImovelRural.value || ehLoteAtributoCar.value)
 
 const nomeCamadaLote = computed(() => {
   if (!loteAlvoGold.value) return 'Camada de Dados'
   const ent = (loteAlvoGold.value.entidadeSilver || '').toLowerCase()
   const nome = (loteAlvoGold.value.fonteDadoNome || '').toLowerCase()
+  if (ent === 'reserva_legal' || nome.includes('reserva') || nome.includes('legal')) {
+    return 'Reserva Legal (CAR)'
+  }
+  if (ent === 'app_declarada' || nome.includes('app')) {
+    return 'APP Total (CAR)'
+  }
+  if (ent === 'vegetacao_nativa_declarada' || nome.includes('vegeta') || nome.includes('cobertura')) {
+    return 'Vegetação Nativa (CAR)'
+  }
   if (ent === 'desmatamento' || nome.includes('desmatamento') || nome.includes('prodes')) {
     return 'Desmatamento (PRODES)'
   }
@@ -302,7 +322,7 @@ async function confirmarPublicacaoGold() {
   faseGold.value = 'PROCESSANDO'
   erroGold.value = ''
 
-  if (ehLoteImovelRural.value) {
+  if (ehLoteComIndicadores.value) {
     try {
       statusGold.value = await obterStatusGold()
     } catch (e) {
@@ -965,7 +985,7 @@ onUnmounted(() => {
                 Migrar dados do Lote #{{ loteAlvoGold?.id }} para a Gold
               </h2>
               <p class="modal-sub">
-                {{ ehLoteImovelRural ? 'Execução dos 7 indicadores socioambientais via PL/SQL e publicação da camada no mapa.' : `Publicação e consolidação da camada ${nomeCamadaLote} na Gold.` }}
+                {{ ehLoteImovelRural ? 'Execução dos 7 indicadores socioambientais via PL/SQL e publicação da camada no mapa.' : (ehLoteAtributoCar ? `Recálculo dos indicadores socioambientais dos imóveis vinculados a ${nomeCamadaLote} via PL/SQL.` : `Publicação e consolidação da camada ${nomeCamadaLote} na Gold.`) }}
               </p>
             </div>
             <button class="btn-fechar" @click="fecharModalGold">✕</button>
@@ -996,6 +1016,26 @@ onUnmounted(() => {
                     <div class="item-detalhe-gold">
                       <strong>3. Rastreabilidade Total:</strong>
                       <span>Geração de hash SHA-256 e versionamento imutável dos indicadores.</span>
+                    </div>
+                  </div>
+                </template>
+                <template v-else-if="ehLoteAtributoCar">
+                  <h4>Recálculo de Indicadores Ambientais: {{ nomeCamadaLote }}</h4>
+                  <p>
+                    A migração deste lote aciona as rotinas analíticas em PL/SQL para recalcular os indicadores dos imóveis impactados por este lote na camada Gold (ex.: IRL para Reserva Legal, IAPP/ICV para Vegetação Nativa e APP).
+                  </p>
+                  <div class="lista-detalhes-gold">
+                    <div class="item-detalhe-gold">
+                      <strong>1. Recálculo dos Indicadores Afetados:</strong>
+                      <span>Atualização dos índices territoriais e de conservação para cada imóvel com dados neste lote.</span>
+                    </div>
+                    <div class="item-detalhe-gold">
+                      <strong>2. Consolidação do Boletim do Imóvel:</strong>
+                      <span>O detalhe congelado em gold.imovel_publicado recebe as novas versões calculadas.</span>
+                    </div>
+                    <div class="item-detalhe-gold">
+                      <strong>3. Rastreabilidade e Versionamento:</strong>
+                      <span>Histórico auditável mantido com vínculo à fonte e ao lote de ingestão.</span>
                     </div>
                   </div>
                 </template>
@@ -1048,10 +1088,10 @@ onUnmounted(() => {
             <div>
               <span class="modal-etiqueta etiqueta-gold">PROCESSAMENTO EM ANDAMENTO</span>
               <h2 class="modal-titulo">
-                {{ ehLoteImovelRural ? 'Calculando e Publicando na Gold...' : `Publicando ${nomeCamadaLote} na Gold...` }}
+                {{ ehLoteImovelRural ? 'Calculando e Publicando na Gold...' : (ehLoteAtributoCar ? `Recalculando Indicadores de ${nomeCamadaLote}...` : `Publicando ${nomeCamadaLote} na Gold...`) }}
               </h2>
               <p class="modal-sub">
-                {{ ehLoteImovelRural ? 'Executando cruzamentos geoespaciais em PL/SQL e simplificação de geometrias.' : `Consolidando e publicando geometrias da camada ${nomeCamadaLote}.` }}
+                {{ ehLoteImovelRural ? 'Executando cruzamentos geoespaciais em PL/SQL e simplificação de geometrias.' : (ehLoteAtributoCar ? `Processando indicadores analíticos em PL/SQL para os imóveis impactados.` : `Consolidando e publicando geometrias da camada ${nomeCamadaLote}.`) }}
               </p>
             </div>
           </header>
@@ -1059,13 +1099,13 @@ onUnmounted(() => {
           <div class="modal-body modal-body--centro">
             <div class="spinner-grande spinner-grande--gold"></div>
             <h3 class="progresso-titulo">
-              {{ ehLoteImovelRural ? 'Calculando Indicadores e Publicando Camadas' : `Publicando ${nomeCamadaLote}` }}
+              {{ ehLoteImovelRural ? 'Calculando Indicadores e Publicando Camadas' : (ehLoteAtributoCar ? `Recalculando Indicadores de ${nomeCamadaLote}` : `Publicando ${nomeCamadaLote}`) }}
             </h3>
             <p class="progresso-sub">
-              Por favor, aguarde. Este processo consolida as geometrias e publica na camada Gold.
+              {{ ehLoteComIndicadores ? 'Por favor, aguarde. Este processo recalcula os índices analíticos e consolida os dados na camada Gold.' : 'Por favor, aguarde. Este processo consolida as geometrias e publica na camada Gold.' }}
             </p>
 
-            <div v-if="ehLoteImovelRural && statusGold?.indicadores" class="progresso-detalhe-card">
+            <div v-if="ehLoteComIndicadores && statusGold?.indicadores" class="progresso-detalhe-card">
               <div class="linha-status-indicador">
                 <span class="rotulo-indicador">Imóveis Analisados:</span>
                 <strong class="valor-indicador">
@@ -1119,13 +1159,13 @@ onUnmounted(() => {
             </div>
             <h3>Dados consolidados e disponíveis na Gold</h3>
             <p class="sub-sucesso">
-              {{ ehLoteImovelRural ? 'Os indicadores foram calculados e as camadas cartográficas estão prontas para visualização no mapa e consultas analíticas.' : `A camada ${nomeCamadaLote} foi consolidada e publicada com sucesso na Gold.` }}
+              {{ ehLoteImovelRural ? 'Os indicadores foram calculados e as camadas cartográficas estão prontas para visualização no mapa e consultas analíticas.' : (ehLoteAtributoCar ? `Os indicadores dos imóveis impactados por ${nomeCamadaLote} foram recalculados e consolidados com sucesso na Gold.` : `A camada ${nomeCamadaLote} foi consolidada e publicada com sucesso na Gold.`) }}
             </p>
 
             <div v-if="resultadoPublicacaoTudo" class="resultado-gold-resumo">
-              <template v-if="ehLoteImovelRural">
+              <template v-if="ehLoteComIndicadores">
                 <div class="resumo-item">
-                  <span class="resumo-rotulo">Imóveis Calculados</span>
+                  <span class="resumo-rotulo">Imóveis Processados</span>
                   <span class="resumo-valor">{{ resultadoPublicacaoTudo.totalImoveis }}</span>
                 </div>
                 <div class="resumo-item">
