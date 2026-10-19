@@ -5,6 +5,15 @@ import CadastroFontes from './CadastroFontes.vue'
 // A tela usa router.push nos atalhos de lote/quarentena; nos testes basta um espiao.
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
+// Sessão de mentira: por padrão o usuário pode tudo (Operador); cada teste pode restringir.
+const { sessaoTeste } = vi.hoisted(() => ({ sessaoTeste: { permissoes: [] } }))
+vi.mock('../auth/autenticacao', () => ({
+    temPermissao: (p) => !p || sessaoTeste.permissoes.includes(p),
+    obterToken: async () => null,
+    entrarNovamente: () => {},
+}))
+const PERMISSOES_OPERADOR = ['fonte:visualizar', 'fonte:gerenciar', 'dados:visualizar']
+
 // Fontes de mentira cobrindo os quatro casos de agendamento que a coluna precisa mostrar.
 const FONTES = [
     { id: 1, nome: 'CAR - Imóveis (PR)', orgao: 'SICAR', tipoAquisicao: 'API_REST', formatoEsperado: 'GEOJSON', cronExpressao: '0 0 2 * * ?', ativo: true },
@@ -19,6 +28,7 @@ let wrapper
 beforeEach(() => {
     // A tela busca /api/fontes no onMounted; sem isso o teste bateria no backend.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => FONTES }))
+    sessaoTeste.permissoes = PERMISSOES_OPERADOR
 })
 
 afterEach(() => {
@@ -61,6 +71,27 @@ describe('CadastroFontes — modal de cadastro/edição', () => {
     })
 })
 
+describe('CadastroFontes — permissões (LIZARDS-45)', () => {
+    it('quem só visualiza fontes vê a lista sem os botões de alterar, executar ou enviar arquivo', async () => {
+        sessaoTeste.permissoes = ['fonte:visualizar']
+        await abrirTela()
+        expect(wrapper.text()).toContain('Fontes Cadastradas (5)')
+        expect(wrapper.find('.btn-adicionar-fonte').exists()).toBe(false)
+        expect(wrapper.find('.btn-editar').exists()).toBe(false)
+        expect(wrapper.find('.btn-executar').exists()).toBe(false)
+        expect(wrapper.find('.btn-conjunto-dados').exists()).toBe(false)
+        // O de-para continua consultável (o modal esconde a edição)
+        expect(wrapper.find('.btn-mapeamento').exists()).toBe(true)
+    })
+
+    it('o Operador vê executar e enviar arquivo em todas as fontes', async () => {
+        await abrirTela()
+        // 4 fontes executáveis + 1 de upload manual
+        expect(wrapper.findAll('.btn-executar')).toHaveLength(5)
+        expect(wrapper.findAll('.btn-conjunto-dados')).toHaveLength(5)
+    })
+})
+
 describe('CadastroFontes — coluna de agendamento', () => {
     it('traduz as expressões geradas pelo construtor de cron', async () => {
         await abrirTela()
@@ -81,5 +112,38 @@ describe('CadastroFontes — coluna de agendamento', () => {
         expect(linhas[3].text()).toContain('Somente manual')
         expect(linhas[4].text()).toContain('0 0/15 * * * ?')
         expect(linhas[4].text()).not.toContain('às')
+    })
+})
+
+describe('CadastroFontes — bloqueio de execução por mapeamento incompleto', () => {
+    it('desabilita os botões de execução e upload quando o mapeamento da tabela Silver estiver incompleto', async () => {
+        const fontesComStatus = [
+            { id: 1, nome: 'Fonte Completa', tipoAquisicao: 'API_REST', entidadeSilver: 'imovel_rural', mapeamentoCompleto: true, totalColunasSilver: 3, totalColunasMapeadas: 3 },
+            { id: 2, nome: 'Fonte Incompleta', tipoAquisicao: 'API_REST', entidadeSilver: 'imovel_rural', mapeamentoCompleto: false, totalColunasSilver: 5, totalColunasMapeadas: 2, colunasSilverFaltantes: ['area_ha', 'geometria', 'situacao'] },
+            { id: 3, nome: 'Fonte Upload Incompleta', tipoAquisicao: 'UPLOAD_MANUAL', entidadeSilver: 'area_protegida', mapeamentoCompleto: false, totalColunasSilver: 4, totalColunasMapeadas: 1, colunasSilverFaltantes: ['campo_b'] },
+        ]
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => fontesComStatus }))
+        await abrirTela()
+
+        const botoes = wrapper.findAll('.btn-executar')
+        expect(botoes).toHaveLength(3)
+
+        // Fonte 1 (completa) -> habilitado
+        expect(botoes[0].attributes('disabled')).toBeUndefined()
+
+        // Fonte 2 (incompleta) -> desabilitado
+        expect(botoes[1].attributes('disabled')).toBeDefined()
+        expect(botoes[1].attributes('title')).toContain('Mapeamento incompleto: faltam 3 colunas')
+        expect(botoes[1].attributes('title')).toContain('area_ha')
+
+        // Fonte 3 (upload manual incompleto) -> desabilitado
+        expect(botoes[2].attributes('disabled')).toBeDefined()
+        expect(botoes[2].attributes('title')).toContain('Mapeamento incompleto')
+
+        // Badges na tabela
+        const badges = wrapper.findAll('.badge-mapeamento-status')
+        expect(badges[0].text()).toContain('Mapeamento OK')
+        expect(badges[1].text()).toContain('Mapeamento Incompleto (2/5)')
+        expect(badges[2].text()).toContain('Mapeamento Incompleto (1/4)')
     })
 })

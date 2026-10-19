@@ -9,6 +9,7 @@
  * propósito, só a mesma ideia visual (cards, tabela, badges).
  */
 import { ref, computed, onMounted } from 'vue'
+import { apiFetch } from '../services/http'
 import { useRoute } from 'vue-router'
 import {
   buscarUltimoLote,
@@ -21,6 +22,9 @@ import {
 } from '../services/conjuntosDadosService'
 import ModalVisualizarGeometria from './ModalVisualizarGeometria.vue'
 import ModalRegistroCamada from './ModalRegistroCamada.vue'
+import ModalComparacaoCamadas from './ModalComparacaoCamadas.vue'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 
 const route = useRoute()
 const fonteId = route.params.fonteId
@@ -59,6 +63,7 @@ const quarentenaCarregada = ref(false)
 
 const modalGeometria = ref(null) // { titulo, wkt }
 const modalRegistro = ref(null) // { titulo, dados, mensagemVazio }
+const modalComparacao = ref(null) // { registroBrutoId, parInicial }
 
 const totalPaginas = computed(() => Math.max(1, Math.ceil(total.value / TAMANHO_PAGINA)))
 
@@ -70,7 +75,12 @@ const colunasDinamicas = computed(() => {
   return Array.from(chaves)
 })
 
-const outrasCamadas = computed(() => CAMADAS.map((c) => c.valor).filter((v) => v !== camadaAtiva.value))
+// A aba Quarentena le /api/quarentena: so aparece pra quem tem quarentena:visualizar.
+// O Analista ve Bronze e Silver; o Operador e o Auditor veem as tres (LIZARDS-46).
+const camadasPermitidas = CAMADAS.filter(
+  (c) => c.valor !== 'QUARENTENA' || temPermissao(PERMISSOES.QUARENTENA_VISUALIZAR),
+)
+const outrasCamadas = computed(() => camadasPermitidas.map((c) => c.valor).filter((v) => v !== camadaAtiva.value))
 
 function normalizarItemQuarentena(item) {
   const dados = {}
@@ -182,6 +192,14 @@ async function verEmCamada(registro, camadaDestino) {
   }
 }
 
+// Quarentena não tem comparação: o registro rejeitado não existe na Silver nem na Gold.
+function compararRegistro(registro) {
+  modalComparacao.value = {
+    registroBrutoId: registro.registroBrutoId,
+    parInicial: camadaAtiva.value === 'SILVER' ? 'SILVER_GOLD' : 'BRONZE_SILVER',
+  }
+}
+
 function rotuloCamada(valor) {
   return CAMADAS.find((c) => c.valor === valor)?.rotulo || valor
 }
@@ -194,7 +212,7 @@ function formatarData(iso) {
 onMounted(async () => {
   try {
     const [fonteResp, loteResp] = await Promise.all([
-      fetch(`/api/fontes/${fonteId}`).then((r) => (r.ok ? r.json() : null)),
+      apiFetch(`/api/fontes/${fonteId}`).then((r) => (r.ok ? r.json() : null)),
       buscarUltimoLote(fonteId),
     ])
     loteResumo.value = { ...loteResp, fonteDadoNomeExibicao: fonteResp?.nome || loteResp.fonteDadoNome }
@@ -230,7 +248,7 @@ onMounted(async () => {
     <template v-else>
       <div class="seletor-camadas">
         <button
-          v-for="camada in CAMADAS"
+          v-for="camada in camadasPermitidas"
           :key="camada.valor"
           class="botao-camada"
           :class="{ 'botao-camada--ativo': camadaAtiva === camada.valor }"
@@ -283,6 +301,14 @@ onMounted(async () => {
                       Mapa
                     </button>
                     <button
+                      v-if="camadaAtiva !== 'QUARENTENA'"
+                      class="botao-icone botao-icone--comparar"
+                      title="Comparar com a camada vizinha (Bronze → Silver → Gold)"
+                      @click="compararRegistro(item)"
+                    >
+                      Comparar
+                    </button>
+                    <button
                       v-for="destino in outrasCamadas"
                       :key="destino"
                       class="botao-icone botao-icone--texto"
@@ -319,6 +345,13 @@ onMounted(async () => {
       :dados="modalRegistro.dados"
       :mensagem-vazio="modalRegistro.mensagemVazio || undefined"
       @fechar="modalRegistro = null"
+    />
+
+    <ModalComparacaoCamadas
+      v-if="modalComparacao"
+      :registro-bruto-id="modalComparacao.registroBrutoId"
+      :par-inicial="modalComparacao.parInicial"
+      @fechar="modalComparacao = null"
     />
   </div>
 </template>
@@ -443,6 +476,11 @@ onMounted(async () => {
   cursor: pointer;
   color: #334155;
   transition: all 0.12s ease;
+}
+
+.botao-icone--comparar {
+  color: #15803d;
+  border-color: #86efac;
 }
 
 .botao-icone:hover {

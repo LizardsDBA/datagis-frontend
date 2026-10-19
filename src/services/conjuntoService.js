@@ -2,14 +2,16 @@
  * Serviço de comunicação com os endpoints de Conjuntos do DataGIS.
  */
 
+import { apiFetch } from './http'
+
 export async function buscarConjuntos() {
-  const resp = await fetch('/conjuntos')
+  const resp = await apiFetch('/conjuntos')
   if (!resp.ok) throw new Error(`Falha ao carregar conjuntos: ${resp.statusText}`)
   return resp.json()
 }
 
 export async function criarConjunto(payload) {
-  const resp = await fetch('/conjuntos', {
+  const resp = await apiFetch('/conjuntos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -22,7 +24,7 @@ export async function criarConjunto(payload) {
 }
 
 export async function buscarFontes() {
-  const resp = await fetch('/api/fontes')
+  const resp = await apiFetch('/api/fontes')
   if (!resp.ok) throw new Error(`Falha ao carregar fontes: ${resp.statusText}`)
   return resp.json()
 }

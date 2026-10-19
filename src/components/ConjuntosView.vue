@@ -3,6 +3,11 @@ import { ref, onMounted, onUnmounted, nextTick, shallowRef } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { buscarConjuntos, criarConjunto, buscarFontes } from '../services/conjuntoService'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
+
+// Quem so visualiza (ex.: Auditor) ve conjuntos e mapa, sem o formulario (LIZARDS-46)
+const podeGerenciar = temPermissao(PERMISSOES.CONJUNTO_GERENCIAR)
 
 // Fix Leaflet default icon paths (problema comum com bundlers)
 delete L.Icon.Default.prototype._getIconUrl
@@ -285,7 +290,7 @@ onUnmounted(() => {
       <aside class="painel-lateral">
 
         <!-- Formulário de cadastro -->
-        <section class="card-form">
+        <section v-if="podeGerenciar" class="card-form">
           <div class="card-form-cabecalho">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-form-icone">
               <circle cx="12" cy="12" r="10" />
