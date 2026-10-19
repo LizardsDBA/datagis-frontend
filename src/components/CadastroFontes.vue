@@ -325,6 +325,31 @@ function enviarUpload(fonte, arquivo) {
   })
 }
 
+function podeExecutar(fonte) {
+  if (!fonte) return false
+  return fonte.mapeamentoCompleto === true && !!fonte.entidadeSilver
+}
+
+function obterTooltipExecucao(fonte, tipo) {
+  if (!fonte) return ''
+  if (fonte.mapeamentoCompleto === false) {
+    const faltam = (fonte.totalColunasSilver || 0) - (fonte.totalColunasMapeadas || 0)
+    const nomes = fonte.colunasSilverFaltantes?.length ? ` (${fonte.colunasSilverFaltantes.join(', ')})` : ''
+    return `Mapeamento incompleto: faltam ${faltam > 0 ? faltam : ''} colunas da tabela Silver${nomes}. Mapeie todas as colunas para liberar a ingestão.`
+  }
+  if (!fonte.entidadeSilver) {
+    return 'Mapeamento incompleto: nenhuma tabela Silver configurada para esta fonte.'
+  }
+  return tipo === 'upload'
+    ? 'Enviar arquivo (.zip / shapefile / csv) e executar ingestão'
+    : 'Disparar ingestão remota de ' + fonte.nome
+}
+
+async function fecharModalMapeamento() {
+  fonteParaMapeamento.value = null
+  await carregarFontes()
+}
+
 function formatarData(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('pt-BR')
@@ -585,6 +610,31 @@ onUnmounted(() => {
                   <div class="fonte-orgao-texto">
                     {{ fonte.orgao ? 'Órgão: ' + fonte.orgao : 'Sem órgão informado' }}
                   </div>
+                  <!-- Indicador de Status do Mapeamento Silver -->
+                  <div class="linha-status-silver">
+                    <span
+                      v-if="fonte.entidadeSilver"
+                      class="badge-mapeamento-status"
+                      :class="fonte.mapeamentoCompleto ? 'badge-mapeamento--ok' : 'badge-mapeamento--pendente'"
+                      :title="
+                        fonte.mapeamentoCompleto
+                          ? 'Mapeamento completo (' + fonte.totalColunasMapeadas + '/' + fonte.totalColunasSilver + ' colunas). Ingestão liberada.'
+                          : 'Mapeamento incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ' colunas). Faltam: ' + (fonte.colunasSilverFaltantes?.join(', ') || 'colunas') + '. Ingestão bloqueada.'
+                      "
+                    >
+                      <svg v-if="fonte.mapeamentoCompleto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                      </svg>
+                      {{ fonte.mapeamentoCompleto ? 'Mapeamento OK' : 'Mapeamento Incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ')' }}
+                    </span>
+                    <span v-else class="badge-mapeamento-status badge-mapeamento--sem-silver" title="Defina a tabela Silver no mapeamento para liberar a ingestão">
+                      Sem Tabela Silver
+                    </span>
+                  </div>
                   <!-- Informação que antes estava escondida: URL de origem exposta diretamente -->
                   <div v-if="fonte.urlOrigem" class="fonte-url-preview" :title="fonte.urlOrigem">
                     <span class="url-texto">{{ fonte.urlOrigem }}</span>
@@ -694,8 +744,8 @@ onUnmounted(() => {
                     <button
                       v-if="podeGerenciar && fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
                       class="btn-acao-circulo btn-executar"
-                      :disabled="estadoDe(fonte.id).estado === 'executando'"
-                      title="Enviar arquivo (.zip / shapefile / csv) e executar ingestão"
+                      :disabled="!podeExecutar(fonte) || estadoDe(fonte.id).estado === 'executando'"
+                      :title="obterTooltipExecucao(fonte, 'upload')"
                       @click="abrirSeletorArquivo(fonte)"
                       aria-label="Fazer upload de arquivo"
                     >
@@ -710,8 +760,8 @@ onUnmounted(() => {
                     <button
                       v-else-if="podeGerenciar"
                       class="btn-acao-circulo btn-executar"
-                      :disabled="estadoDe(fonte.id).estado === 'executando'"
-                      :title="'Disparar ingestão remota de ' + fonte.nome"
+                      :disabled="!podeExecutar(fonte) || estadoDe(fonte.id).estado === 'executando'"
+                      :title="obterTooltipExecucao(fonte, 'executar')"
                       @click="executar(fonte)"
                       aria-label="Executar ingestão"
                     >
@@ -863,7 +913,8 @@ onUnmounted(() => {
     <!-- Modal de Mapeamento de Colunas -->
     <ModalMapeamentoColunas
       :fonte="fonteParaMapeamento"
-      @fechar="fonteParaMapeamento = null"
+      @fechar="fecharModalMapeamento"
+      @atualizado="carregarFontes"
     />
   </div>
 </template>
@@ -1684,4 +1735,50 @@ onUnmounted(() => {
   color: #94a3b8;
 }
 
+.btn-executar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.linha-status-silver {
+  margin-top: 0.35rem;
+  display: flex;
+  align-items: center;
+}
+
+.badge-mapeamento-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge-mapeamento-status svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.badge-mapeamento--ok {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-mapeamento--pendente {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.badge-mapeamento--sem-silver {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
 </style>
