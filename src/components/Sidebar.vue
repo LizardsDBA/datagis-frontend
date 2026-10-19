@@ -12,69 +12,96 @@ defineProps({
 
 const emit = defineEmits(['fechar'])
 
-// permissao = mesma role exigida pela rota (router/index.js): item que o usuário não pode
-// abrir nem aparece no menu.
-const itens = [
+// Estrutura completa de itens com permissões da sprint-2, agrupada pelas categorias Medalhão (LIZARDS-36)
+const categorias = [
   {
-    rota: '/fontes',
-    rotulo: 'Cadastro de Fontes',
-    icone: 'fontes',
-    descricao: 'Ingestão e schemas',
-    permissao: PERMISSOES.FONTE_VISUALIZAR,
+    titulo: 'Ingestão & Qualidade (Bronze)',
+    itens: [
+      {
+        rota: '/fontes',
+        rotulo: 'Cadastro de Fontes',
+        icone: 'fontes',
+        descricao: 'Ingestão e schemas',
+        permissao: PERMISSOES.FONTE_VISUALIZAR,
+      },
+      {
+        rota: '/lotes',
+        rotulo: 'Lotes e Pipeline',
+        icone: 'lotes',
+        descricao: 'Monitoramento e Transição',
+        permissao: PERMISSOES.LOTE_VISUALIZAR,
+      },
+      {
+        rota: '/quarentena',
+        rotulo: 'Quarentena e Qualidade',
+        icone: 'quarentena',
+        descricao: 'Auditoria e Correção',
+        permissao: PERMISSOES.QUARENTENA_VISUALIZAR,
+      },
+    ],
   },
   {
-    rota: '/lotes',
-    rotulo: 'Lotes e Pipeline',
-    icone: 'lotes',
-    descricao: 'Monitoramento e Transição',
-    permissao: PERMISSOES.LOTE_VISUALIZAR,
+    titulo: 'Processamento & Linhagem (Silver)',
+    itens: [
+      {
+        rota: '/conjuntos',
+        rotulo: 'Conjuntos e Cobertura',
+        icone: 'conjuntos',
+        descricao: 'Cadastro e Mapa Territorial',
+        permissao: PERMISSOES.CONJUNTO_VISUALIZAR,
+      },
+    ],
   },
   {
-    rota: '/quarentena',
-    rotulo: 'Quarentena e Qualidade',
-    icone: 'quarentena',
-    descricao: 'Auditoria e Correção',
-    permissao: PERMISSOES.QUARENTENA_VISUALIZAR,
+    titulo: 'Publicação & Resultados (Gold)',
+    itens: [
+      {
+        rota: '/indicadores',
+        rotulo: 'Indicadores e Resultados',
+        icone: 'indicadores',
+        descricao: 'Consulta por município e imóvel',
+        permissao: PERMISSOES.INDICADOR_VISUALIZAR,
+      },
+      // Oculto do menu por enquanto (LIZARDS-27). A rota /gold continua existindo; para voltar, é só descomentar.
+      // {
+      //   rota: '/gold',
+      //   rotulo: 'Indicadores e Imóveis',
+      //   icone: 'gold',
+      //   descricao: 'Camada Gold',
+      //   permissao: PERMISSOES.INDICADOR_VISUALIZAR,
+      // },
+    ],
   },
   {
-    rota: '/conjuntos',
-    rotulo: 'Conjuntos e Cobertura',
-    icone: 'conjuntos',
-    descricao: 'Cadastro e Mapa Territorial',
-    permissao: PERMISSOES.CONJUNTO_VISUALIZAR,
-  },
-  {
-    rota: '/indicadores',
-    rotulo: 'Indicadores e Resultados',
-    icone: 'indicadores',
-    descricao: 'Consulta por município e imóvel',
-    permissao: PERMISSOES.INDICADOR_VISUALIZAR,
-  },
-  // Oculto do menu por enquanto (LIZARDS-27). A rota /gold continua existindo; para voltar, é só descomentar.
-  // {
-  //   rota: '/gold',
-  //   rotulo: 'Indicadores e Imóveis',
-  //   icone: 'gold',
-  //   descricao: 'Camada Gold',
-  //   permissao: PERMISSOES.INDICADOR_VISUALIZAR,
-  // },
-  {
-    rota: '/auditoria',
-    rotulo: 'Logs de Auditoria',
-    icone: 'auditoria',
-    descricao: 'Quem fez o quê e quando',
-    permissao: PERMISSOES.AUDITORIA_VISUALIZAR,
-  },
-  {
-    rota: '/admin/usuarios',
-    rotulo: 'Usuários e Acessos',
-    icone: 'usuarios',
-    descricao: 'Perfis e Permissões',
-    permissao: PERMISSOES.USUARIO_GERENCIAR,
+    titulo: 'Administração & Governança',
+    itens: [
+      {
+        rota: '/auditoria',
+        rotulo: 'Logs de Auditoria',
+        icone: 'auditoria',
+        descricao: 'Quem fez o quê e quando',
+        permissao: PERMISSOES.AUDITORIA_VISUALIZAR,
+      },
+      {
+        rota: '/admin/usuarios',
+        rotulo: 'Usuários e Acessos',
+        icone: 'usuarios',
+        descricao: 'Perfis e Permissões',
+        permissao: PERMISSOES.USUARIO_GERENCIAR,
+      },
+    ],
   },
 ]
 
-const itensVisiveis = computed(() => itens.filter((item) => temPermissao(item.permissao)))
+// Mantém a regra rigorosa da sprint-2: filtra apenas os itens que o perfil atual tem permissão para visualizar
+const categoriasVisiveis = computed(() => {
+  return categorias
+    .map((categoria) => ({
+      ...categoria,
+      itens: categoria.itens.filter((item) => temPermissao(item.permissao)),
+    }))
+    .filter((categoria) => categoria.itens.length > 0)
+})
 
 const iniciais = computed(() =>
   (sessao.nome || sessao.login || '?')
@@ -128,73 +155,81 @@ function navegar() {
       </div>
 
       <nav class="menu">
-        <div class="menu-secao-rotulo">Módulos do Sistema</div>
-        <router-link
-          v-for="item in itensVisiveis"
-          :key="item.rota"
-          :to="item.rota"
-          class="item-menu"
-          active-class="item-menu--ativo"
-          @click="navegar"
+        <!-- Renderização agrupada por categorias da Arquitetura Medalhão (LIZARDS-36) -->
+        <div 
+          v-for="categoria in categoriasVisiveis" 
+          :key="categoria.titulo" 
+          class="menu-categoria"
         >
-          <div class="icone-wrapper">
-            <!-- Ícone para Fontes -->
-            <svg v-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <ellipse cx="12" cy="5" rx="8" ry="3" />
-              <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
-              <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
-            </svg>
-            <!-- Ícone para Lotes e Pipeline -->
-            <svg v-else-if="item.icone === 'lotes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
-            <!-- Ícone para Quarentena / Qualidade -->
-            <svg v-else-if="item.icone === 'quarentena'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
-            </svg>
-            <!-- Ícone para Conjuntos e Cobertura -->
-            <svg v-else-if="item.icone === 'conjuntos'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <!-- Ícone para Indicadores e Resultados -->
-            <svg v-else-if="item.icone === 'indicadores'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <line x1="3" y1="9" x2="21" y2="9" />
-              <line x1="9" y1="9" x2="9" y2="21" />
-              <line x1="3" y1="15" x2="21" y2="15" />
-            </svg>
-            <!-- Ícone para a camada Gold -->
-            <svg v-else-if="item.icone === 'gold'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 19V5" />
-              <path d="M4 5h11l-2 3 2 3H4" />
-              <path d="M16 15h4" />
-              <path d="M18 13v4" />
-            </svg>
-            <!-- Ícone para Logs de Auditoria -->
-            <svg v-else-if="item.icone === 'auditoria'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="8" y1="13" x2="16" y2="13" />
-              <line x1="8" y1="17" x2="13" y2="17" />
-            </svg>
-            <!-- Ícone para Usuários e Acessos -->
-            <svg v-else-if="item.icone === 'usuarios'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </div>
-          <div class="item-texto">
-            <span class="item-rotulo">{{ item.rotulo }}</span>
-            <span class="item-desc">{{ item.descricao }}</span>
-          </div>
-        </router-link>
+          <div class="menu-secao-rotulo">{{ categoria.titulo }}</div>
+
+          <router-link
+            v-for="item in categoria.itens"
+            :key="item.rota"
+            :to="item.rota"
+            class="item-menu"
+            active-class="item-menu--ativo"
+            @click="navegar"
+          >
+            <div class="icone-wrapper">
+              <!-- Ícone para Fontes -->
+              <svg v-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <ellipse cx="12" cy="5" rx="8" ry="3" />
+                <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+                <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+              </svg>
+              <!-- Ícone para Lotes e Pipeline -->
+              <svg v-else-if="item.icone === 'lotes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                <polyline points="2 17 12 22 22 17" />
+                <polyline points="2 12 12 17 22 12" />
+              </svg>
+              <!-- Ícone para Quarentena / Qualidade -->
+              <svg v-else-if="item.icone === 'quarentena'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="M12 8v4" />
+                <path d="M12 16h.01" />
+              </svg>
+              <!-- Ícone para Conjuntos e Cobertura -->
+              <svg v-else-if="item.icone === 'conjuntos'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <!-- Ícone para Indicadores e Resultados -->
+              <svg v-else-if="item.icone === 'indicadores'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="9" y1="9" x2="9" y2="21" />
+                <line x1="3" y1="15" x2="21" y2="15" />
+              </svg>
+              <!-- Ícone para a camada Gold (Oculto/Comentado LIZARDS-27) -->
+              <svg v-else-if="item.icone === 'gold'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19V5" />
+                <path d="M4 5h11l-2 3 2 3H4" />
+                <path d="M16 15h4" />
+                <path d="M18 13v4" />
+              </svg>
+              <!-- Ícone para Logs de Auditoria -->
+              <svg v-else-if="item.icone === 'auditoria'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="8" y1="13" x2="16" y2="13" />
+                <line x1="8" y1="17" x2="13" y2="17" />
+              </svg>
+              <!-- Ícone para Usuários e Acessos -->
+              <svg v-else-if="item.icone === 'usuarios'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <div class="item-texto">
+              <span class="item-rotulo">{{ item.rotulo }}</span>
+              <span class="item-desc">{{ item.descricao }}</span>
+            </div>
+          </router-link>
+        </div>
       </nav>
 
       <div class="rodape">
@@ -318,18 +353,24 @@ function navegar() {
 .menu {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 1.25rem;
   flex: 1;
 }
 
+.menu-categoria {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 .menu-secao-rotulo {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #94a3b8;
-  padding: 0.4rem 0.6rem;
-  margin-bottom: 0.2rem;
+  padding: 0.2rem 0.6rem;
+  margin-bottom: 0.1rem;
 }
 
 .item-menu {
