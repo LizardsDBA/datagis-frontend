@@ -97,6 +97,8 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'municipio', label: 'Município', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'descricao', label: 'Descrição da Infração', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'num_processo', label: 'Número do Processo Administrativo', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'houve_embargo', label: 'Houve Embargo', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'houve_apreensao', label: 'Houve Apreensão', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'geometria', label: 'Geometria Espacial (Ponto / Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false },
     ],
     dominios: [
@@ -142,6 +144,7 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'risco_fogo', label: 'Risco de Fogo', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'dias_sem_chuva', label: 'Dias Sem Chuva', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'precipitacao_mm', label: 'Precipitação (mm)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
+      { nome: 'frp', label: 'FRP (Fire Radiative Power)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'geometria', label: 'Geometria Espacial (Ponto)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false },
     ],
     dominios: [
