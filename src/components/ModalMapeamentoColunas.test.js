@@ -327,4 +327,25 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     expect(wrapper.vm.sucesso).toBeNull()
     expect(wrapper.find('.alerta--sucesso').exists()).toBe(false)
   })
+
+  it('não possui opção de atributo customizado ou outro no dropdown de destino', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
+      },
+    })
+    await flushPromises()
+
+    const selectAtributo = wrapper.find('.atributo-select-wrapper select')
+    expect(selectAtributo.exists()).toBe(true)
+    const options = selectAtributo.findAll('option')
+    const valores = options.map((o) => o.attributes('value'))
+    const textos = options.map((o) => o.text())
+
+    expect(valores).not.toContain('__customizado__')
+    expect(textos.some((t) => t.toLowerCase().includes('outro'))).toBe(false)
+    expect(textos.some((t) => t.toLowerCase().includes('personalizado'))).toBe(false)
+    expect(wrapper.find('.custom-atributo-wrapper').exists()).toBe(false)
+    expect(wrapper.find('.btn-voltar-select').exists()).toBe(false)
+  })
 })

@@ -25,6 +25,7 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'area_ha', label: 'Área do Imóvel (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'modulos_fiscais', label: 'Módulos Fiscais', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'municipio', label: 'Município (Código IBGE / Nome)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'data_registro', label: 'Data de Registro', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: true },
     ],
     dominios: [
@@ -46,7 +47,6 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'orgao', label: 'Órgão Gestor Responsável', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'orgao' },
       { nome: 'bioma', label: 'Bioma Predominante', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'bioma' },
       { nome: 'ato_legal', label: 'Ato Legal de Criação', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'ano_criacao', label: 'Ano de Criação', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 1500.0 },
       { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: true },
     ],
     dominios: [
@@ -63,15 +63,15 @@ const CATALOGO_SILVER_FALLBACK = [
     colunas: [
       { nome: 'numero_termo', label: 'Número do Termo de Embargo (Chave Natural)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
       { nome: 'data_embargo', label: 'Data do Embargo', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'area_ha', label: 'Área Embargada (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
+      { nome: 'area_embargada_ha', label: 'Área Embargada (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'orgao', label: 'Órgão Emissor', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true, tabelaReferencia: 'orgao' },
       { nome: 'tipo_area_embargo', label: 'Tipo de Infração / Área Embargada', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_area_embargo' },
       { nome: 'cpf_cnpj', label: 'Documento do Infrator (CPF / CNPJ)', tipoDado: 'cpf_cnpj', destinoTipo: 'COLUNA', obrigatorio: false, validarCpfCnpj: true },
-      { nome: 'nome_infrator', label: 'Nome ou Razão Social do Infrator', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'nome_autuado', label: 'Nome ou Razão Social do Infrator/Autuado', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'municipio', label: 'Município', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'descricao_infracao', label: 'Descrição do Motivo do Embargo', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'processo', label: 'Número do Processo Administrativo', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'auto_infracao_id', label: 'Referência ao Auto de Infração', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'descricao', label: 'Descrição do Motivo do Embargo', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'num_processo', label: 'Número do Processo Administrativo', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'num_auto_infracao', label: 'Referência ao Auto de Infração', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'geometria', label: 'Geometria do Embargo (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true },
     ],
     dominios: [
@@ -92,11 +92,11 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'tipo_infracao', label: 'Tipo de Infração', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_infracao' },
       { nome: 'tipo_pessoa', label: 'Tipo de Pessoa (Física / Jurídica)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_pessoa' },
       { nome: 'status_auto_infracao', label: 'Status do Auto', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'status_auto_infracao' },
-      { nome: 'cpf_cnpj', label: 'CPF ou CNPJ do Autuado', tipoDado: 'cpf_cnpj', destinoTipo: 'COLUNA', obrigatorio: false, validarCpfCnpj: true },
+      { nome: 'cpf_cnpj_infrator', label: 'CPF ou CNPJ do Autuado', tipoDado: 'cpf_cnpj', destinoTipo: 'COLUNA', obrigatorio: false, validarCpfCnpj: true },
       { nome: 'nome_infrator', label: 'Nome do Autuado', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'municipio', label: 'Município', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'descricao_infracao', label: 'Descrição da Infração', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'processo', label: 'Número do Processo Administrativo', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'descricao', label: 'Descrição da Infração', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'num_processo', label: 'Número do Processo Administrativo', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'geometria', label: 'Geometria Espacial (Ponto / Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false },
     ],
     dominios: [
@@ -113,11 +113,12 @@ const CATALOGO_SILVER_FALLBACK = [
     descricao: 'Polígonos de detecção de desmatamento consolidado INPE',
     colunas: [
       { nome: 'identificador_origem', label: 'Identificador de Origem (Chave Natural)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
-      { nome: 'ano_deteccao', label: 'Ano da Detecção PRODES', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 1980.0 },
+      { nome: 'ano', label: 'Ano da Detecção PRODES', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 1980.0 },
       { nome: 'area_ha', label: 'Área Desmatada (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'classe_prodes', label: 'Classe PRODES', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'classe_prodes' },
       { nome: 'satelite', label: 'Satélite', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'satelite' },
       { nome: 'sensor', label: 'Sensor', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'sensor' },
+      { nome: 'data_imagem', label: 'Data da Imagem', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'geometria', label: 'Geometria do Desmatamento (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true },
     ],
     dominios: [
@@ -132,13 +133,15 @@ const CATALOGO_SILVER_FALLBACK = [
     descricao: 'Detecções de focos de queimada por satélite (INPE Queimadas)',
     colunas: [
       { nome: 'identificador_origem', label: 'Identificador de Origem (Chave Natural)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
-      { nome: 'data_hora_foco', label: 'Data e Hora do Foco', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'data_hora', label: 'Data e Hora do Foco', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'satelite', label: 'Satélite', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'satelite' },
       { nome: 'bioma', label: 'Bioma', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'bioma' },
       { nome: 'municipio', label: 'Município', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'latitude', label: 'Latitude', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false },
+      { nome: 'longitude', label: 'Longitude', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'risco_fogo', label: 'Risco de Fogo', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'dias_sem_chuva', label: 'Dias Sem Chuva', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
-      { nome: 'precipitacao', label: 'Precipitação (mm)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
+      { nome: 'precipitacao_mm', label: 'Precipitação (mm)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'geometria', label: 'Geometria Espacial (Ponto)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false },
     ],
     dominios: [
@@ -155,7 +158,7 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'nome', label: 'Nome do Município', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
       { nome: 'unidade_federativa', label: 'Unidade Federativa (UF)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'unidade_federativa' },
       { nome: 'bioma_predominante', label: 'Bioma Predominante', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'bioma' },
-      { nome: 'area_ha', label: 'Área Total do Município (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
+      { nome: 'area_km2', label: 'Área Total do Município (km²)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'geometria', label: 'Geometria Limite Municipal (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true },
     ],
     dominios: [
@@ -263,9 +266,8 @@ const popupExcluirCampoAberto = ref(false)
 const mapeamentoParaExcluir = ref(null)
 const excluindoCampo = ref(false)
 
-// Controle do Atributo Destino Canônico vs Customizado
+// Controle do Atributo Destino Canônico
 const atributoDestinoSelecionado = ref('')
-const modoAtributoCustomizado = ref(false)
 
 const novoMapeamento = ref({
   id: null,
@@ -509,15 +511,6 @@ async function executarTrocaTabelaSilver(novaTabela) {
 }
 
 function aoTrocarAtributoDestino() {
-  if (atributoDestinoSelecionado.value === '__customizado__') {
-    modoAtributoCustomizado.value = true
-    novoMapeamento.value.atributoDestino = ''
-    novoMapeamento.value.destinoTipo = 'JSON'
-    novoMapeamento.value.tipoDado = 'texto'
-    return
-  }
-
-  modoAtributoCustomizado.value = false
   novoMapeamento.value.atributoDestino = atributoDestinoSelecionado.value
 
   const col = colunasSilverDisponiveis.value.find(
@@ -533,12 +526,6 @@ function aoTrocarAtributoDestino() {
     novoMapeamento.value.validarCpfCnpj = !!col.validarCpfCnpj
     novoMapeamento.value.validarRecortePr = !!col.validarRecortePr
   }
-}
-
-function voltarParaColunasPadrao() {
-  modoAtributoCustomizado.value = false
-  atributoDestinoSelecionado.value = ''
-  novoMapeamento.value.atributoDestino = ''
 }
 
 function editar(map) {
@@ -558,16 +545,7 @@ function editar(map) {
     impedirRegressao: map.impedirRegressao !== false,
   }
 
-  const existeNoCatalogo = colunasSilverDisponiveis.value.some(
-    (c) => c.nome === map.atributoDestino
-  )
-  if (existeNoCatalogo) {
-    atributoDestinoSelecionado.value = map.atributoDestino
-    modoAtributoCustomizado.value = false
-  } else {
-    atributoDestinoSelecionado.value = '__customizado__'
-    modoAtributoCustomizado.value = true
-  }
+  atributoDestinoSelecionado.value = map.atributoDestino
 
   sucesso.value = null
   erro.value = null
@@ -592,7 +570,6 @@ function cancelarEdicao() {
     impedirRegressao: true,
   }
   atributoDestinoSelecionado.value = ''
-  modoAtributoCustomizado.value = false
 }
 
 async function salvarCampo() {
@@ -868,7 +845,7 @@ function remover(id) {
               <label class="rotulo-campo">
                 Coluna de Destino (Silver: {{ esquemaAtivo?.nome || tabelaSilverSelecionada }}) *
               </label>
-              <div v-if="!modoAtributoCustomizado" class="atributo-select-wrapper">
+              <div class="atributo-select-wrapper">
                 <select
                   v-model="atributoDestinoSelecionado"
                   class="select-form"
@@ -884,24 +861,7 @@ function remover(id) {
                   >
                     {{ col.label }} ({{ col.nome }}){{ isColunaSilverUtilizada(col.nome) ? ' — já mapeado' : '' }}
                   </option>
-                  <option value="__customizado__">+ Outro / Atributo Personalizado (JSON)...</option>
                 </select>
-              </div>
-              <div v-else class="custom-atributo-wrapper">
-                <input
-                  v-model="novoMapeamento.atributoDestino"
-                  required
-                  placeholder="Nome do atributo no JSON"
-                  class="input-form"
-                />
-                <button
-                  type="button"
-                  class="btn-voltar-select"
-                  title="Voltar para a lista de colunas padrão"
-                  @click="voltarParaColunasPadrao"
-                >
-                  ← Voltar às colunas padrão
-                </button>
               </div>
             </div>
 
@@ -1693,28 +1653,6 @@ function remover(id) {
 .select-form:focus {
   border-color: #15803d;
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
-}
-
-.custom-atributo-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.btn-voltar-select {
-  align-self: flex-start;
-  background: transparent;
-  border: none;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #0284c7;
-  cursor: pointer;
-  padding: 0.1rem 0;
-  text-decoration: underline;
-}
-
-.btn-voltar-select:hover {
-  color: #0369a1;
 }
 
 .campo-checks {
