@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { nomeDoPerfil, sair, sessao, temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
+import { alternarTema, estadoTema } from '../tema'
 
 defineProps({
   abertoNoMobile: {
@@ -18,6 +19,10 @@ const recolhido = ref(false)
 function alternarRecuo() {
   recolhido.value = !recolhido.value
 }
+
+// Botão de tema (LIZARDS-38): o rótulo descreve a ação, não o estado atual
+const temaEscuro = computed(() => estadoTema.atual === 'escuro')
+const rotuloTema = computed(() => (temaEscuro.value ? 'Usar tema claro' : 'Usar tema escuro'))
 
 // Handler de duplo clique para expandir a barra lateral caso esteja recolhida
 function lidarDuploClique() {
@@ -285,6 +290,16 @@ function navegar() {
             <p class="rodape-nome">{{ sessao.nome || sessao.login }}</p>
             <p class="rodape-perfil">{{ descricaoPerfis }}</p>
           </div>
+          <button class="btn-tema" :title="rotuloTema" :aria-label="rotuloTema" @click="alternarTema">
+            <!-- Sol no escuro (volta pro claro), lua no claro (vai pro escuro) -->
+            <svg v-if="temaEscuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
           <button class="btn-sair" title="Sair do DataGIS" aria-label="Sair" @click="sair">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -633,6 +648,32 @@ function navegar() {
 }
 
 .btn-sair svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Botão de tema (LIZARDS-38): mesmo formato do Sair, sem o vermelho no hover */
+.btn-tema {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-tema:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.btn-tema svg {
   width: 1rem;
   height: 1rem;
 }
