@@ -311,3 +311,11 @@ code, pre {
 :root[data-tema="escuro"] ::-webkit-scrollbar-thumb:hover {
   background: var(--cor-texto-desabilitado);
 }
+
+/* Campos sem cor própria (ex.: busca da Quarentena e de Usuários) usariam o cinza
+   padrão do navegador no escuro. :where() deixa esta regra com prioridade mínima:
+   ela só preenche o que a tela não definiu, nunca passa por cima de regra de tela. */
+:root[data-tema="escuro"] :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  background-color: var(--cor-superficie-elevada);
+  color: var(--cor-texto);
+}

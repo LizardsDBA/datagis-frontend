@@ -385,4 +385,95 @@ defineExpose({ recarregar: carregarDados })
 @keyframes girar {
   to { transform: rotate(360deg); }
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .card-secao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .card-header {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .card-header:hover {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .diagnostico-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .diagnostico-sub {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-toggle-acordeao {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-toggle-acordeao:hover {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .btn-exportar {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-exportar:hover {
+  background: var(--cor-borda);
+  color: var(--cor-texto-titulo);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .corpo-secao {
+  border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .tabela-container {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-diagnostico th,
+:root[data-tema="escuro"] .tabela-diagnostico td {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-diagnostico th {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .tabela-diagnostico td {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .tabela-diagnostico td:first-child {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .valor-percentual {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-msg,
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .alerta-erro {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .spinner-sm {
+  border-color: var(--cor-borda-forte);
+  border-top-color: var(--cor-alerta);
+}
 </style>
