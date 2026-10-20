@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { nomeDoPerfil, sair, sessao, temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 
@@ -12,7 +12,21 @@ defineProps({
 
 const emit = defineEmits(['fechar'])
 
-// Estrutura completa de itens com permissões da sprint-2, agrupada pelas categorias Medalhão (LIZARDS-36)
+// Estado reativo para controlar o recuo da Sidebar (LIZARDS-37)
+const recolhido = ref(false)
+
+function alternarRecuo() {
+  recolhido.value = !recolhido.value
+}
+
+// Handler de duplo clique para expandir a barra lateral caso esteja recolhida
+function lidarDuploClique() {
+  if (recolhido.value) {
+    recolhido.value = false
+  }
+}
+
+// Estrutura completa agrupada pelas categorias Medalhão (LIZARDS-36) com permissões da sprint-2
 const categorias = [
   {
     titulo: 'Ingestão & Qualidade (Bronze)',
@@ -62,14 +76,6 @@ const categorias = [
         descricao: 'Consulta por município e imóvel',
         permissao: PERMISSOES.INDICADOR_VISUALIZAR,
       },
-      // Oculto do menu por enquanto (LIZARDS-27). A rota /gold continua existindo; para voltar, é só descomentar.
-      // {
-      //   rota: '/gold',
-      //   rotulo: 'Indicadores e Imóveis',
-      //   icone: 'gold',
-      //   descricao: 'Camada Gold',
-      //   permissao: PERMISSOES.INDICADOR_VISUALIZAR,
-      // },
     ],
   },
   {
@@ -93,7 +99,7 @@ const categorias = [
   },
 ]
 
-// Mantém a regra rigorosa da sprint-2: filtra apenas os itens que o perfil atual tem permissão para visualizar
+// Mantém o filtro estrito de permissões da sprint-2 por perfil de usuário
 const categoriasVisiveis = computed(() => {
   return categorias
     .map((categoria) => ({
@@ -123,7 +129,7 @@ function navegar() {
 
 <template>
   <div>
-    <!-- Backdrop com desfoque suave para mobile -->
+    <!-- Backdrop para mobile -->
     <div
       v-if="abertoNoMobile"
       class="sidebar-backdrop"
@@ -132,21 +138,56 @@ function navegar() {
     ></div>
 
     <!-- Barra Lateral / Drawer -->
-    <aside class="barra-lateral" :class="{ 'barra-lateral--aberta-mobile': abertoNoMobile }">
+    <aside 
+      class="barra-lateral" 
+      :class="{ 
+        'barra-lateral--aberta-mobile': abertoNoMobile,
+        'barra-lateral--recolhida': recolhido 
+      }"
+    >
       <div class="marca">
-        <div class="marca-info">
-          <div class="marca-icone" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
+        <!-- Quando RECOLHIDO: Ícone funcional do DataGIS para expandir -->
+        <button 
+          v-if="recolhido" 
+          class="marca-icone marca-icone--botao" 
+          @click="alternarRecuo"
+          title="Expandir painel lateral"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+            <polyline points="2 17 12 22 22 17" />
+            <polyline points="2 12 12 17 22 12" />
+          </svg>
+        </button>
+
+        <!-- Quando EXPANDIDO: Logo + Nome + Botão Clean do Toggle -->
+        <template v-else>
+          <div class="marca-info">
+            <div class="marca-icone" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                <polyline points="2 17 12 22 22 17" />
+                <polyline points="2 12 12 17 22 12" />
+              </svg>
+            </div>
+            <div class="marca-texto">
+              <span class="marca-nome">DataGIS</span>
+              <span class="marca-sub">Plataforma Geoespacial</span>
+            </div>
+          </div>
+
+          <!-- Botão Toggle Clean -->
+          <button 
+            class="btn-toggle-desktop" 
+            @click="alternarRecuo" 
+            title="Recolher painel lateral"
+          >
+            <svg class="icone-gemini" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
             </svg>
-          </div>
-          <div>
-            <span class="marca-nome">DataGIS</span>
-            <span class="marca-sub">Plataforma Geoespacial</span>
-          </div>
-        </div>
+          </button>
+        </template>
 
         <!-- Botão de Fechar no Mobile -->
         <button class="btn-fechar-drawer" @click="emit('fechar')" title="Fechar menu">
@@ -155,13 +196,14 @@ function navegar() {
       </div>
 
       <nav class="menu">
-        <!-- Renderização agrupada por categorias da Arquitetura Medalhão (LIZARDS-36) -->
+        <!-- Renderização agrupada por categorias Medalhão -->
         <div 
           v-for="categoria in categoriasVisiveis" 
           :key="categoria.titulo" 
           class="menu-categoria"
         >
-          <div class="menu-secao-rotulo">{{ categoria.titulo }}</div>
+          <div v-if="!recolhido" class="menu-secao-rotulo">{{ categoria.titulo }}</div>
+          <div v-else class="menu-secao-divisor"></div>
 
           <router-link
             v-for="item in categoria.itens"
@@ -169,7 +211,9 @@ function navegar() {
             :to="item.rota"
             class="item-menu"
             active-class="item-menu--ativo"
+            :title="recolhido ? item.rotulo : ''"
             @click="navegar"
+            @dblclick="lidarDuploClique"
           >
             <div class="icone-wrapper">
               <!-- Ícone para Fontes -->
@@ -202,13 +246,6 @@ function navegar() {
                 <line x1="9" y1="9" x2="9" y2="21" />
                 <line x1="3" y1="15" x2="21" y2="15" />
               </svg>
-              <!-- Ícone para a camada Gold (Oculto/Comentado LIZARDS-27) -->
-              <svg v-else-if="item.icone === 'gold'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 19V5" />
-                <path d="M4 5h11l-2 3 2 3H4" />
-                <path d="M16 15h4" />
-                <path d="M18 13v4" />
-              </svg>
               <!-- Ícone para Logs de Auditoria -->
               <svg v-else-if="item.icone === 'auditoria'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -220,11 +257,12 @@ function navegar() {
               <svg v-else-if="item.icone === 'usuarios'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M22 21v-2a4 4 0 0 1 0 7.75" />
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
             </div>
-            <div class="item-texto">
+
+            <div v-if="!recolhido" class="item-texto">
               <span class="item-rotulo">{{ item.rotulo }}</span>
               <span class="item-desc">{{ item.descricao }}</span>
             </div>
@@ -233,18 +271,28 @@ function navegar() {
       </nav>
 
       <div class="rodape">
-        <div class="avatar" aria-hidden="true">{{ iniciais }}</div>
-        <div class="rodape-info">
-          <p class="rodape-nome">{{ sessao.nome || sessao.login }}</p>
-          <p class="rodape-perfil">{{ descricaoPerfis }}</p>
+        <!-- Apenas o avatar centralizado quando recolhido -->
+        <div 
+          class="avatar" 
+          aria-hidden="true" 
+          :title="recolhido ? `${sessao.nome || sessao.login} (${descricaoPerfis})` : ''"
+        >
+          {{ iniciais }}
         </div>
-        <button class="btn-sair" title="Sair do DataGIS" aria-label="Sair" @click="sair">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-        </button>
+        
+        <template v-if="!recolhido">
+          <div class="rodape-info">
+            <p class="rodape-nome">{{ sessao.nome || sessao.login }}</p>
+            <p class="rodape-perfil">{{ descricaoPerfis }}</p>
+          </div>
+          <button class="btn-sair" title="Sair do DataGIS" aria-label="Sair" @click="sair">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
+        </template>
       </div>
     </aside>
   </div>
@@ -266,37 +314,64 @@ function navegar() {
   to { opacity: 1; }
 }
 
-/* Barra Lateral Desktop */
+/* Barra Lateral Desktop Fixa - Largura expandida ajustada para 17.5rem para evitar cortes de texto */
 .barra-lateral {
-  width: 16.5rem;
+  width: 17.5rem;
   flex-shrink: 0;
-  min-height: 100vh;
-  height: 100%;
+  height: 100vh;
+  position: sticky;
+  top: 0;
   background: #ffffff;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  padding: 1.5rem 1.1rem;
+  padding: 1.25rem 0.9rem;
   box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: sticky;
-  top: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s ease;
   z-index: 100;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.barra-lateral::-webkit-scrollbar {
+  width: 4px;
+}
+.barra-lateral::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* Estado Recolhido (LIZARDS-37) */
+.barra-lateral--recolhida {
+  width: 5rem;
+  padding: 1.25rem 0.75rem;
 }
 
 .marca {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 1.25rem;
-  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
   border-bottom: 1px solid #eef2f6;
+  flex-shrink: 0;
+  min-height: 2.5rem;
+}
+
+.barra-lateral--recolhida .marca {
+  justify-content: center;
 }
 
 .marca-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  overflow: hidden;
+}
+
+.marca-texto {
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .marca-icone {
@@ -309,6 +384,19 @@ function navegar() {
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 4px rgba(21, 128, 61, 0.25);
+  flex-shrink: 0;
+  border: none;
+}
+
+/* Quando o ícone do DataGIS vira botão clicável (recolhido) */
+.marca-icone--botao {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.marca-icone--botao:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(21, 128, 61, 0.35);
 }
 
 .marca-icone svg {
@@ -318,7 +406,7 @@ function navegar() {
 
 .marca-nome {
   display: block;
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 800;
   color: #0f172a;
   letter-spacing: -0.02em;
@@ -326,11 +414,37 @@ function navegar() {
 
 .marca-sub {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 600;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
+}
+
+/* Botão Toggle Clean */
+.btn-toggle-desktop {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-toggle-desktop:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.icone-gemini {
+  width: 1.35rem;
+  height: 1.35rem;
 }
 
 .btn-fechar-drawer {
@@ -345,43 +459,52 @@ function navegar() {
   line-height: 1;
 }
 
-.btn-fechar-drawer:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
 .menu {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
   flex: 1;
 }
 
 .menu-categoria {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 
+/* Títulos de categoria ajustados para caberem sem cortes de reticências */
 .menu-secao-rotulo {
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 0.63rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   color: #94a3b8;
-  padding: 0.2rem 0.6rem;
-  margin-bottom: 0.1rem;
+  padding: 0.2rem 0.3rem 0.1rem;
+  margin-top: 0.1rem;
+  white-space: nowrap;
+}
+
+.menu-secao-divisor {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0.4rem 0;
 }
 
 .item-menu {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  padding: 0.75rem 0.85rem;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
   border-radius: 10px;
   text-decoration: none;
   border: 1px solid transparent;
   transition: all 0.15s ease;
+  overflow: hidden;
+}
+
+.barra-lateral--recolhida .item-menu {
+  justify-content: center;
+  padding: 0.65rem 0;
 }
 
 .item-menu:hover {
@@ -410,17 +533,20 @@ function navegar() {
 .item-texto {
   display: flex;
   flex-direction: column;
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .item-rotulo {
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 700;
   color: #334155;
   transition: color 0.15s ease;
 }
 
 .item-desc {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #94a3b8;
 }
 
@@ -447,10 +573,18 @@ function navegar() {
 .rodape {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 0.5rem 0;
+  gap: 0.65rem;
+  padding: 0.85rem 0.25rem 0;
   border-top: 1px solid #eef2f6;
   margin-top: auto;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Centralização perfeita da bolinha quando recolhido */
+.barra-lateral--recolhida .rodape {
+  justify-content: center;
+  padding: 0.85rem 0 0;
 }
 
 .avatar {
@@ -471,6 +605,8 @@ function navegar() {
 .rodape-info {
   display: flex;
   flex-direction: column;
+  white-space: nowrap;
+  overflow: hidden;
   min-width: 0;
   flex: 1;
 }
@@ -503,26 +639,30 @@ function navegar() {
 
 .rodape-nome {
   margin: 0;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #1e293b;
 }
 
 .rodape-perfil {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #16a34a;
   font-weight: 600;
 }
 
 /* Breakpoint Mobile / Tablet (< 1024px) */
 @media (max-width: 1023px) {
+  .btn-toggle-desktop {
+    display: none;
+  }
+
   .barra-lateral {
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 18rem;
+    width: 18rem !important;
     max-width: 85vw;
     z-index: 999;
     transform: translateX(-100%);
