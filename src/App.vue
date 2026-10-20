@@ -188,4 +188,45 @@ function obterNomePagina() {
     padding: 0.85rem 0.75rem 2rem;
   }
 }
+
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .layout {
+  background-color: var(--cor-fundo);
+}
+
+:root[data-tema="escuro"] .topbar-mobile {
+  background: var(--cor-superficie);
+  border-bottom-color: var(--cor-borda);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-hamburguer {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-hamburguer:hover {
+  background: var(--cor-borda);
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .topbar-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .topbar-sub {
+  color: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .topbar-status-badge {
+  background: var(--tenue-sucesso);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .ponto-status {
+  background: var(--cor-sucesso);
+}
 </style>

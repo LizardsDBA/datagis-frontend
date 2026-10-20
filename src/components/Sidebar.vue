@@ -308,6 +308,23 @@ function navegar() {
             </svg>
           </button>
         </template>
+
+        <!-- Recolhida: o botão de tema continua acessível, abaixo do avatar (LIZARDS-38) -->
+        <button
+          v-if="recolhido"
+          class="btn-tema"
+          :title="rotuloTema"
+          :aria-label="rotuloTema"
+          @click="alternarTema"
+        >
+          <svg v-if="temaEscuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
       </div>
     </aside>
   </div>
@@ -717,5 +734,169 @@ function navegar() {
   .btn-fechar-drawer {
     display: block;
   }
+}
+
+/* Barra de rolagem discreta (LIZARDS-38): invisível até passar o mouse na sidebar.
+   A rolagem continua funcionando; só some a faixa cinza do trilho. scrollbar-width/
+   scrollbar-color valem no Chrome, Edge e Firefox (e fazem o Chrome ignorar o
+   ::-webkit-scrollbar); o ::-webkit-scrollbar fica como reserva para o Safari. */
+.barra-lateral {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.barra-lateral:hover {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.barra-lateral::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.barra-lateral::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.barra-lateral:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+/* Rodapé recolhido (LIZARDS-38): itens empilhados, para caber o botão de tema */
+.barra-lateral--recolhida .rodape {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .barra-lateral {
+  background: var(--cor-superficie);
+  border-right-color: var(--cor-borda);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .barra-lateral:hover {
+  scrollbar-color: var(--cor-borda-forte) transparent;
+}
+
+:root[data-tema="escuro"] .barra-lateral:hover::-webkit-scrollbar-thumb {
+  background: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .marca {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .marca-icone {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .marca-icone--botao:hover {
+  background: var(--cor-primaria-hover);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .marca-nome {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .marca-sub {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .btn-toggle-desktop,
+:root[data-tema="escuro"] .btn-fechar-drawer {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-toggle-desktop:hover,
+:root[data-tema="escuro"] .btn-fechar-drawer:hover {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .menu-secao-rotulo {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .menu-secao-divisor {
+  background: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .item-menu:hover {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .icone-wrapper {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-terciario);
+  box-shadow: inset 0 0 0 1px var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .item-rotulo {
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .item-desc {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .item-menu--ativo {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .item-menu--ativo .icone-wrapper {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .item-menu--ativo .item-rotulo {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .item-menu--ativo .item-desc {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .rodape {
+  border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .avatar {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .rodape-nome {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .rodape-perfil {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-sair,
+:root[data-tema="escuro"] .btn-tema {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-tema:hover {
+  background: var(--cor-borda);
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .btn-sair:hover {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+  color: var(--cor-erro);
 }
 </style>

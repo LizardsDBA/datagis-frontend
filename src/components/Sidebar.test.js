@@ -55,4 +55,15 @@ describe('Sidebar — botão de tema no rodapé', () => {
 
     expect(botoes).toEqual(['btn-tema', 'btn-sair'])
   })
+
+  it('com a sidebar recolhida, o botão de tema continua no rodapé e alterna o tema', async () => {
+    const wrapper = montar()
+    await wrapper.find('.btn-toggle-desktop').trigger('click')
+
+    const botoes = wrapper.findAll('.rodape button').map((b) => b.classes()[0])
+    expect(botoes).toEqual(['btn-tema'])
+
+    await wrapper.find('.rodape .btn-tema').trigger('click')
+    expect(alternarTema).toHaveBeenCalledTimes(1)
+  })
 })
