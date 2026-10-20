@@ -19,7 +19,7 @@ const CATALOGO_SILVER_FALLBACK = [
     descricao: 'Cadastro Ambiental Rural - limites e situação cadastral de imóveis rurais',
     colunas: [
       { nome: 'cod_imovel', label: 'Código do Imóvel (Chave Natural)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
-      { nome: 'situacao_imovel', label: 'Situação do Imóvel', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true, tabelaReferencia: 'situacao_imovel' },
+      { nome: 'situacao_imovel', label: 'Situação do Imóvel', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'situacao_imovel' },
       { nome: 'condicao_imovel', label: 'Condição do Imóvel', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'condicao_imovel' },
       { nome: 'tipo_imovel', label: 'Tipo do Imóvel', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_imovel' },
       { nome: 'area_ha', label: 'Área do Imóvel (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
@@ -41,10 +41,8 @@ const CATALOGO_SILVER_FALLBACK = [
     colunas: [
       { nome: 'codigo_origem', label: 'Código de Origem (CNUC / FUNAI)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
       { nome: 'nome', label: 'Nome da Unidade / Terra Indígena', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
+      { nome: 'categoria_area_protegida', label: 'Categoria de Área Protegida', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true, tabelaReferencia: 'categoria_area_protegida' },
       { nome: 'area_ha', label: 'Área Total (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
-      { nome: 'tipo_area_protegida', label: 'Tipo de Área Protegida', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_area_protegida' },
-      { nome: 'categoria_area_protegida', label: 'Categoria de Área Protegida', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'categoria_area_protegida' },
-      { nome: 'orgao', label: 'Órgão Gestor Responsável', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'orgao' },
       { nome: 'bioma', label: 'Bioma Predominante', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'bioma' },
       { nome: 'ato_legal', label: 'Ato Legal de Criação', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: true },
@@ -64,7 +62,6 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'numero_termo', label: 'Número do Termo de Embargo (Chave Natural)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
       { nome: 'data_embargo', label: 'Data do Embargo', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'area_embargada_ha', label: 'Área Embargada (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
-      { nome: 'orgao', label: 'Órgão Emissor', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true, tabelaReferencia: 'orgao' },
       { nome: 'tipo_area_embargo', label: 'Tipo de Infração / Área Embargada', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_area_embargo' },
       { nome: 'cpf_cnpj', label: 'Documento do Infrator (CPF / CNPJ)', tipoDado: 'cpf_cnpj', destinoTipo: 'COLUNA', obrigatorio: false, validarCpfCnpj: true },
       { nome: 'nome_autuado', label: 'Nome ou Razão Social do Infrator/Autuado', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
@@ -87,7 +84,6 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'numero_auto', label: 'Número do Auto de Infração (Chave Natural)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
       { nome: 'data_auto', label: 'Data da Lavratura do Auto', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'valor_multa', label: 'Valor da Multa (R$)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
-      { nome: 'orgao', label: 'Órgão Autuador', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true, tabelaReferencia: 'orgao' },
       { nome: 'tipo_auto_infracao', label: 'Tipo de Auto de Infração', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_auto_infracao' },
       { nome: 'tipo_infracao', label: 'Tipo de Infração', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_infracao' },
       { nome: 'tipo_pessoa', label: 'Tipo de Pessoa (Física / Jurídica)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'tipo_pessoa' },
@@ -159,7 +155,6 @@ const CATALOGO_SILVER_FALLBACK = [
     colunas: [
       { nome: 'cod_ibge', label: 'Código IBGE (Chave Natural)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
       { nome: 'nome', label: 'Nome do Município', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
-      { nome: 'unidade_federativa', label: 'Unidade Federativa (UF)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'unidade_federativa' },
       { nome: 'bioma_predominante', label: 'Bioma Predominante', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'bioma' },
       { nome: 'area_km2', label: 'Área Total do Município (km²)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'geometria', label: 'Geometria Limite Municipal (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true },
@@ -342,28 +337,34 @@ function isColunaSilverUtilizada(nomeColuna) {
 }
 
 const statusMapeamentoSilver = computed(() => {
-  const esperadas = colunasSilverDisponiveis.value
-  const totalEsperadas = esperadas.length
-  if (totalEsperadas === 0) {
+  const todasColunas = colunasSilverDisponiveis.value
+  const obrigatorias = todasColunas.filter((c) => c.obrigatorio)
+  const totalObrigatorias = obrigatorias.length
+  const mapeadasSet = colunasSilverMapeadasNomes.value
+
+  if (totalObrigatorias === 0) {
     return {
-      completo: false,
+      completo: true,
       totalEsperadas: 0,
-      totalMapeadas: 0,
+      totalMapeadas: mapeadasSet.size,
+      totalObrigatorias: 0,
+      mapeadasObrigatorias: 0,
       faltantes: [],
-      porcentagem: 0,
+      porcentagem: 100,
     }
   }
 
-  const mapeadasSet = colunasSilverMapeadasNomes.value
-  const faltantes = esperadas.filter((c) => !mapeadasSet.has(c.nome.trim().toLowerCase()))
-  const totalMapeadas = totalEsperadas - faltantes.length
+  const faltantes = obrigatorias.filter((c) => !mapeadasSet.has(c.nome.trim().toLowerCase()))
+  const mapeadasObrigatorias = totalObrigatorias - faltantes.length
   const completo = faltantes.length === 0
-  const porcentagem = Math.round((totalMapeadas / totalEsperadas) * 100)
+  const porcentagem = Math.round((mapeadasObrigatorias / totalObrigatorias) * 100)
 
   return {
     completo,
-    totalEsperadas,
-    totalMapeadas,
+    totalEsperadas: totalObrigatorias,
+    totalMapeadas: mapeadasSet.size,
+    totalObrigatorias,
+    mapeadasObrigatorias,
     faltantes,
     porcentagem,
   }
@@ -762,7 +763,7 @@ function remover(id) {
                 <span>{{ statusMapeamentoSilver.completo ? 'Ingestão Liberada' : 'Ingestão Bloqueada' }}</span>
               </div>
               <div class="prontidao-contador">
-                <strong>{{ statusMapeamentoSilver.totalMapeadas }} de {{ statusMapeamentoSilver.totalEsperadas }}</strong> colunas da tabela Silver preenchidas ({{ statusMapeamentoSilver.porcentagem }}%)
+                <strong>{{ statusMapeamentoSilver.mapeadasObrigatorias }} de {{ statusMapeamentoSilver.totalObrigatorias }}</strong> colunas obrigatórias (NOT NULL) preenchidas ({{ statusMapeamentoSilver.porcentagem }}%) — total de {{ statusMapeamentoSilver.totalMapeadas }} coluna(s) mapeada(s)
               </div>
             </div>
 
@@ -776,7 +777,7 @@ function remover(id) {
 
           <div v-if="!statusMapeamentoSilver.completo" class="prontidao-pendencias">
             <span class="prontidao-aviso-texto">
-              A ingestão desta fonte só será liberada quando todas as colunas da tabela Silver forem mapeadas. Colunas pendentes ({{ statusMapeamentoSilver.faltantes.length }}):
+              A ingestão desta fonte só será liberada quando todas as colunas obrigatórias (NOT NULL) da tabela Silver forem mapeadas. Colunas obrigatórias pendentes ({{ statusMapeamentoSilver.faltantes.length }}):
             </span>
             <div class="chips-colunas-pendentes">
               <span
@@ -793,7 +794,7 @@ function remover(id) {
               <svg class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <span>Todas as colunas necessárias da tabela Silver foram preenchidas. Esta fonte está apta para ingestão!</span>
+              <span>Todas as colunas obrigatórias (NOT NULL) da tabela Silver foram preenchidas. Esta fonte está apta para ingestão!</span>
             </div>
           </template>
         </div>

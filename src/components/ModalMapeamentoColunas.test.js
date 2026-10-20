@@ -46,12 +46,23 @@ vi.mock('../services/quarentenaService', () => ({
       descricao: 'Cadastro de imóveis rurais',
       colunas: [
         { nome: 'cod_imovel', label: 'Código do Imóvel', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
-        { nome: 'situacao_imovel', label: 'Situação', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true, tabelaReferencia: 'situacao_imovel' },
+        { nome: 'situacao_imovel', label: 'Situação', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'situacao_imovel' },
         { nome: 'area_ha', label: 'Área (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', valorMinimo: 0 },
       ],
       dominios: [
         { tabela: 'situacao_imovel', label: 'situacao_imovel (AT, PE, CA...)' },
       ],
+    },
+    {
+      id: 'area_protegida',
+      nome: 'Área Protegida (UC / TI)',
+      descricao: 'Unidades de Conservação e Terras Indígenas',
+      colunas: [
+        { nome: 'codigo_origem', label: 'Código de Origem', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
+        { nome: 'nome', label: 'Nome da Unidade', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
+        { nome: 'categoria_area_protegida', label: 'Categoria', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: true },
+      ],
+      dominios: [],
     },
     {
       id: 'embargo_ambiental',
@@ -181,7 +192,7 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     })
   })
 
-  it('desabilita opção de coluna Silver já mapeada e exibe pendências no card de prontidão', async () => {
+  it('desabilita opção de coluna Silver já mapeada e exibe prontidão liberada quando obrigatórias estão mapeadas', async () => {
     wrapper = mount(ModalMapeamentoColunas, {
       props: {
         fonte: { id: 2, nome: 'CAR Imóveis', entidadeSilver: 'imovel_rural' },
@@ -189,13 +200,11 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     })
     await flushPromises()
 
-    // 1. O card de prontidão deve mostrar que a ingestão está bloqueada e faltam colunas
+    // 1. O card de prontidão deve mostrar que a ingestão está liberada porque a única obrigatória (cod_imovel) está mapeada
     const cardProntidao = wrapper.find('.card-prontidao-ingestao')
     expect(cardProntidao.exists()).toBe(true)
-    expect(cardProntidao.text()).toContain('Ingestão Bloqueada')
-    expect(cardProntidao.text()).toContain('1 de 3 colunas da tabela Silver preenchidas')
-    expect(cardProntidao.text()).toContain('situacao_imovel')
-    expect(cardProntidao.text()).toContain('area_ha')
+    expect(cardProntidao.text()).toContain('Ingestão Liberada')
+    expect(cardProntidao.text()).toContain('1 de 1 colunas obrigatórias (NOT NULL) preenchidas')
 
     // 2. No select de atributos, a coluna 'cod_imovel' já mapeada deve estar desabilitada
     const selectAtributo = wrapper.find('.atributo-select-wrapper select')
@@ -205,9 +214,25 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     expect(optCodImovel.attributes('disabled')).toBeDefined()
     expect(optCodImovel.text()).toContain('já mapeado')
 
-    // 3. Coluna não mapeada ('situacao_imovel') deve estar habilitada
+    // 3. Coluna opcional não mapeada ('situacao_imovel') deve estar habilitada
     const optSituacao = opcoes.find((o) => o.attributes('value') === 'situacao_imovel')
     expect(optSituacao.attributes('disabled')).toBeUndefined()
+  })
+
+  it('exibe ingestão bloqueada quando faltam colunas obrigatórias da tabela Silver', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 3, nome: 'UC Teste', entidadeSilver: 'area_protegida' },
+      },
+    })
+    await flushPromises()
+
+    const cardProntidao = wrapper.find('.card-prontidao-ingestao')
+    expect(cardProntidao.exists()).toBe(true)
+    expect(cardProntidao.text()).toContain('Ingestão Bloqueada')
+    expect(cardProntidao.text()).toContain('Colunas obrigatórias pendentes')
+    expect(cardProntidao.text()).toContain('nome')
+    expect(cardProntidao.text()).toContain('categoria_area_protegida')
   })
 
   it('abre popup de confirmação e cancela a troca de Tabela Silver quando o usuário clica em Cancelar', async () => {
