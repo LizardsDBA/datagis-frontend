@@ -215,85 +215,18 @@ const lotesNaSilver = computed(() => lotes.value.filter(l => l.status === 'PROMO
 
 // Modal de Migração Silver -> Gold
 const modalGoldAberto = ref(false)
-const loteAlvoGold = ref(null)
 const faseGold = ref('CONFIRMACAO') // 'CONFIRMACAO' | 'PROCESSANDO' | 'SUCESSO' | 'ERRO'
 const statusGold = ref(null)
 const resultadoPublicacaoTudo = ref(null)
 const erroGold = ref('')
 let timerPollingGold = null
 
-const ehLoteAtributoCar = computed(() => {
-  if (!loteAlvoGold.value) return false
-  const ent = (loteAlvoGold.value.entidadeSilver || '').toLowerCase()
-  if (ent === 'reserva_legal' || ent === 'app_declarada' || ent === 'vegetacao_nativa_declarada') return true
-  const nome = (loteAlvoGold.value.fonteDadoNome || '').toLowerCase()
-  return nome.includes('reserva') || nome.includes('app') || nome.includes('vegeta') || nome.includes('cobertura')
-})
-
-const ehLoteImovelRural = computed(() => {
-  if (!loteAlvoGold.value) return false
-  if (ehLoteAtributoCar.value) return false
-  const ent = (loteAlvoGold.value.entidadeSilver || '').toLowerCase()
-  if (ent === 'imovel_rural' || ent === 'car') return true
-  const nome = (loteAlvoGold.value.fonteDadoNome || '').toLowerCase()
-  return nome.includes('imóvel') || nome.includes('imovel') || (nome.includes('car') && !nome.includes('reserva') && !nome.includes('app') && !nome.includes('vegeta'))
-})
-
-const ehLoteComIndicadores = computed(() => ehLoteImovelRural.value || ehLoteAtributoCar.value)
-
-const nomeCamadaLote = computed(() => {
-  if (!loteAlvoGold.value) return 'Camada de Dados'
-  const ent = (loteAlvoGold.value.entidadeSilver || '').toLowerCase()
-  const nome = (loteAlvoGold.value.fonteDadoNome || '').toLowerCase()
-  if (ent === 'reserva_legal' || nome.includes('reserva') || nome.includes('legal')) {
-    return 'Reserva Legal (CAR)'
-  }
-  if (ent === 'app_declarada' || nome.includes('app')) {
-    return 'APP Total (CAR)'
-  }
-  if (ent === 'vegetacao_nativa_declarada' || nome.includes('vegeta') || nome.includes('cobertura')) {
-    return 'Vegetação Nativa (CAR)'
-  }
-  if (ent === 'desmatamento' || nome.includes('desmatamento') || nome.includes('prodes')) {
-    return 'Desmatamento (PRODES)'
-  }
-  if (ent === 'embargo_ambiental' || ent === 'embargo' || nome.includes('embargo')) {
-    return 'Embargos Ambientais (IBAMA)'
-  }
-  if (ent === 'area_protegida' || nome.includes('conservação') || nome.includes('protegida') || nome.includes('uc')) {
-    return 'Áreas Protegidas e Unidades de Conservação'
-  }
-  if (ent === 'municipio' || nome.includes('município') || nome.includes('ibge')) {
-    return 'Malha Municipal (IBGE)'
-  }
-  if (ent === 'foco_calor' || nome.includes('foco') || nome.includes('queimada')) {
-    return 'Focos de Calor (INPE)'
-  }
-  return loteAlvoGold.value.fonteDadoNome || 'Camada de Dados'
-})
-
-function abrirModalGold(lote = null) {
-  let alvo = lote
-  if (!alvo) {
-    if (lotesNaSilver.value.length === 1) {
-      alvo = lotesNaSilver.value[0]
-    } else {
-      erro.value = 'Selecione diretamente na tabela o lote específico que deseja migrar para a Gold.'
-      return
-    }
-  }
-
-  if (alvo.status === 'PROMOVIDO_GOLD') {
-    erro.value = `O lote #${alvo.id} já foi migrado para a Gold e não pode ser migrado novamente.`
+function abrirModalGold() {
+  if (lotesNaSilver.value.length === 0) {
+    erro.value = 'Nenhum lote com status PROMOVIDO_SILVER disponível para migração para a Gold.'
     return
   }
 
-  if (alvo.status !== 'PROMOVIDO_SILVER') {
-    erro.value = `O lote #${alvo.id} não está apto para migração (status atual: ${alvo.status}).`
-    return
-  }
-
-  loteAlvoGold.value = alvo
   faseGold.value = 'CONFIRMACAO'
   statusGold.value = null
   resultadoPublicacaoTudo.value = null
@@ -308,51 +241,35 @@ function fecharModalGold() {
     timerPollingGold = null
   }
   modalGoldAberto.value = false
-  loteAlvoGold.value = null
 }
 
 async function confirmarPublicacaoGold() {
-  if (!loteAlvoGold.value || !loteAlvoGold.value.id) {
-    erro.value = 'Selecione um lote específico para migrar para a Gold.'
-    fecharModalGold()
-    return
-  }
-
-  const loteIdAlvo = loteAlvoGold.value.id
   faseGold.value = 'PROCESSANDO'
   erroGold.value = ''
 
-  if (ehLoteComIndicadores.value) {
+  try {
+    statusGold.value = await obterStatusGold()
+  } catch (e) {
+    // ignora falha inicial de status
+  }
+
+  timerPollingGold = setInterval(async () => {
     try {
       statusGold.value = await obterStatusGold()
     } catch (e) {
-      // ignora falha inicial de status
+      // ignora falhas intermediarias de polling
     }
-
-    timerPollingGold = setInterval(async () => {
-      try {
-        statusGold.value = await obterStatusGold()
-      } catch (e) {
-        // ignora falhas intermediarias de polling
-      }
-    }, 2000)
-  }
+  }, 2000)
 
   try {
-    const res = await publicarGold(loteIdAlvo)
+    const res = await publicarGold()
     if (timerPollingGold) {
       clearInterval(timerPollingGold)
       timerPollingGold = null
     }
     resultadoPublicacaoTudo.value = res
     faseGold.value = 'SUCESSO'
-
-    const item = lotes.value.find(l => l.id === loteIdAlvo)
-    if (item) {
-      item.status = 'PROMOVIDO_GOLD'
-    }
-    sucesso.value = `Pronto! O lote #${loteIdAlvo} (${loteAlvoGold.value.fonteDadoNome}) foi migrado para a Gold.`
-
+    sucesso.value = 'Pronto! A migração para a camada Gold foi concluída e os dados foram consolidados com sucesso.'
     await carregarLotes()
   } catch (e) {
     if (timerPollingGold) {
@@ -394,7 +311,7 @@ onUnmounted(() => {
           v-if="podePublicarGold"
           class="btn-migrar-gold"
           :disabled="carregando || lotesNaSilver.length === 0 || faseGold === 'PROCESSANDO'"
-          @click="abrirModalGold(null)"
+          @click="abrirModalGold"
           title="Migrar dados consolidados da Silver para a Gold"
         >
           <svg class="icone-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -676,23 +593,9 @@ onUnmounted(() => {
                       <span>Publicado na Gold</span>
                     </div>
 
-                    <div v-else-if="lote.status === 'PROMOVIDO_SILVER'" class="acoes-silver">
-                      <button
-                        v-if="podePublicarGold"
-                        class="btn-acao btn-acao--gold"
-                        title="Migrar dados consolidados deste lote para a camada Gold"
-                        :disabled="processandoAcao || faseGold === 'PROCESSANDO'"
-                        @click="abrirModalGold(lote)"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                        </svg>
-                        <span>Migrar para Gold</span>
-                      </button>
-                      <div v-else class="texto-concluido">
-                        <span class="icone-check">✓</span>
-                        <span>Disponível na Silver</span>
-                      </div>
+                    <div v-else-if="lote.status === 'PROMOVIDO_SILVER'" class="texto-concluido">
+                      <span class="icone-check">✓</span>
+                      <span>Disponível na Silver</span>
                     </div>
 
                     <span v-else class="texto-apagado">—</span>
@@ -982,10 +885,10 @@ onUnmounted(() => {
             <div>
               <span class="modal-etiqueta etiqueta-gold">TRANSIÇÃO SILVER → GOLD</span>
               <h2 class="modal-titulo">
-                Migrar dados do Lote #{{ loteAlvoGold?.id }} para a Gold
+                Publicação Consolidada na Camada Gold
               </h2>
               <p class="modal-sub">
-                {{ ehLoteImovelRural ? 'Execução dos 7 indicadores socioambientais via PL/SQL e publicação da camada no mapa.' : (ehLoteAtributoCar ? `Recálculo dos indicadores socioambientais dos imóveis vinculados a ${nomeCamadaLote} via PL/SQL.` : `Publicação e consolidação da camada ${nomeCamadaLote} na Gold.`) }}
+                Cálculo de indicadores analíticos em PL/SQL e publicação das camadas cartográficas no mapa.
               </p>
             </div>
             <button class="btn-fechar" @click="fecharModalGold">✕</button>
@@ -999,73 +902,35 @@ onUnmounted(() => {
                 </svg>
               </div>
               <div class="info-texto">
-                <template v-if="ehLoteImovelRural">
-                  <h4>Cálculo de Indicadores e Publicação de Imóveis (CAR)</h4>
-                  <p>
-                    A migração aciona as rotinas em banco (PL/SQL) que realizam os cruzamentos espaciais entre os imóveis rurais e as restrições territoriais, ambientais e de conservação.
-                  </p>
-                  <div class="lista-detalhes-gold">
-                    <div class="item-detalhe-gold">
-                      <strong>1. Cálculo dos 7 Indicadores:</strong>
-                      <span>ISAP, IAE, IRL, IAPP, IDesmat, IFC e ICV via Oracle Spatial.</span>
-                    </div>
-                    <div class="item-detalhe-gold">
-                      <strong>2. Publicação das Camadas de Mapa:</strong>
-                      <span>Generalização geométrica (Douglas-Peucker) das 6 camadas cartográficas.</span>
-                    </div>
-                    <div class="item-detalhe-gold">
-                      <strong>3. Rastreabilidade Total:</strong>
-                      <span>Geração de hash SHA-256 e versionamento imutável dos indicadores.</span>
-                    </div>
+                <h4>Consolidação e Publicação Analítica</h4>
+                <p>
+                  A publicação processa todos os dados consolidados na camada Silver, realizando os cruzamentos geoespaciais e calculando os indicadores ambientais para todos os imóveis da plataforma.
+                </p>
+                <div class="lista-detalhes-gold">
+                  <div class="item-detalhe-gold">
+                    <strong>1. Cálculo dos 7 Indicadores:</strong>
+                    <span>ISAP, IAE, IRL, IAPP, IDesmat, IFC e ICV calculados via procedures Oracle Spatial.</span>
                   </div>
-                </template>
-                <template v-else-if="ehLoteAtributoCar">
-                  <h4>Recálculo de Indicadores Ambientais: {{ nomeCamadaLote }}</h4>
-                  <p>
-                    A migração deste lote aciona as rotinas analíticas em PL/SQL para recalcular os indicadores dos imóveis impactados por este lote na camada Gold (ex.: IRL para Reserva Legal, IAPP/ICV para Vegetação Nativa e APP).
-                  </p>
-                  <div class="lista-detalhes-gold">
-                    <div class="item-detalhe-gold">
-                      <strong>1. Recálculo dos Indicadores Afetados:</strong>
-                      <span>Atualização dos índices territoriais e de conservação para cada imóvel com dados neste lote.</span>
-                    </div>
-                    <div class="item-detalhe-gold">
-                      <strong>2. Consolidação do Boletim do Imóvel:</strong>
-                      <span>O detalhe congelado em gold.imovel_publicado recebe as novas versões calculadas.</span>
-                    </div>
-                    <div class="item-detalhe-gold">
-                      <strong>3. Rastreabilidade e Versionamento:</strong>
-                      <span>Histórico auditável mantido com vínculo à fonte e ao lote de ingestão.</span>
-                    </div>
+                  <div class="item-detalhe-gold">
+                    <strong>2. Publicação das Camadas de Mapa:</strong>
+                    <span>Generalização e simplificação geométrica das 6 camadas cartográficas para consulta interativa.</span>
                   </div>
-                </template>
-                <template v-else>
-                  <h4>Publicação da Camada: {{ nomeCamadaLote }}</h4>
-                  <p>
-                    A migração deste lote consolidará e publicará exclusivamente as geometrias e atributos da fonte <strong>{{ loteAlvoGold?.fonteDadoNome }}</strong> na camada Gold.
-                  </p>
-                  <div class="lista-detalhes-gold">
-                    <div class="item-detalhe-gold">
-                      <strong>1. Publicação Cartográfica:</strong>
-                      <span>Disponibilização da camada para visualização e consulta no mapa interativo.</span>
-                    </div>
-                    <div class="item-detalhe-gold">
-                      <strong>2. Cruzamentos Analíticos:</strong>
-                      <span>Os dados consolidados ficam ativos para cruzamento com os imóveis da plataforma.</span>
-                    </div>
+                  <div class="item-detalhe-gold">
+                    <strong>3. Promoção dos Lotes:</strong>
+                    <span>Todos os lotes atualmente na camada Silver ({{ lotesNaSilver.length }} lote(s)) serão promovidos para Gold.</span>
                   </div>
-                </template>
+                </div>
               </div>
             </div>
 
             <div class="resumo-lote">
               <div class="resumo-item">
-                <span class="resumo-rotulo">Lote Selecionado</span>
-                <span class="resumo-valor">#{{ loteAlvoGold?.id }} ({{ loteAlvoGold?.fonteDadoNome }})</span>
+                <span class="resumo-rotulo">Lotes Aptos na Silver</span>
+                <span class="resumo-valor">{{ lotesNaSilver.length }} lote(s)</span>
               </div>
               <div class="resumo-item">
-                <span class="resumo-rotulo">Camada Alvo</span>
-                <span class="resumo-valor">{{ nomeCamadaLote }}</span>
+                <span class="resumo-rotulo">Camadas Cartográficas</span>
+                <span class="resumo-valor">6 camadas</span>
               </div>
               <div class="resumo-item">
                 <span class="resumo-rotulo">Destino</span>
@@ -1088,10 +953,10 @@ onUnmounted(() => {
             <div>
               <span class="modal-etiqueta etiqueta-gold">PROCESSAMENTO EM ANDAMENTO</span>
               <h2 class="modal-titulo">
-                {{ ehLoteImovelRural ? 'Calculando e Publicando na Gold...' : (ehLoteAtributoCar ? `Recalculando Indicadores de ${nomeCamadaLote}...` : `Publicando ${nomeCamadaLote} na Gold...`) }}
+                Calculando e Publicando na Gold...
               </h2>
               <p class="modal-sub">
-                {{ ehLoteImovelRural ? 'Executando cruzamentos geoespaciais em PL/SQL e simplificação de geometrias.' : (ehLoteAtributoCar ? `Processando indicadores analíticos em PL/SQL para os imóveis impactados.` : `Consolidando e publicando geometrias da camada ${nomeCamadaLote}.`) }}
+                Executando cruzamentos geoespaciais em PL/SQL e simplificação de geometrias.
               </p>
             </div>
           </header>
@@ -1099,13 +964,13 @@ onUnmounted(() => {
           <div class="modal-body modal-body--centro">
             <div class="spinner-grande spinner-grande--gold"></div>
             <h3 class="progresso-titulo">
-              {{ ehLoteImovelRural ? 'Calculando Indicadores e Publicando Camadas' : (ehLoteAtributoCar ? `Recalculando Indicadores de ${nomeCamadaLote}` : `Publicando ${nomeCamadaLote}`) }}
+              Calculando Indicadores e Publicando Camadas
             </h3>
             <p class="progresso-sub">
-              {{ ehLoteComIndicadores ? 'Por favor, aguarde. Este processo recalcula os índices analíticos e consolida os dados na camada Gold.' : 'Por favor, aguarde. Este processo consolida as geometrias e publica na camada Gold.' }}
+              Por favor, aguarde. Este processo recalcula os índices analíticos e consolida os dados na camada Gold.
             </p>
 
-            <div v-if="ehLoteComIndicadores && statusGold?.indicadores" class="progresso-detalhe-card">
+            <div v-if="statusGold?.indicadores" class="progresso-detalhe-card">
               <div class="linha-status-indicador">
                 <span class="rotulo-indicador">Imóveis Analisados:</span>
                 <strong class="valor-indicador">
@@ -1125,7 +990,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-if="ehLoteImovelRural && statusGold?.camadasMapa && statusGold.camadasMapa.length > 0" class="camadas-status-grid">
+            <div v-if="statusGold?.camadasMapa && statusGold.camadasMapa.length > 0" class="camadas-status-grid">
               <div
                 v-for="camada in statusGold.camadasMapa"
                 :key="camada.codigoCamada"
@@ -1159,30 +1024,18 @@ onUnmounted(() => {
             </div>
             <h3>Dados consolidados e disponíveis na Gold</h3>
             <p class="sub-sucesso">
-              {{ ehLoteImovelRural ? 'Os indicadores foram calculados e as camadas cartográficas estão prontas para visualização no mapa e consultas analíticas.' : (ehLoteAtributoCar ? `Os indicadores dos imóveis impactados por ${nomeCamadaLote} foram recalculados e consolidados com sucesso na Gold.` : `A camada ${nomeCamadaLote} foi consolidada e publicada com sucesso na Gold.`) }}
+              Os indicadores foram calculados e as camadas cartográficas estão prontas para visualização no mapa e consultas analíticas.
             </p>
 
             <div v-if="resultadoPublicacaoTudo" class="resultado-gold-resumo">
-              <template v-if="ehLoteComIndicadores">
-                <div class="resumo-item">
-                  <span class="resumo-rotulo">Imóveis Processados</span>
-                  <span class="resumo-valor">{{ resultadoPublicacaoTudo.totalImoveis }}</span>
-                </div>
-                <div class="resumo-item">
-                  <span class="resumo-rotulo">Publicados com Sucesso</span>
-                  <span class="resumo-valor texto-verde">{{ resultadoPublicacaoTudo.imoveisPublicados }}</span>
-                </div>
-              </template>
-              <template v-else>
-                <div class="resumo-item">
-                  <span class="resumo-rotulo">Lote Migrado</span>
-                  <span class="resumo-valor">#{{ loteAlvoGold?.id }}</span>
-                </div>
-                <div class="resumo-item">
-                  <span class="resumo-rotulo">Camada Publicada</span>
-                  <span class="resumo-valor texto-verde">{{ nomeCamadaLote }}</span>
-                </div>
-              </template>
+              <div class="resumo-item">
+                <span class="resumo-rotulo">Imóveis Processados</span>
+                <span class="resumo-valor">{{ resultadoPublicacaoTudo.totalImoveis }}</span>
+              </div>
+              <div class="resumo-item">
+                <span class="resumo-rotulo">Publicados com Sucesso</span>
+                <span class="resumo-valor texto-verde">{{ resultadoPublicacaoTudo.imoveisPublicados }}</span>
+              </div>
               <div class="resumo-item">
                 <span class="resumo-rotulo">Status Final</span>
                 <span class="badge-status badge--gold">Migrado para Gold</span>
@@ -2321,23 +2174,7 @@ onUnmounted(() => {
   margin-left: 0.25rem;
 }
 
-/* Ações Silver na Tabela */
-.acoes-silver {
-  display: flex;
-  align-items: center;
-}
 
-.btn-acao--gold {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fcd34d;
-}
-
-.btn-acao--gold:hover:not(:disabled) {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #f59e0b;
-}
 
 /* Modal Gold */
 .modal-dialog--gold {

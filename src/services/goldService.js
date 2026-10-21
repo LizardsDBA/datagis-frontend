@@ -77,10 +77,9 @@ export async function buscarImovelPublicado(codImovel) {
   }
 }
 
-export async function publicarGold(loteId = null) {
+export async function publicarGold() {
   try {
-    const url = loteId ? `/gold/publicar?loteId=${encodeURIComponent(loteId)}` : '/gold/publicar'
-    const { data } = await api.post(url)
+    const { data } = await api.post('/gold/publicar')
     return data
   } catch (error) {
     throw new Error(mensagemDoErro(error, 'Falha ao executar a publicação da camada Gold.'))

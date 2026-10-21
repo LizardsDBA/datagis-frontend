@@ -222,17 +222,6 @@ describe('goldService', () => {
     expect(resultado).toEqual(mockResultado)
   })
 
-  it('publicarGold com loteId chama POST /gold/publicar?loteId=ID', async () => {
-    const { publicarGold } = await carregarGoldService()
-
-    const mockResultado = { totalImoveis: 5, imoveisPublicados: 5 }
-    api.post.mockResolvedValueOnce({ data: mockResultado })
-
-    const resultado = await publicarGold(42)
-    expect(api.post).toHaveBeenCalledWith('/gold/publicar?loteId=42')
-    expect(resultado).toEqual(mockResultado)
-  })
-
   it('obterStatusGold chama GET /gold/status e retorna status consolidado', async () => {
     const { obterStatusGold } = await carregarGoldService()
 

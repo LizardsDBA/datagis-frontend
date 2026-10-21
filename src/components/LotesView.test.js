@@ -99,7 +99,7 @@ describe('LotesView.vue - Liberação e Quarentena', () => {
     })
   })
 
-  it('exibe botão de migração para Gold no cabeçalho e na linha quando há lotes em PROMOVIDO_SILVER', async () => {
+  it('exibe botão de migração para Gold no cabeçalho quando há lotes em PROMOVIDO_SILVER', async () => {
     buscarLotes.mockResolvedValue([
       {
         id: 10,
@@ -118,18 +118,26 @@ describe('LotesView.vue - Liberação e Quarentena', () => {
     expect(btnTopoGold.text()).toContain('Migrar para Gold')
     expect(btnTopoGold.text()).toContain('1 na Silver')
 
-    const btnLinhaGold = wrapper.find('.btn-acao--gold')
-    expect(btnLinhaGold.exists()).toBe(true)
-    expect(btnLinhaGold.text()).toContain('Migrar para Gold')
+    expect(wrapper.find('.btn-acao--gold').exists()).toBe(false)
+    const concluido = wrapper.find('.texto-concluido')
+    expect(concluido.exists()).toBe(true)
+    expect(concluido.text()).toContain('Disponível na Silver')
   })
 
-  it('abre modal de confirmação de migração para Gold com detalhes dos 7 indicadores', async () => {
+  it('abre modal consolidado de confirmação de migração para Gold com detalhes dos indicadores e camadas', async () => {
     buscarLotes.mockResolvedValue([
       {
         id: 10,
         fonteDadoNome: 'CAR Homologado',
         status: 'PROMOVIDO_SILVER',
         quantidadeRegistros: 100,
+        criadoEm: '2026-10-18T10:00:00Z',
+      },
+      {
+        id: 20,
+        fonteDadoNome: 'IBAMA Embargos',
+        status: 'PROMOVIDO_SILVER',
+        quantidadeRegistros: 50,
         criadoEm: '2026-10-18T10:00:00Z',
       },
     ])
@@ -140,34 +148,13 @@ describe('LotesView.vue - Liberação e Quarentena', () => {
     await wrapper.find('.btn-migrar-gold').trigger('click')
 
     expect(wrapper.text()).toContain('TRANSIÇÃO SILVER → GOLD')
-    expect(wrapper.text()).toContain('Migrar dados do Lote #10 para a Gold')
+    expect(wrapper.text()).toContain('Publicação Consolidada na Camada Gold')
     expect(wrapper.text()).toContain('ISAP, IAE, IRL, IAPP, IDesmat, IFC e ICV')
-    expect(wrapper.text()).toContain('Generalização geométrica (Douglas-Peucker)')
+    expect(wrapper.text()).toContain('2 lote(s)')
+    expect(wrapper.text()).toContain('6 camadas')
   })
 
-  it('abre modal para fonte não-CAR exibindo detalhes da camada específica e sem indicadores de CAR', async () => {
-    buscarLotes.mockResolvedValue([
-      {
-        id: 77,
-        fonteDadoNome: 'PRODES Desmatamento SP',
-        entidadeSilver: 'desmatamento',
-        status: 'PROMOVIDO_SILVER',
-        quantidadeRegistros: 350,
-        criadoEm: '2026-10-18T10:00:00Z',
-      },
-    ])
-
-    wrapper = mount(LotesView)
-    await flushPromises()
-
-    await wrapper.find('.btn-acao--gold').trigger('click')
-
-    expect(wrapper.text()).toContain('Migrar dados do Lote #77 para a Gold')
-    expect(wrapper.text()).toContain('Publicação da Camada: Desmatamento (PRODES)')
-    expect(wrapper.text()).not.toContain('ISAP, IAE, IRL')
-  })
-
-  it('executa a migração para a Gold com sucesso e exibe o resumo de publicação', async () => {
+  it('executa a migração para a Gold com sucesso via botão único e exibe o resumo de publicação', async () => {
     buscarLotes.mockResolvedValue([
       {
         id: 10,
@@ -181,92 +168,26 @@ describe('LotesView.vue - Liberação e Quarentena', () => {
       totalImoveis: 100,
       imoveisPublicados: 100,
       imoveisComFalha: [],
-      camadasPublicadas: ['IMOVEL_RURAL'],
+      camadasPublicadas: ['IMOVEL_RURAL', 'MUNICIPIO'],
       camadasComFalha: [],
     })
 
     wrapper = mount(LotesView)
     await flushPromises()
 
-    // Abre modal pelo botão da linha
-    await wrapper.find('.btn-acao--gold').trigger('click')
+    // Abre modal pelo botão do topo
+    await wrapper.find('.btn-migrar-gold').trigger('click')
 
     // Confirma publicação
     const btnConfirmar = wrapper.find('.btn-confirmar-gold')
     await btnConfirmar.trigger('click')
     await flushPromises()
 
-    expect(publicarGold).toHaveBeenCalledWith(10)
+    expect(publicarGold).toHaveBeenCalledWith()
     expect(wrapper.text()).toContain('PUBLICAÇÃO CONCLUÍDA')
     expect(wrapper.text()).toContain('Migração para a Gold Finalizada')
     expect(wrapper.text()).toContain('100')
     expect(wrapper.text()).toContain('Publicados com Sucesso')
-  })
-
-  it('ao migrar lote específico para Gold, atualiza o status do lote para PROMOVIDO_GOLD na interface', async () => {
-    buscarLotes.mockResolvedValue([
-      {
-        id: 15,
-        fonteDadoNome: 'CAR Reserva',
-        status: 'PROMOVIDO_SILVER',
-        quantidadeRegistros: 50,
-        criadoEm: '2026-10-18T10:00:00Z',
-      },
-    ])
-    publicarGold.mockResolvedValue({
-      totalImoveis: 50,
-      imoveisPublicados: 50,
-      imoveisComFalha: [],
-      camadasPublicadas: ['IMOVEL_RURAL'],
-      camadasComFalha: [],
-    })
-
-    wrapper = mount(LotesView)
-    await flushPromises()
-
-    // Abre modal para o lote 15
-    await wrapper.find('.btn-acao--gold').trigger('click')
-
-    // Confirma
-    await wrapper.find('.btn-confirmar-gold').trigger('click')
-    await flushPromises()
-
-    expect(publicarGold).toHaveBeenCalledWith(15)
-
-    // Ao fechar a modal de sucesso, a linha do lote deve refletir o status PROMOVIDO_GOLD
-    const btnFechar = wrapper.find('.modal-dialog--gold .btn-fechar')
-    await btnFechar.trigger('click')
-    await flushPromises()
-
-    const badgeGold = wrapper.find('.badge--gold')
-    expect(badgeGold.exists()).toBe(true)
-    expect(badgeGold.text()).toContain('Migrado para Gold')
-
-    const acaoConcluidaGold = wrapper.find('.texto-concluido--gold')
-    expect(acaoConcluidaGold.exists()).toBe(true)
-    expect(acaoConcluidaGold.text()).toContain('Publicado na Gold')
-  })
-
-  it('abre modal para lote de Reserva Legal exibindo texto de recálculo de indicadores ambientais', async () => {
-    buscarLotes.mockResolvedValue([
-      {
-        id: 35,
-        fonteDadoNome: 'IAT/PR - Reserva Legal (CAR)',
-        entidadeSilver: 'reserva_legal',
-        status: 'PROMOVIDO_SILVER',
-        quantidadeRegistros: 120,
-        criadoEm: '2026-10-18T10:00:00Z',
-      },
-    ])
-
-    wrapper = mount(LotesView)
-    await flushPromises()
-
-    await wrapper.find('.btn-acao--gold').trigger('click')
-
-    expect(wrapper.text()).toContain('Recálculo de Indicadores Ambientais: Reserva Legal (CAR)')
-    expect(wrapper.text()).toContain('Recálculo dos Indicadores Afetados')
-    expect(wrapper.text()).toContain('Reserva Legal (CAR)')
   })
 
   it('renderiza corretamente lote com status PROMOVIDO_GOLD já existente', async () => {
