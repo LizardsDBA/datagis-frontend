@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, RouterLinkStub } from '@vue/test-utils'
 import Sidebar from './Sidebar.vue'
 import { alternarTema, estadoTema } from '../tema'
+import { sair } from '../auth/autenticacao'
 
 // Sessão de mentira: só o necessário para o rodapé (nome, perfil e sair)
 const { sessaoTeste } = vi.hoisted(() => ({
@@ -61,9 +62,20 @@ describe('Sidebar — botão de tema no rodapé', () => {
     await wrapper.find('.btn-toggle-desktop').trigger('click')
 
     const botoes = wrapper.findAll('.rodape button').map((b) => b.classes()[0])
-    expect(botoes).toEqual(['btn-tema'])
+    expect(botoes).toEqual(['btn-tema', 'btn-sair'])
 
     await wrapper.find('.rodape .btn-tema').trigger('click')
     expect(alternarTema).toHaveBeenCalledTimes(1)
+  })
+
+  it('com a sidebar recolhida, o Sair continua no rodapé e encerra a sessão', async () => {
+    const wrapper = montar()
+    await wrapper.find('.btn-toggle-desktop').trigger('click')
+
+    const botao = wrapper.find('.rodape .btn-sair')
+    expect(botao.attributes('aria-label')).toBe('Sair')
+
+    await botao.trigger('click')
+    expect(sair).toHaveBeenCalledTimes(1)
   })
 })
