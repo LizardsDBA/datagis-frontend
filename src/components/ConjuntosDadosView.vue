@@ -541,4 +541,86 @@ onMounted(async () => {
     transform: rotate(360deg);
   }
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .etiqueta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .subtitulo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .seletor-camadas {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .botao-camada {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .botao-camada--ativo {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .cartao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados th {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados td {
+  border-bottom-color: var(--cor-borda-suave);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .botao-icone {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .botao-icone--comparar {
+  color: var(--cor-link);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .botao-icone:hover {
+  background: var(--cor-borda);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .controles-paginacao {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .controles-paginacao button {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .estado-carregando,
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-vazio--erro {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .spinner-grande {
+  border-color: var(--cor-borda);
+  border-top-color: var(--cor-primaria);
+}
 </style>

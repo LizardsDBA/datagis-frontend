@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { nomeDoPerfil, sair, sessao, temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
+import { alternarTema, estadoTema } from '../tema'
 
 defineProps({
   abertoNoMobile: {
@@ -18,6 +19,10 @@ const recolhido = ref(false)
 function alternarRecuo() {
   recolhido.value = !recolhido.value
 }
+
+// Botão de tema (LIZARDS-38): o rótulo descreve a ação, não o estado atual
+const temaEscuro = computed(() => estadoTema.atual === 'escuro')
+const rotuloTema = computed(() => (temaEscuro.value ? 'Usar tema claro' : 'Usar tema escuro'))
 
 // Handler de duplo clique para expandir a barra lateral caso esteja recolhida
 function lidarDuploClique() {
@@ -285,6 +290,16 @@ function navegar() {
             <p class="rodape-nome">{{ sessao.nome || sessao.login }}</p>
             <p class="rodape-perfil">{{ descricaoPerfis }}</p>
           </div>
+          <button class="btn-tema" :title="rotuloTema" :aria-label="rotuloTema" @click="alternarTema">
+            <!-- Sol no escuro (volta pro claro), lua no claro (vai pro escuro) -->
+            <svg v-if="temaEscuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
           <button class="btn-sair" title="Sair do DataGIS" aria-label="Sair" @click="sair">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -293,6 +308,38 @@ function navegar() {
             </svg>
           </button>
         </template>
+
+        <!-- Recolhida: o botão de tema continua acessível, abaixo do avatar (LIZARDS-38) -->
+        <button
+          v-if="recolhido"
+          class="btn-tema"
+          :title="rotuloTema"
+          :aria-label="rotuloTema"
+          @click="alternarTema"
+        >
+          <svg v-if="temaEscuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
+
+        <!-- Recolhida: o Sair também continua acessível, abaixo do tema (LIZARDS-38) -->
+        <button
+          v-if="recolhido"
+          class="btn-sair"
+          title="Sair do DataGIS"
+          aria-label="Sair"
+          @click="sair"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
       </div>
     </aside>
   </div>
@@ -637,6 +684,32 @@ function navegar() {
   height: 1rem;
 }
 
+/* Botão de tema (LIZARDS-38): mesmo formato do Sair, sem o vermelho no hover */
+.btn-tema {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-tema:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.btn-tema svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 .rodape-nome {
   margin: 0;
   font-size: 0.82rem;
@@ -676,5 +749,169 @@ function navegar() {
   .btn-fechar-drawer {
     display: block;
   }
+}
+
+/* Barra de rolagem discreta (LIZARDS-38): invisível até passar o mouse na sidebar.
+   A rolagem continua funcionando; só some a faixa cinza do trilho. scrollbar-width/
+   scrollbar-color valem no Chrome, Edge e Firefox (e fazem o Chrome ignorar o
+   ::-webkit-scrollbar); o ::-webkit-scrollbar fica como reserva para o Safari. */
+.barra-lateral {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.barra-lateral:hover {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.barra-lateral::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.barra-lateral::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.barra-lateral:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+/* Rodapé recolhido (LIZARDS-38): itens empilhados, para caber o botão de tema */
+.barra-lateral--recolhida .rodape {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .barra-lateral {
+  background: var(--cor-superficie);
+  border-right-color: var(--cor-borda);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .barra-lateral:hover {
+  scrollbar-color: var(--cor-borda-forte) transparent;
+}
+
+:root[data-tema="escuro"] .barra-lateral:hover::-webkit-scrollbar-thumb {
+  background: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .marca {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .marca-icone {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .marca-icone--botao:hover {
+  background: var(--cor-primaria-hover);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .marca-nome {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .marca-sub {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .btn-toggle-desktop,
+:root[data-tema="escuro"] .btn-fechar-drawer {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-toggle-desktop:hover,
+:root[data-tema="escuro"] .btn-fechar-drawer:hover {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .menu-secao-rotulo {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .menu-secao-divisor {
+  background: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .item-menu:hover {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .icone-wrapper {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-terciario);
+  box-shadow: inset 0 0 0 1px var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .item-rotulo {
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .item-desc {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .item-menu--ativo {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .item-menu--ativo .icone-wrapper {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .item-menu--ativo .item-rotulo {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .item-menu--ativo .item-desc {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .rodape {
+  border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .avatar {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .rodape-nome {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .rodape-perfil {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-sair,
+:root[data-tema="escuro"] .btn-tema {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-tema:hover {
+  background: var(--cor-borda);
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .btn-sair:hover {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+  color: var(--cor-erro);
 }
 </style>

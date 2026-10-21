@@ -470,4 +470,120 @@ watch(parAtivo, carregar, { immediate: true })
 .tabela-lado .codigo + .numero {
   border-left: 1px solid #d0d7de;
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .caixa-modal {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .cabecalho-modal {
+  border-bottom-color: var(--cor-borda);
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .cabecalho-modal h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .botao-fechar {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .seletor {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .botao-seletor {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .botao-seletor--ativo {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .filtro-diferencas {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-vazio--erro {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .arquivo-diff {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .cabecalho-arquivo {
+  background: var(--cor-superficie-elevada);
+  border-bottom-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .nome-arquivo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .contagem--add {
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .contagem--del {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .numero {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .codigo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .campo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .linha--del,
+:root[data-tema="escuro"] .linha--del .numero,
+:root[data-tema="escuro"] .linha--del .sinal {
+  background: var(--tenue-erro);
+}
+
+:root[data-tema="escuro"] .linha--add,
+:root[data-tema="escuro"] .linha--add .numero,
+:root[data-tema="escuro"] .linha--add .sinal {
+  background: var(--cor-primaria-tenue);
+}
+
+/* Número da linha um degrau mais forte que a linha (12%), igual nos dois lados */
+:root[data-tema="escuro"] .numero.linha--del {
+  background: rgb(248 113 113 / 25%);
+}
+
+:root[data-tema="escuro"] .numero.linha--add {
+  background: rgb(74 222 128 / 25%);
+}
+
+:root[data-tema="escuro"] .linha--vazia {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .linha--del .destaque,
+:root[data-tema="escuro"] .codigo.linha--del .destaque {
+  background: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .linha--add .destaque,
+:root[data-tema="escuro"] .codigo.linha--add .destaque {
+  background: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .tabela-lado .codigo + .numero {
+  border-left-color: var(--cor-borda-forte);
+}
 </style>

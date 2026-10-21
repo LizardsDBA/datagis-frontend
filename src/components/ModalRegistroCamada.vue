@@ -116,4 +116,40 @@ const emit = defineEmits(['fechar'])
   color: #1e293b;
   word-break: break-word;
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .caixa-modal {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .cabecalho-modal {
+  border-bottom-color: var(--cor-borda);
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .cabecalho-modal h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .botao-fechar {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .tabela-chave-valor th,
+:root[data-tema="escuro"] .tabela-chave-valor td {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .tabela-chave-valor th {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .tabela-chave-valor td {
+  color: var(--cor-texto);
+}
 </style>

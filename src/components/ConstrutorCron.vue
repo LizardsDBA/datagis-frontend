@@ -171,4 +171,36 @@ watch(() => props.modelValue, (novo) => {
   border-radius: 4px;
   color: #2e7d32;
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .construtor-cron {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .opcao-modo {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .campo-inline {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .campo-inline input,
+:root[data-tema="escuro"] .campo-inline select {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .texto-personalizado {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .previa {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .previa code {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-link);
+}
 </style>

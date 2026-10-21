@@ -1246,4 +1246,366 @@ onMounted(() => {
     flex-wrap: wrap;
   }
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .banner-sucesso-flutuante {
+  background: var(--tenue-sucesso);
+  border-color: var(--cor-primaria);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .btn-fechar-banner {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .etiqueta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .subtitulo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-atualizar {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-atualizar:hover:not(:disabled) {
+  background: var(--cor-borda);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .card-metrica {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .metrica-label {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .card-metrica--clicavel:hover {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .card-metrica:first-child .metrica-valor,
+:root[data-tema="escuro"] .card-metrica--total .metrica-valor {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .card-metrica--pendente .metrica-valor {
+  color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .card-metrica--analise .metrica-valor {
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .card-metrica--sucesso .metrica-valor {
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .card-metrica--descarte .metrica-valor {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .card-metrica:first-child.card-metrica--ativo,
+:root[data-tema="escuro"] .card-metrica--total.card-metrica--ativo {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .card-metrica--pendente.card-metrica--ativo {
+  border-color: var(--cor-alerta);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .card-metrica--analise.card-metrica--ativo {
+  border-color: var(--cor-info);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .card-metrica--sucesso.card-metrica--ativo {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .card-metrica--descarte.card-metrica--ativo {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .metrica-valor {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .metrica-sub {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .banner-ofensor {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .ofensor-label {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .ofensor-nome {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .ofensor-valor {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .ofensor-sub {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .card-acordeao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .acordeao-header {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .acordeao-header:hover {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .acordeao-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .btn-toggle-acordeao {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .acordeao-corpo {
+  border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .rotulo-filtro {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .select-filtro,
+:root[data-tema="escuro"] .input-filtro-lote {
+  border-color: var(--cor-borda-forte);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .select-filtro:focus,
+:root[data-tema="escuro"] .input-filtro-lote:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .icone-busca {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .input-busca {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .input-busca:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .select-acao-rapida {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .banner-filtro-lote {
+  background: var(--tenue-alerta);
+  border-color: rgb(251 191 36 / 30%);
+  color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .banner-filtro-lote--neutro {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .banner-filtro-lote--neutro .badge-lote-banner {
+  background: var(--cor-fundo);
+}
+
+:root[data-tema="escuro"] .badge-lote-banner {
+  background: var(--cor-alerta);
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .btn-banner-link {
+  background: var(--cor-superficie-elevada);
+  border-color: rgb(251 191 36 / 30%);
+  color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .btn-banner-link:hover {
+  background: var(--tenue-alerta);
+}
+
+:root[data-tema="escuro"] .btn-banner-remover {
+  color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .banner-erro {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .tabela-container {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados th {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados td {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .linha-tabela:hover {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .chave-codigo {
+  color: var(--cor-texto-titulo);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .sub-id {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .tag-entidade {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .rotulo-campo-problema {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .codigo-campo-problema {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .motivo-texto {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .origem-fonte-nome {
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .badge-lote-clicavel {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .btn-inspecionar {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .btn-inspecionar svg {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-inspecionar:hover {
+  background: var(--cor-primaria-hover);
+  color: var(--cor-primaria-contraste);
+  border-color: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .estado-carregando,
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-vazio svg {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .spinner {
+  border-color: var(--cor-borda);
+  border-top-color: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .paginacao-container {
+  background-color: var(--cor-superficie);
+  border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .paginacao-info {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .paginacao-info strong {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .paginacao-lote-tag {
+  background-color: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .rotulo-paginacao {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .select-tamanho {
+  border-color: var(--cor-borda-forte);
+  color: var(--cor-texto);
+  background-color: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .select-tamanho:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-pag {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-pag:hover:not(:disabled) {
+  background-color: var(--cor-borda);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .paginacao-status {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .paginacao-status strong {
+  color: var(--cor-texto-titulo);
+}
 </style>

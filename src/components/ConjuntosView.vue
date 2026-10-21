@@ -999,4 +999,300 @@ onUnmounted(() => {
     min-height: 420px;
   }
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .etiqueta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .subtitulo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-atualizar {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-atualizar:hover:not(:disabled) {
+  background: var(--cor-borda);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .banner-erro {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .painel-lateral {
+  scrollbar-color: var(--cor-borda-forte) transparent;
+}
+
+:root[data-tema="escuro"] .card-form {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .card-form-icone {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .card-form-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .rotulo {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .input-campo {
+  border-color: var(--cor-borda-forte);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .input-campo:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .input-campo:disabled {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .select-chevron {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .radio-item {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .radio-item:hover {
+  border-color: var(--cor-borda-forte);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .radio-item--selecionado {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria-tenue);
+}
+
+:root[data-tema="escuro"] .info-geo {
+  background: var(--tenue-info);
+  border-color: rgb(124 180 247 / 30%);
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .alerta-form--erro {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .alerta-form--sucesso {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .btn-cadastrar {
+  background: linear-gradient(135deg, var(--cor-primaria), var(--cor-primaria));
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-cadastrar:hover:not(:disabled) {
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .card-lista {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .card-lista-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .badge-contagem {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .item-conjunto {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .item-conjunto:hover {
+  border-color: var(--cor-primaria-borda);
+  background: var(--cor-primaria-tenue);
+}
+
+:root[data-tema="escuro"] .item-conjunto--destaque {
+  border-color: var(--cor-alerta);
+  background: var(--tenue-alerta);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .item-id {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .item-fonte {
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .item-competencia,
+:root[data-tema="escuro"] .item-geo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .item-geo--sim {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .item-geo--nao {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .status--ativa {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .status--inativa {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .status--processando {
+  background: var(--tenue-info);
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .status--erro {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .painel-mapa {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .mapa-topo {
+  background: var(--cor-superficie);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .legenda-item {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .legenda-item--padrao::before {
+  background: var(--tenue-sucesso);
+  border-color: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .legenda-item--destaque::before {
+  background: var(--tenue-alerta);
+  border-color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .mapa-dica {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .mapa-overlay-aviso {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .mapa-overlay-aviso svg {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .mapa-overlay-aviso p {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-carregando {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .spinner {
+  border-color: var(--cor-borda);
+  border-top-color: var(--cor-primaria);
+}
+
+/* Mapa (LIZARDS-38): continua o mesmo OpenStreetMap; no escuro só a camada de fundo
+   (.leaflet-tile-pane) é escurecida por filtro. Os polígonos ficam em outra camada
+   (.leaflet-overlay-pane) e mantêm as cores. Os elementos do Leaflet são criados por
+   JavaScript, sem a marca de escopo do Vue, por isso o :deep() a partir do container. */
+:root[data-tema="escuro"] .mapa-container {
+  background: var(--cor-fundo);
+}
+
+:root[data-tema="escuro"] .mapa-container :deep(.leaflet-tile-pane) {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+
+:root[data-tema="escuro"] .mapa-container :deep(.leaflet-bar) {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .mapa-container :deep(.leaflet-bar a) {
+  background-color: var(--cor-superficie-elevada);
+  border-bottom-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .mapa-container :deep(.leaflet-bar a:hover) {
+  background-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .mapa-container :deep(.leaflet-control-attribution) {
+  background: rgb(21 28 36 / 80%);
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .mapa-container :deep(.leaflet-control-attribution a) {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .mapa-container :deep(.leaflet-popup-content-wrapper),
+:root[data-tema="escuro"] .mapa-container :deep(.leaflet-popup-tip) {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto);
+}
+/* Aviso sobre o mapa: branco translúcido no claro, superfície escura translúcida aqui */
+:root[data-tema="escuro"] .mapa-overlay-aviso {
+  background: rgb(21 28 36 / 95%);
+}
+
+/* Menu moderno (LIZARDS-38): o .input-campo usa appearance: none, que vence a regra
+   global do style.css; aqui ele também passa a usar a lista desenhada pelo CSS. */
+@supports (appearance: base-select) {
+  select.input-campo,
+  select.input-campo::picker(select) {
+    appearance: base-select;
+  }
+
+  /* a tela já desenha a própria setinha (.select-chevron); esconde a do navegador */
+  select.input-campo::picker-icon {
+    display: none;
+  }
+}
 </style>
