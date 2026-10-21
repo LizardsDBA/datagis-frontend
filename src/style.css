@@ -319,3 +319,77 @@ code, pre {
   background-color: var(--cor-superficie-elevada);
   color: var(--cor-texto);
 }
+
+/* Lista aberta dos menus de seleção: o navegador desenha a lista, mas aceita fundo e
+   texto das opções; sem isso o item selecionado aparece em cinza claro no tema escuro. */
+:root[data-tema="escuro"] option {
+  background-color: var(--cor-superficie-elevada);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] option:checked {
+  background-color: var(--cor-borda-forte);
+  color: var(--cor-texto-titulo);
+}
+
+/* Menus de seleção modernos, nos dois temas: lista com cantos arredondados, sombra,
+   opções em "pílula" e ✓ no item escolhido. Só Chrome/Edge 135+ suportam o
+   appearance: base-select; nos outros navegadores o @supports pula tudo e o menu fica
+   como antes. :where() deixa a prioridade em zero: regra de tela continua valendo. */
+@supports (appearance: base-select) {
+  :where(select),
+  :where(select)::picker(select) {
+    appearance: base-select;
+  }
+
+  :where(select)::picker(select) {
+    margin-top: 0.25rem;
+    padding: 0.35rem;
+    border: 1px solid var(--cor-slate-200);
+    border-radius: var(--raio-lg);
+    background: var(--cor-branco);
+    box-shadow: var(--sombra-lg);
+  }
+
+  :where(select) option {
+    padding: 0.45rem 0.65rem;
+    border-radius: var(--raio-sm);
+  }
+
+  :where(select) option:hover {
+    background-color: var(--cor-slate-100);
+  }
+
+  :where(select) option:checked {
+    background-color: var(--cor-primaria-clara);
+    color: var(--cor-primaria);
+    font-weight: 600;
+  }
+
+  :where(select) option::checkmark {
+    color: var(--cor-primaria);
+  }
+
+  :root[data-tema="escuro"] select::picker(select) {
+    background: var(--cor-superficie-elevada);
+    border-color: var(--cor-borda);
+    box-shadow: 0 16px 40px -12px rgb(0 0 0 / 60%);
+  }
+
+  :root[data-tema="escuro"] select option {
+    background-color: transparent;
+  }
+
+  :root[data-tema="escuro"] select option:hover {
+    background-color: var(--cor-borda);
+  }
+
+  :root[data-tema="escuro"] select option:checked {
+    background-color: var(--cor-primaria-tenue);
+    color: var(--cor-link);
+  }
+
+  :root[data-tema="escuro"] select option::checkmark {
+    color: var(--cor-link);
+  }
+}

@@ -1281,4 +1281,18 @@ onUnmounted(() => {
 :root[data-tema="escuro"] .mapa-overlay-aviso {
   background: rgb(21 28 36 / 95%);
 }
+
+/* Menu moderno (LIZARDS-38): o .input-campo usa appearance: none, que vence a regra
+   global do style.css; aqui ele também passa a usar a lista desenhada pelo CSS. */
+@supports (appearance: base-select) {
+  select.input-campo,
+  select.input-campo::picker(select) {
+    appearance: base-select;
+  }
+
+  /* a tela já desenha a própria setinha (.select-chevron); esconde a do navegador */
+  select.input-campo::picker-icon {
+    display: none;
+  }
+}
 </style>
