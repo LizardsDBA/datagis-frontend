@@ -24,6 +24,9 @@ export default defineConfig({
       '^/conjuntos($|/)': {
         target: 'http://backend:8080',
         changeOrigin: true,
+        // A tela /conjuntos tem o mesmo caminho do endpoint: F5 ou URL digitada pedem
+        // HTML e iam parar no backend (401). Pedido de página fica no Vite (SPA).
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? req.url : undefined),
       },
     },
   },
