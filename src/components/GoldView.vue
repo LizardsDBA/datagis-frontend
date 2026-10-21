@@ -1209,4 +1209,35 @@ onUnmounted(() => {
   .indicadores-detalhe-grid { grid-template-columns: 1fr; }
   .modal-overlay { padding: 0.5rem; }
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .botao-principal {
+  background: linear-gradient(135deg, var(--cor-primaria), var(--cor-primaria));
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .campo-busca input:focus,
+:root[data-tema="escuro"] .input-campo:focus {
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .tabela-gold tbody tr:hover td {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .codigo-badge--imovel {
+  background: var(--tenue-info);
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .btn-detalhe {
+  border-color: var(--cor-primaria-borda);
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .btn-detalhe:hover:not(:disabled) {
+  background: var(--cor-primaria-tenue);
+}
 </style>

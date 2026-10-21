@@ -53,4 +53,23 @@ p {
   font-weight: 600;
   cursor: pointer;
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .cartao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] h1 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] p {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-sair {
+  background: var(--cor-fundo);
+}
 </style>

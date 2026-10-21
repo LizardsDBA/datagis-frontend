@@ -868,4 +868,200 @@ button:disabled {
     max-width: none;
   }
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .etiqueta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .subtitulo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-primario {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .btn-primario:hover:not(:disabled) {
+  background: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] .btn-secundario {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .btn-secundario:hover:not(:disabled) {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .alerta--erro {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .alerta--sucesso {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .card-secao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .campo-texto {
+  border-color: var(--cor-borda-forte);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .campo-texto:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .tabela-container {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados th {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados td {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .usuario-nome {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .usuario-detalhe {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .texto-fraco {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .badge--perfil {
+  background: var(--tenue-info);
+  color: var(--cor-info);
+  border-color: rgb(124 180 247 / 30%);
+}
+
+:root[data-tema="escuro"] .badge--permissao {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .badge--ativo {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .badge--inativo {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .btn-acao {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .btn-acao:hover:not(:disabled) {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .btn-acao--perigo {
+  color: var(--cor-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .btn-acao--perigo:hover:not(:disabled) {
+  background: var(--tenue-erro);
+}
+
+:root[data-tema="escuro"] .modal-dialog {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .modal-header {
+  border-bottom-color: var(--cor-borda-suave);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .modal-etiqueta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .modal-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .btn-fechar {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .modal-footer {
+  background: var(--cor-superficie-elevada);
+  border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .grupo {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .grupo legend {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .campo {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .campo small {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .opcao {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .opcao-desc {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .opcao code {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .via-perfil {
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .resumo-efetivas {
+  color: var(--cor-texto-secundario);
+}
 </style>
