@@ -610,26 +610,18 @@ onUnmounted(() => {
                   <div class="fonte-orgao-texto">
                     {{ fonte.orgao ? 'Órgão: ' + fonte.orgao : 'Sem órgão informado' }}
                   </div>
-                  <!-- Indicador de Status do Mapeamento Silver -->
-                  <div class="linha-status-silver">
+                  <!-- Indicador de Status do Mapeamento Silver (exibido apenas quando pendente) -->
+                  <div v-if="!fonte.mapeamentoCompleto || !fonte.entidadeSilver" class="linha-status-silver">
                     <span
                       v-if="fonte.entidadeSilver"
-                      class="badge-mapeamento-status"
-                      :class="fonte.mapeamentoCompleto ? 'badge-mapeamento--ok' : 'badge-mapeamento--pendente'"
-                      :title="
-                        fonte.mapeamentoCompleto
-                          ? 'Mapeamento completo (' + fonte.totalColunasMapeadas + '/' + fonte.totalColunasSilver + ' colunas). Ingestão liberada.'
-                          : 'Mapeamento incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ' colunas). Faltam: ' + (fonte.colunasSilverFaltantes?.join(', ') || 'colunas') + '. Ingestão bloqueada.'
-                      "
+                      class="badge-mapeamento-status badge-mapeamento--pendente"
+                      :title="'Mapeamento incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ' colunas). Faltam: ' + (fonte.colunasSilverFaltantes?.join(', ') || 'colunas') + '. Ingestão bloqueada.'"
                     >
-                      <svg v-if="fonte.mapeamentoCompleto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                         <circle cx="12" cy="12" r="10" />
                         <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                       </svg>
-                      {{ fonte.mapeamentoCompleto ? 'Mapeamento OK' : 'Mapeamento Incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ')' }}
+                      Mapeamento Incompleto ({{ fonte.totalColunasMapeadas || 0 }}/{{ fonte.totalColunasSilver || 0 }})
                     </span>
                     <span v-else class="badge-mapeamento-status badge-mapeamento--sem-silver" title="Defina a tabela Silver no mapeamento para liberar a ingestão">
                       Sem Tabela Silver

@@ -203,8 +203,8 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     // 1. O card de prontidão deve mostrar que a ingestão está liberada porque a única obrigatória (cod_imovel) está mapeada
     const cardProntidao = wrapper.find('.card-prontidao-ingestao')
     expect(cardProntidao.exists()).toBe(true)
-    expect(cardProntidao.text()).toContain('Ingestão Liberada')
-    expect(cardProntidao.text()).toContain('1 de 1 colunas obrigatórias (NOT NULL) preenchidas')
+    expect(cardProntidao.text()).toContain('Todas as colunas obrigatórias (NOT NULL) da tabela Silver foram preenchidas')
+    expect(cardProntidao.text()).toContain('Esta fonte está apta para ingestão!')
 
     // 2. No select de atributos, a coluna 'cod_imovel' já mapeada deve estar desabilitada
     const selectAtributo = wrapper.find('.atributo-select-wrapper select')
@@ -219,7 +219,7 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     expect(optSituacao.attributes('disabled')).toBeUndefined()
   })
 
-  it('exibe ingestão bloqueada quando faltam colunas obrigatórias da tabela Silver', async () => {
+  it('exibe pendências quando faltam colunas obrigatórias da tabela Silver', async () => {
     wrapper = mount(ModalMapeamentoColunas, {
       props: {
         fonte: { id: 3, nome: 'UC Teste', entidadeSilver: 'area_protegida' },
@@ -229,7 +229,7 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
 
     const cardProntidao = wrapper.find('.card-prontidao-ingestao')
     expect(cardProntidao.exists()).toBe(true)
-    expect(cardProntidao.text()).toContain('Ingestão Bloqueada')
+    expect(cardProntidao.text()).toContain('A ingestão desta fonte só será liberada')
     expect(cardProntidao.text()).toContain('Colunas obrigatórias pendentes')
     expect(cardProntidao.text()).toContain('nome')
     expect(cardProntidao.text()).toContain('categoria_area_protegida')

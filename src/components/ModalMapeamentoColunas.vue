@@ -746,54 +746,27 @@ function remover(id) {
 
         <!-- CARD DE STATUS E PRONTIDÃO PARA INGESTÃO -->
         <div v-if="tabelaSilverSelecionada && esquemaAtivo" class="card-prontidao-ingestao">
-          <div v-if="carregando" class="prontidao-topo prontidao-carregando">
+          <div v-if="carregando" class="prontidao-carregando">
             <span class="spinner-sm"></span>
             <span>Carregando integridade do mapeamento...</span>
           </div>
           <template v-else>
-            <div class="prontidao-topo">
-              <div class="prontidao-status-badge" :class="statusMapeamentoSilver.completo ? 'badge-prontidao-liberada' : 'badge-prontidao-bloqueada'">
-                <svg v-if="statusMapeamentoSilver.completo" class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <svg v-else class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                </svg>
-                <span>{{ statusMapeamentoSilver.completo ? 'Ingestão Liberada' : 'Ingestão Bloqueada' }}</span>
-              </div>
-              <div class="prontidao-contador">
-                <strong>{{ statusMapeamentoSilver.mapeadasObrigatorias }} de {{ statusMapeamentoSilver.totalObrigatorias }}</strong> colunas obrigatórias (NOT NULL) preenchidas ({{ statusMapeamentoSilver.porcentagem }}%) — total de {{ statusMapeamentoSilver.totalMapeadas }} coluna(s) mapeada(s)
-              </div>
-            </div>
-
-          <div class="barra-prontidao-trilho">
-            <div
-              class="barra-prontidao-preenchimento"
-              :class="{ 'barra-prontidao-preenchimento--completo': statusMapeamentoSilver.completo }"
-              :style="{ width: statusMapeamentoSilver.porcentagem + '%' }"
-            ></div>
-          </div>
-
-          <div v-if="!statusMapeamentoSilver.completo" class="prontidao-pendencias">
-            <span class="prontidao-aviso-texto">
-              A ingestão desta fonte só será liberada quando todas as colunas obrigatórias (NOT NULL) da tabela Silver forem mapeadas. Colunas obrigatórias pendentes ({{ statusMapeamentoSilver.faltantes.length }}):
-            </span>
-            <div class="chips-colunas-pendentes">
-              <span
-                v-for="col in statusMapeamentoSilver.faltantes"
-                :key="col.nome"
-                class="chip-coluna-pendente"
-                :title="col.label"
-              >
-                {{ col.nome }}
+            <div v-if="!statusMapeamentoSilver.completo" class="prontidao-pendencias">
+              <span class="prontidao-aviso-texto">
+                A ingestão desta fonte só será liberada quando todas as colunas obrigatórias (NOT NULL) da tabela Silver forem mapeadas. Colunas obrigatórias pendentes ({{ statusMapeamentoSilver.faltantes.length }}):
               </span>
+              <div class="chips-colunas-pendentes">
+                <span
+                  v-for="col in statusMapeamentoSilver.faltantes"
+                  :key="col.nome"
+                  class="chip-coluna-pendente"
+                  :title="col.label"
+                >
+                  {{ col.nome }}
+                </span>
+              </div>
             </div>
-          </div>
             <div v-else class="prontidao-concluida">
-              <svg class="mini-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
               <span>Todas as colunas obrigatórias (NOT NULL) da tabela Silver foram preenchidas. Esta fonte está apta para ingestão!</span>
             </div>
           </template>
@@ -2160,83 +2133,29 @@ function remover(id) {
 .card-prontidao-ingestao {
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 1.15rem 1.35rem;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
+  border-radius: 10px;
+  padding: 0.85rem 1.15rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
-.prontidao-topo {
+.prontidao-carregando {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.prontidao-status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.badge-prontidao-liberada {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.badge-prontidao-bloqueada {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fde68a;
-}
-
-.prontidao-contador {
-  font-size: 0.86rem;
-  color: #475569;
-}
-
-.prontidao-contador strong {
-  color: #0f172a;
-}
-
-.barra-prontidao-trilho {
-  width: 100%;
-  height: 8px;
-  background: #f1f5f9;
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.barra-prontidao-preenchimento {
-  height: 100%;
-  background: linear-gradient(90deg, #f59e0b, #d97706);
-  border-radius: 9999px;
-  transition: width 0.3s ease;
-}
-
-.barra-prontidao-preenchimento--completo {
-  background: linear-gradient(90deg, #10b981, #059669);
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: #64748b;
 }
 
 .prontidao-pendencias {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .prontidao-aviso-texto {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: #64748b;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .chips-colunas-pendentes {
@@ -2258,17 +2177,9 @@ function remover(id) {
 }
 
 .prontidao-concluida {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   font-size: 0.82rem;
   font-weight: 600;
   color: #047857;
-}
-
-.prontidao-concluida .mini-svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
+  line-height: 1.45;
 }
 </style>
