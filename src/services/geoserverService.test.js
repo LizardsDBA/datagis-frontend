@@ -84,11 +84,12 @@ describe('geoserverService', () => {
   })
 
   it('identifica o item sob o ponto clicado (lon lat)', async () => {
-    apiFetch.mockResolvedValue(resposta('{"features":[{"properties":{"COD_NATURAL":"4106902"}}]}'))
+    apiFetch.mockResolvedValue(resposta('{"features":[{"properties":{"COD_NATURAL":"4106902","ROTULO":"Curitiba"}}]}'))
 
-    const codigo = await identificarNoPonto('datagis:vw_mapa_municipio', -49.27, -25.43)
+    const item = await identificarNoPonto('datagis:vw_mapa_municipio', -49.27, -25.43)
 
-    expect(codigo).toBe('4106902')
+    expect(item).toEqual({ codigo: '4106902', rotulo: 'Curitiba' })
+    expect(parametrosChamados().params.get('PROPERTYNAME')).toBe('COD_NATURAL,ROTULO')
     // SRID explícito: sem ele o GeoServer lê o EPSG:4674 como lat/lon e o clique não acha nada.
     expect(parametrosChamados().params.get('CQL_FILTER')).toBe('INTERSECTS(GEOMETRIA, SRID=4326;POINT(-49.27 -25.43))')
   })
