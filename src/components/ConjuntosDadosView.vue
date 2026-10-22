@@ -23,6 +23,7 @@ import {
 import ModalVisualizarGeometria from './ModalVisualizarGeometria.vue'
 import ModalRegistroCamada from './ModalRegistroCamada.vue'
 import ModalComparacaoCamadas from './ModalComparacaoCamadas.vue'
+import ModalComparacaoLotes from './ModalComparacaoLotes.vue'
 import { temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 
@@ -64,6 +65,7 @@ const quarentenaCarregada = ref(false)
 const modalGeometria = ref(null) // { titulo, wkt }
 const modalRegistro = ref(null) // { titulo, dados, mensagemVazio }
 const modalComparacao = ref(null) // { registroBrutoId, parInicial }
+const modalComparacaoLotes = ref(false)
 
 const totalPaginas = computed(() => Math.max(1, Math.ceil(total.value / TAMANHO_PAGINA)))
 
@@ -229,7 +231,17 @@ onMounted(async () => {
   <div class="pagina-conjunto-dados">
     <header class="topo-pagina">
       <p class="etiqueta">CONJUNTO DE DADOS</p>
-      <h1 class="titulo">{{ loteResumo?.fonteDadoNomeExibicao || 'Carregando…' }}</h1>
+      <div class="topo-titulo-linha">
+        <h1 class="titulo">{{ loteResumo?.fonteDadoNomeExibicao || 'Carregando…' }}</h1>
+        <button
+          v-if="loteResumo"
+          class="botao-comparar-lotes"
+          title="Comparar com o lote anterior (diff entre lotes)"
+          @click="modalComparacaoLotes = true"
+        >
+          ⇄ Comparar lotes
+        </button>
+      </div>
       <p v-if="loteResumo" class="subtitulo">
         Lote #{{ loteResumo.loteId }} — {{ loteResumo.quantidadeRegistros }} registros —
         promovido em {{ formatarData(loteResumo.dataExecucao) }}
@@ -353,6 +365,13 @@ onMounted(async () => {
       :par-inicial="modalComparacao.parInicial"
       @fechar="modalComparacao = null"
     />
+
+    <ModalComparacaoLotes
+      v-if="modalComparacaoLotes"
+      :fonte-dado-id="Number(fonteId)"
+      :fonte-dado-nome="loteResumo?.fonteDadoNomeExibicao || ''"
+      @fechar="modalComparacaoLotes = false"
+    />
   </div>
 </template>
 
@@ -382,6 +401,33 @@ onMounted(async () => {
   font-size: 1.5rem;
   color: #0f172a;
   margin: 0;
+}
+
+.topo-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.botao-comparar-lotes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.botao-comparar-lotes:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
 }
 
 .subtitulo {
@@ -550,6 +596,16 @@ onMounted(async () => {
 
 :root[data-tema="escuro"] .titulo {
   color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .botao-comparar-lotes {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .botao-comparar-lotes:hover {
+  background: var(--cor-primaria-borda);
 }
 
 :root[data-tema="escuro"] .subtitulo {
