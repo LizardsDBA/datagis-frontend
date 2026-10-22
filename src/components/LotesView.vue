@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { buscarLotes, liberarLote, descartarLote } from '../services/loteService'
+import { buscarLotes, liberarLote, descartarLote, obterProgressoLote } from '../services/loteService'
 import { publicarGold, obterStatusGold } from '../services/goldService'
 import { temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
@@ -109,6 +109,7 @@ function fecharModalLiberacao() {
     clearInterval(timerProgresso)
     timerProgresso = null
   }
+  sessionStorage.removeItem('datagis_lote_liberando_id')
   loteParaLiberar.value = null
   faseLiberacao.value = 'CONFIRMACAO'
   progressoPercentual.value = 0
@@ -129,53 +130,103 @@ async function confirmarLiberacao() {
   if (!loteParaLiberar.value) return
 
   faseLiberacao.value = 'PROCESSANDO'
-  progressoPercentual.value = 14
+  progressoPercentual.value = 10
   etapaAtual.value = 1
   mensagemErroLiberacao.value = ''
 
-  const inicio = Date.now()
-  timerProgresso = setInterval(() => {
-    const decorrido = Date.now() - inicio
-    if (decorrido < 1000) {
-      progressoPercentual.value = Math.min(30, progressoPercentual.value + 4)
-      etapaAtual.value = 1
-    } else if (decorrido < 2500) {
-      progressoPercentual.value = Math.min(62, progressoPercentual.value + 3)
-      etapaAtual.value = 2
-    } else if (decorrido < 6000) {
-      progressoPercentual.value = Math.min(90, progressoPercentual.value + 2)
-      etapaAtual.value = 3
-    }
-  }, 220)
+  if (timerProgresso) {
+    clearInterval(timerProgresso)
+    timerProgresso = null
+  }
 
   const loteIdAlvo = loteParaLiberar.value.id
+  sessionStorage.setItem('datagis_lote_liberando_id', String(loteIdAlvo))
+
   try {
-    await liberarLote(loteIdAlvo)
+    const resposta = await liberarLote(loteIdAlvo)
 
-    if (timerProgresso) clearInterval(timerProgresso)
-    progressoPercentual.value = 100
-    etapaAtual.value = 4
-    faseLiberacao.value = 'SUCESSO'
-
-    const item = lotes.value.find(l => l.id === loteIdAlvo)
-    if (item) {
-      item.status = 'PROMOVIDO_SILVER'
+    if (resposta?.statusFinal === 'PROMOVIDO_SILVER' || resposta?.fase === 'CONCLUIDO') {
+      finalizarLiberacaoSucesso(loteIdAlvo)
+      return
     }
-    sucesso.value = `Pronto! O lote #${loteIdAlvo} foi para a Silver.`
 
-    carregarLotes()
-
-    setTimeout(() => {
-      if (faseLiberacao.value === 'SUCESSO' && loteParaLiberar.value?.id === loteIdAlvo) {
-        fecharModalLiberacao()
-      }
-    }, 1800)
+    iniciarPollingLiberacao(loteIdAlvo)
   } catch (e) {
-    if (timerProgresso) clearInterval(timerProgresso)
+    sessionStorage.removeItem('datagis_lote_liberando_id')
+    if (timerProgresso) {
+      clearInterval(timerProgresso)
+      timerProgresso = null
+    }
     faseLiberacao.value = 'ERRO'
     mensagemErroLiberacao.value = e.message || 'Não foi possível enviar o lote para a Silver.'
     carregarLotes()
   }
+}
+
+function finalizarLiberacaoSucesso(loteIdAlvo) {
+  if (timerProgresso) {
+    clearInterval(timerProgresso)
+    timerProgresso = null
+  }
+  sessionStorage.removeItem('datagis_lote_liberando_id')
+  progressoPercentual.value = 100
+  etapaAtual.value = 4
+  faseLiberacao.value = 'SUCESSO'
+
+  const item = lotes.value.find(l => l.id === loteIdAlvo)
+  if (item) {
+    item.status = 'PROMOVIDO_SILVER'
+  }
+  sucesso.value = `Pronto! O lote #${loteIdAlvo} foi para a Silver.`
+
+  carregarLotes()
+
+  setTimeout(() => {
+    if (faseLiberacao.value === 'SUCESSO' && loteParaLiberar.value?.id === loteIdAlvo) {
+      fecharModalLiberacao()
+    }
+  }, 1800)
+}
+
+function iniciarPollingLiberacao(loteIdAlvo) {
+  if (timerProgresso) {
+    clearInterval(timerProgresso)
+    timerProgresso = null
+  }
+
+  timerProgresso = setInterval(async () => {
+    try {
+      const prog = await obterProgressoLote(loteIdAlvo)
+      if (!prog) return
+
+      if (prog.percentual > 0) {
+        progressoPercentual.value = Math.max(progressoPercentual.value, prog.percentual)
+      }
+
+      if (prog.fase === 'REVALIDANDO_QUARENTENA' || prog.fase === 'INICIANDO') {
+        etapaAtual.value = 1
+      } else if (prog.fase === 'CARREGANDO_BRONZE' || prog.fase === 'EXECUTANDO_REGRAS') {
+        etapaAtual.value = 2
+      } else if (prog.fase === 'PERSISTINDO_SILVER') {
+        etapaAtual.value = 3
+      }
+
+      if (prog.statusFinal === 'PROMOVIDO_SILVER' || prog.fase === 'CONCLUIDO') {
+        finalizarLiberacaoSucesso(loteIdAlvo)
+      } else if (prog.statusFinal === 'RETIDO_QUARENTENA' || prog.fase === 'CONCLUIDO_COM_ERROS' || prog.fase === 'FALHA') {
+        if (timerProgresso) {
+          clearInterval(timerProgresso)
+          timerProgresso = null
+        }
+        sessionStorage.removeItem('datagis_lote_liberando_id')
+        faseLiberacao.value = 'ERRO'
+        mensagemErroLiberacao.value = prog.detalhe || 'O lote contém inconsistências e permaneceu retido na Quarentena.'
+        carregarLotes()
+      }
+    } catch (e) {
+      // Falha temporária de rede durante polling
+    }
+  }, 1000)
 }
 
 function abrirModalDescarte(lote) {
@@ -221,14 +272,26 @@ const resultadoPublicacaoTudo = ref(null)
 const erroGold = ref('')
 let timerPollingGold = null
 
-function abrirModalGold() {
+async function abrirModalGold() {
   if (lotesNaSilver.value.length === 0) {
     erro.value = 'Nenhum lote com status PROMOVIDO_SILVER disponível para migração para a Gold.'
     return
   }
 
+  try {
+    const status = await obterStatusGold()
+    statusGold.value = status
+    if (status?.algumEmAndamento) {
+      faseGold.value = 'PROCESSANDO'
+      modalGoldAberto.value = true
+      iniciarPollingGold()
+      return
+    }
+  } catch (e) {
+    // ignora falha inicial de status
+  }
+
   faseGold.value = 'CONFIRMACAO'
-  statusGold.value = null
   resultadoPublicacaoTudo.value = null
   erroGold.value = ''
   modalGoldAberto.value = true
@@ -243,52 +306,117 @@ function fecharModalGold() {
   modalGoldAberto.value = false
 }
 
+function iniciarPollingGold() {
+  if (timerPollingGold) {
+    clearInterval(timerPollingGold)
+    timerPollingGold = null
+  }
+
+  timerPollingGold = setInterval(async () => {
+    try {
+      const status = await obterStatusGold()
+      statusGold.value = status
+
+      const emAndamento = status?.algumEmAndamento ?? (status?.indicadores?.status === 'EM_ANDAMENTO')
+      if (!emAndamento) {
+        if (timerPollingGold) {
+          clearInterval(timerPollingGold)
+          timerPollingGold = null
+        }
+
+        if (status?.indicadores?.status === 'FALHOU') {
+          faseGold.value = 'ERRO'
+          erroGold.value = status?.indicadores?.mensagemErro || 'Falha ao executar a migração para a camada Gold.'
+        } else {
+          faseGold.value = 'SUCESSO'
+          sucesso.value = 'Pronto! A migração para a camada Gold foi concluída e os dados foram consolidados com sucesso.'
+          await carregarLotes()
+        }
+      }
+    } catch (e) {
+      // ignora falhas intermediárias de polling
+    }
+  }, 2000)
+}
+
 async function confirmarPublicacaoGold() {
   faseGold.value = 'PROCESSANDO'
   erroGold.value = ''
 
   try {
-    statusGold.value = await obterStatusGold()
+    const res = await publicarGold()
+    statusGold.value = res
+    if (res?.totalImoveis !== undefined) {
+      resultadoPublicacaoTudo.value = res
+    }
+
+    if (res && (res.totalImoveis !== undefined || (res.algumEmAndamento === false && res.indicadores?.status === 'CONCLUIDA'))) {
+      faseGold.value = 'SUCESSO'
+      sucesso.value = 'Pronto! A migração para a camada Gold foi concluída e os dados foram consolidados com sucesso.'
+      await carregarLotes()
+      return
+    }
   } catch (e) {
-    // ignora falha inicial de status
+    faseGold.value = 'ERRO'
+    erroGold.value = e.message || 'Falha ao iniciar a migração para a camada Gold.'
+    return
   }
 
-  timerPollingGold = setInterval(async () => {
-    try {
-      statusGold.value = await obterStatusGold()
-    } catch (e) {
-      // ignora falhas intermediarias de polling
-    }
-  }, 2000)
+  iniciarPollingGold()
+}
 
+async function verificarStatusGoldAtivo() {
   try {
-    const res = await publicarGold()
-    if (timerPollingGold) {
-      clearInterval(timerPollingGold)
-      timerPollingGold = null
+    const status = await obterStatusGold()
+    if (status?.algumEmAndamento) {
+      statusGold.value = status
+      faseGold.value = 'PROCESSANDO'
+      modalGoldAberto.value = true
+      iniciarPollingGold()
     }
-    resultadoPublicacaoTudo.value = res
-    faseGold.value = 'SUCESSO'
-    sucesso.value = 'Pronto! A migração para a camada Gold foi concluída e os dados foram consolidados com sucesso.'
-    await carregarLotes()
   } catch (e) {
-    if (timerPollingGold) {
-      clearInterval(timerPollingGold)
-      timerPollingGold = null
-    }
-    faseGold.value = 'ERRO'
-    erroGold.value = e.message || 'Falha ao executar a migração para a camada Gold.'
+    // ignora falhas transitórias de verificação inicial
   }
 }
 
-onMounted(() => {
-  carregarLotes()
+async function verificarLoteLiberandoAtivo() {
+  const loteIdSalvo = sessionStorage.getItem('datagis_lote_liberando_id')
+  if (!loteIdSalvo) return
+
+  try {
+    const idNum = Number(loteIdSalvo)
+    const prog = await obterProgressoLote(idNum)
+    if (prog && prog.fase !== 'OCIOSO' && !prog.concluidoEm) {
+      const loteObj = lotes.value.find(l => l.id === idNum) || { id: idNum, fonteDadoNome: `Lote #${idNum}` }
+      loteParaLiberar.value = loteObj
+      faseLiberacao.value = 'PROCESSANDO'
+      progressoPercentual.value = prog.percentual || 10
+      if (prog.fase === 'PERSISTINDO_SILVER') etapaAtual.value = 3
+      else if (prog.fase === 'CARREGANDO_BRONZE' || prog.fase === 'EXECUTANDO_REGRAS') etapaAtual.value = 2
+      else etapaAtual.value = 1
+      iniciarPollingLiberacao(idNum)
+    } else {
+      sessionStorage.removeItem('datagis_lote_liberando_id')
+    }
+  } catch (e) {
+    sessionStorage.removeItem('datagis_lote_liberando_id')
+  }
+}
+
+onMounted(async () => {
+  await carregarLotes()
+  await verificarStatusGoldAtivo()
+  await verificarLoteLiberandoAtivo()
 })
 
 onUnmounted(() => {
   if (timerPollingGold) {
     clearInterval(timerPollingGold)
     timerPollingGold = null
+  }
+  if (timerProgresso) {
+    clearInterval(timerProgresso)
+    timerProgresso = null
   }
 })
 </script>

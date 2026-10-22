@@ -26,7 +26,7 @@ export async function liberarLote(loteId, analistaId = 1) {
     const data = await resp.json().catch(() => null)
     throw new Error(data?.erro || 'Falha ao liberar lote para a Silver')
   }
-  return true
+  return resp.json().catch(() => ({ status: 'INICIANDO', percentual: 0 }))
 }
 
 export async function descartarLote(loteId, motivo, analistaId = 1) {
@@ -41,3 +41,21 @@ export async function descartarLote(loteId, motivo, analistaId = 1) {
   }
   return true
 }
+
+export async function obterProgressoLote(loteId) {
+  const resp = await apiFetch(`/api/lotes/${loteId}/progresso`)
+  if (!resp.ok) throw new Error(`Falha ao obter progresso do lote #${loteId}: ${resp.statusText}`)
+  return resp.json()
+}
+
+export async function reprocessarLote(loteId) {
+  const resp = await apiFetch(`/api/lotes/${loteId}/reprocessar`, {
+    method: 'POST',
+  })
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => null)
+    throw new Error(data?.erro || `Falha ao reprocessar lote #${loteId}`)
+  }
+  return resp.json().catch(() => ({ status: 'INICIANDO', percentual: 0 }))
+}
+

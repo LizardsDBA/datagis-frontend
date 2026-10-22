@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import Sidebar from './components/Sidebar.vue'
+import PainelMonitoramentoGlobal from './components/PainelMonitoramentoGlobal.vue'
 
 const menuAberto = ref(false)
 const route = useRoute()
@@ -56,6 +57,9 @@ function obterNomePagina() {
         </div>
       </main>
     </div>
+
+    <!-- Painel Global de Monitoramento de Migrações e Ingestões -->
+    <PainelMonitoramentoGlobal />
   </div>
 </template>
 
