@@ -14,6 +14,8 @@ vi.mock('../auth/autenticacao', () => ({
   nomeDoPerfil: (c) => c.replace('perfil-', ''),
   sair: vi.fn(),
 }))
+const rotaAtual = vi.hoisted(() => ({ path: '/' }))
+vi.mock('vue-router', () => ({ useRoute: () => rotaAtual }))
 vi.mock('../tema', async () => {
   const { reactive } = await import('vue')
   const estadoTema = reactive({ atual: 'claro' })
@@ -30,6 +32,8 @@ function montar() {
 }
 
 beforeEach(() => {
+  rotaAtual.path = '/'
+  sessaoTeste.permissoes = []
   estadoTema.atual = 'claro'
   vi.mocked(alternarTema).mockClear()
 })
@@ -77,5 +81,37 @@ describe('Sidebar — botão de tema no rodapé', () => {
 
     await botao.trigger('click')
     expect(sair).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Sidebar — Indicadores e Resultados: um item para o mapa e a tabela (LIZARDS-35)', () => {
+  const TODAS = ['conjunto:visualizar', 'indicador:visualizar']
+
+  it('um só item "Indicadores e Resultados", que leva ao mapa', () => {
+    sessaoTeste.permissoes = TODAS
+    const wrapper = montar()
+
+    const item = wrapper.findAllComponents(RouterLinkStub).find((l) => l.props('to') === '/conjuntos')
+    expect(item.text()).toContain('Indicadores e Resultados')
+    expect(wrapper.text()).not.toContain('Conjuntos e Cobertura')
+    expect(wrapper.text().match(/Indicadores e Resultados/g)).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('Publicação & Resultados')
+    expect(wrapper.findAllComponents(RouterLinkStub).map((l) => l.props('to'))).not.toContain('/indicadores')
+  })
+
+  it('com a tabela aberta, o item continua marcado no menu', () => {
+    sessaoTeste.permissoes = TODAS
+    rotaAtual.path = '/indicadores'
+    const item = montar().findAllComponents(RouterLinkStub).find((l) => l.props('to') === '/conjuntos')
+
+    expect(item.classes()).toContain('item-menu--ativo')
+  })
+
+  it('em outra tela, o item não fica marcado por relação', () => {
+    sessaoTeste.permissoes = TODAS
+    rotaAtual.path = '/fontes'
+    const item = montar().findAllComponents(RouterLinkStub).find((l) => l.props('to') === '/conjuntos')
+
+    expect(item.classes()).not.toContain('item-menu--ativo')
   })
 })
