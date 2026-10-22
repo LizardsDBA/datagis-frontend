@@ -140,10 +140,10 @@ describe('CadastroFontes — bloqueio de execução por mapeamento incompleto', 
         expect(botoes[2].attributes('disabled')).toBeDefined()
         expect(botoes[2].attributes('title')).toContain('Mapeamento incompleto')
 
-        // Badges na tabela
+        // Badges na tabela: apenas fontes incompletas exibem aviso (fonte OK não exibe nada)
         const badges = wrapper.findAll('.badge-mapeamento-status')
-        expect(badges[0].text()).toContain('Mapeamento OK')
-        expect(badges[1].text()).toContain('Mapeamento Incompleto (2/5)')
-        expect(badges[2].text()).toContain('Mapeamento Incompleto (1/4)')
+        expect(badges).toHaveLength(2)
+        expect(badges[0].text()).toContain('Mapeamento Incompleto (2/5)')
+        expect(badges[1].text()).toContain('Mapeamento Incompleto (1/4)')
     })
 })

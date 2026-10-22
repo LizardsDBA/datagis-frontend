@@ -152,6 +152,29 @@ function iniciarSondagemDeProgresso(fonte) {
       est.totalEstimado = corpo.totalEstimado
       est.percentual = corpo.percentual
       est.detalhe = corpo.detalhe
+
+      if (corpo.fase === 'CONCLUIDO') {
+        pararSondagemDeProgresso(fonte)
+        if (est.cronometro) {
+          clearInterval(est.cronometro)
+          est.cronometro = null
+        }
+        est.estado = 'sucesso'
+        est.resultado = {
+          quantidadeRegistros: corpo.registrosProcessados,
+          status: 'CONCLUIDO',
+        }
+        await carregarFontes()
+      } else if (corpo.fase === 'ERRO') {
+        pararSondagemDeProgresso(fonte)
+        if (est.cronometro) {
+          clearInterval(est.cronometro)
+          est.cronometro = null
+        }
+        est.estado = 'erro'
+        est.erro = corpo.detalhe || 'Falha na ingestão da fonte.'
+        await carregarFontes()
+      }
     } catch (e) {
       // Sondagem e so cosmetica - uma falha aqui nao deve interromper a execucao real.
     }
@@ -171,10 +194,38 @@ async function carregarFontes() {
   try {
     const resposta = await apiFetch('/api/fontes')
     fontes.value = await resposta.json()
+    verificarExecucoesAtivas(fontes.value)
   } catch (e) {
     erro.value = 'Não deu pra carregar a lista de fontes.'
   } finally {
     carregandoLista.value = false
+  }
+}
+
+async function verificarExecucoesAtivas(listaFontes) {
+  if (!listaFontes || !Array.isArray(listaFontes)) return
+  for (const fonte of listaFontes) {
+    try {
+      const resp = await apiFetch(`/api/fontes/${fonte.id}/progresso`)
+      if (resp.ok) {
+        const progresso = await resp.json()
+        if (progresso.fase && progresso.fase !== 'CONCLUIDO' && progresso.fase !== 'ERRO' && progresso.fase !== 'OCIOSO') {
+          const est = estadoDe(fonte.id)
+          est.estado = 'executando'
+          est.fase = progresso.fase
+          est.registrosProcessados = progresso.registrosProcessados || 0
+          est.totalEstimado = progresso.totalEstimado || null
+          est.percentual = progresso.percentual || null
+          est.detalhe = progresso.detalhe || null
+          if (!est.cronometro) {
+            est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
+          }
+          iniciarSondagemDeProgresso(fonte)
+        }
+      }
+    } catch (e) {
+      // ignora falhas transitórias
+    }
   }
 }
 
@@ -230,6 +281,7 @@ async function executar(fonte) {
   est.erro = null
   est.segundos = 0
   zerarProgresso(est)
+  if (est.cronometro) clearInterval(est.cronometro)
   est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
   iniciarSondagemDeProgresso(fonte)
 
@@ -239,14 +291,23 @@ async function executar(fonte) {
     if (!resposta.ok) {
       throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)
     }
-    est.resultado = corpo
-    est.estado = 'sucesso'
+    if (resposta.status === 200 && corpo?.quantidadeRegistros !== undefined) {
+      est.resultado = corpo
+      est.estado = 'sucesso'
+      pararSondagemDeProgresso(fonte)
+      if (est.cronometro) {
+        clearInterval(est.cronometro)
+        est.cronometro = null
+      }
+      await carregarFontes()
+    }
   } catch (e) {
     est.erro = e.message
     est.estado = 'erro'
-  } finally {
-    clearInterval(est.cronometro)
-    est.cronometro = null
+    if (est.cronometro) {
+      clearInterval(est.cronometro)
+      est.cronometro = null
+    }
     pararSondagemDeProgresso(fonte)
     await carregarFontes()
   }
@@ -276,6 +337,7 @@ function enviarUpload(fonte, arquivo) {
   est.segundos = 0
   zerarProgresso(est)
   est.progressoUploadPct = 0
+  if (est.cronometro) clearInterval(est.cronometro)
   est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
 
   return new Promise((resolve) => {
@@ -294,8 +356,10 @@ function enviarUpload(fonte, arquivo) {
     }
 
     const finalizar = async (sucesso, resultadoOuErro) => {
-      clearInterval(est.cronometro)
-      est.cronometro = null
+      if (est.cronometro) {
+        clearInterval(est.cronometro)
+        est.cronometro = null
+      }
       pararSondagemDeProgresso(fonte)
       if (sucesso) {
         est.resultado = resultadoOuErro
@@ -314,7 +378,11 @@ function enviarUpload(fonte, arquivo) {
         corpo = JSON.parse(xhr.responseText)
       } catch (e) {}
       if (xhr.status >= 200 && xhr.status < 300) {
-        finalizar(true, corpo)
+        if (xhr.status === 200 && corpo?.quantidadeRegistros !== undefined) {
+          finalizar(true, corpo)
+        } else {
+          iniciarSondagemDeProgresso(fonte)
+        }
       } else {
         finalizar(false, corpo?.erro || `O servidor respondeu HTTP ${xhr.status}`)
       }
@@ -610,26 +678,18 @@ onUnmounted(() => {
                   <div class="fonte-orgao-texto">
                     {{ fonte.orgao ? 'Órgão: ' + fonte.orgao : 'Sem órgão informado' }}
                   </div>
-                  <!-- Indicador de Status do Mapeamento Silver -->
-                  <div class="linha-status-silver">
+                  <!-- Indicador de Status do Mapeamento Silver (exibido apenas quando pendente) -->
+                  <div v-if="!fonte.mapeamentoCompleto || !fonte.entidadeSilver" class="linha-status-silver">
                     <span
                       v-if="fonte.entidadeSilver"
-                      class="badge-mapeamento-status"
-                      :class="fonte.mapeamentoCompleto ? 'badge-mapeamento--ok' : 'badge-mapeamento--pendente'"
-                      :title="
-                        fonte.mapeamentoCompleto
-                          ? 'Mapeamento completo (' + fonte.totalColunasMapeadas + '/' + fonte.totalColunasSilver + ' colunas). Ingestão liberada.'
-                          : 'Mapeamento incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ' colunas). Faltam: ' + (fonte.colunasSilverFaltantes?.join(', ') || 'colunas') + '. Ingestão bloqueada.'
-                      "
+                      class="badge-mapeamento-status badge-mapeamento--pendente"
+                      :title="'Mapeamento incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ' colunas). Faltam: ' + (fonte.colunasSilverFaltantes?.join(', ') || 'colunas') + '. Ingestão bloqueada.'"
                     >
-                      <svg v-if="fonte.mapeamentoCompleto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                         <circle cx="12" cy="12" r="10" />
                         <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                       </svg>
-                      {{ fonte.mapeamentoCompleto ? 'Mapeamento OK' : 'Mapeamento Incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ')' }}
+                      Mapeamento Incompleto ({{ fonte.totalColunasMapeadas || 0 }}/{{ fonte.totalColunasSilver || 0 }})
                     </span>
                     <span v-else class="badge-mapeamento-status badge-mapeamento--sem-silver" title="Defina a tabela Silver no mapeamento para liberar a ingestão">
                       Sem Tabela Silver
