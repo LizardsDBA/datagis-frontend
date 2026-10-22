@@ -4,7 +4,7 @@
  * (LIZARDS-30). Exibe um diff no estilo GitHub: registros adicionados,
  * removidos, modificados e inalterados, com paginação e filtros por situação.
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { buscarComparacaoLotes } from '../services/conjuntosDadosService'
 
 const props = defineProps({
@@ -141,6 +141,28 @@ function rotuloSituacao(situacao) {
   }
 }
 
+/** Removido só existe no lote anterior; os demais são lidos do lote atual. */
+function idDoRegistro(reg) {
+  return reg.situacao === 'REMOVIDO' ? reg.registroBrutoIdAnterior : reg.registroBrutoIdAtual
+}
+
+/** Linha no arquivo de origem; a linha 0 é válida (não pode sumir por ser "falsa"). */
+function linhaDoRegistro(reg) {
+  const linha = reg.situacao === 'REMOVIDO' ? reg.numeroLinhaAnterior : reg.numeroLinhaAtual
+  return linha ?? null
+}
+
+/** Texto ao lado do título: com chave, "registro #11 · linha 0"; sem chave, "(linha 0)". */
+function referenciaDoRegistro(reg) {
+  const linha = linhaDoRegistro(reg)
+  if (!reg.chave) return linha != null ? `(linha ${linha})` : ''
+  return [`registro #${idDoRegistro(reg)}`, linha != null ? `linha ${linha}` : null].filter(Boolean).join(' · ')
+}
+
+function fecharComEsc(evento) {
+  if (evento.key === 'Escape') emit('fechar')
+}
+
 function colunasDoRegistro(reg) {
   const chaves = new Set()
   if (reg.dadosAtual) Object.keys(reg.dadosAtual).forEach((k) => chaves.add(k))
@@ -148,7 +170,11 @@ function colunasDoRegistro(reg) {
   return Array.from(chaves)
 }
 
-onMounted(carregar)
+onMounted(() => {
+  window.addEventListener('keydown', fecharComEsc)
+  carregar()
+})
+onUnmounted(() => window.removeEventListener('keydown', fecharComEsc))
 </script>
 
 <template>
@@ -230,15 +256,10 @@ onMounted(carregar)
             <span class="indicador-situacao" :class="classeSituacao(reg.situacao)">
               {{ iconeSituacao(reg.situacao) }}
             </span>
-            <span class="titulo-item">
-              <template v-if="reg.situacao === 'REMOVIDO'">
-                Registro #{{ reg.registroBrutoIdAnterior }}
-                <span v-if="reg.numeroLinhaAnterior" class="numero-linha">(linha {{ reg.numeroLinhaAnterior }})</span>
-              </template>
-              <template v-else>
-                Registro #{{ reg.registroBrutoIdAtual }}
-                <span v-if="reg.numeroLinhaAtual" class="numero-linha">(linha {{ reg.numeroLinhaAtual }})</span>
-              </template>
+            <!-- O título é a chave natural (ex.: código CAR): é por ela que o usuário reconhece
+                 o registro. O id interno e a linha ficam ao lado, só como referência. -->
+            <span class="titulo-item" :title="comparacao.campoChave && reg.chave ? `${comparacao.campoChave}: ${reg.chave}` : ''">
+              {{ reg.chave || `Registro #${idDoRegistro(reg)}` }}<span v-if="referenciaDoRegistro(reg)" class="numero-linha">{{ referenciaDoRegistro(reg) }}</span>
             </span>
             <span class="badge-situacao" :class="classeSituacao(reg.situacao)">
               {{ rotuloSituacao(reg.situacao) }}
@@ -649,6 +670,7 @@ onMounted(carregar)
 }
 
 .numero-linha {
+  margin-left: 0.5rem;
   font-weight: 400;
   color: #94a3b8;
 }
@@ -741,6 +763,14 @@ onMounted(carregar)
   font-weight: 600;
   white-space: nowrap;
   width: 1%;
+}
+
+/* A regra das células (pre-wrap + break-all, para valores longos como a geometria) é mais
+   específica que .celula-campo e quebrava o nome do campo no meio ("dat_ / cria / cao"). */
+.tabela-diff-campos td.celula-campo,
+.tabela-dados-registro td.celula-campo {
+  white-space: nowrap;
+  word-break: normal;
 }
 
 .celula-valor--del {
