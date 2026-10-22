@@ -404,36 +404,41 @@ function formatarFase(fase) {
   font-family: inherit;
 }
 
-/* Pílula Minimizada */
+/* Pílula Minimizada (Estilo DataGIS - Clean White & Agroambiental) */
 .pill-minimizada {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 44px;
+  height: 42px;
   padding: 0 16px;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: 9999px;
-  color: #f1f5f9;
-  font-size: 0.85rem;
-  font-weight: 500;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(14px);
+  color: #1e293b;
+  font-size: 0.84rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
 .pill-minimizada:hover {
-  background: rgba(30, 41, 59, 0.96);
-  border-color: rgba(255, 255, 255, 0.24);
+  background: #f8fafc;
+  border-color: #94a3b8;
   transform: translateY(-2px);
-  box-shadow: 0 14px 30px -4px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
 .pill--ativa {
-  border-color: rgba(16, 185, 129, 0.4);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 16px rgba(16, 185, 129, 0.25);
+  border-color: #86efac;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.15), 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+.pill--ativa:hover {
+  border-color: #4ade80;
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.2), 0 0 0 3px rgba(34, 197, 94, 0.15);
 }
 
 .pill-icone-status {
@@ -441,11 +446,11 @@ function formatarFase(fase) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #38bdf8;
+  color: #15803d;
 }
 
 .pill--ativa .pill-icone-status {
-  color: #34d399;
+  color: #16a34a;
 }
 
 .pulso-ativo {
@@ -453,8 +458,8 @@ function formatarFase(fase) {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: #10b981;
-  opacity: 0.6;
+  background: #22c55e;
+  opacity: 0.5;
   animation: pulso-onda 2s infinite;
 }
 
@@ -464,8 +469,8 @@ function formatarFase(fase) {
 }
 
 .icone-pill {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 
 .pill-texto {
@@ -479,33 +484,32 @@ function formatarFase(fase) {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  background: #10b981;
-  color: #042f2e;
-  font-size: 0.75rem;
+  background: #15803d;
+  color: #ffffff;
+  font-size: 0.72rem;
   font-weight: 700;
   border-radius: 9999px;
 }
 
 .icone-chevron {
-  width: 16px;
-  height: 16px;
-  opacity: 0.6;
+  width: 15px;
+  height: 15px;
+  color: #64748b;
   transition: transform 0.2s ease;
 }
 
 .pill-minimizada:hover .icone-chevron {
-  opacity: 1;
+  color: #0f172a;
 }
 
-/* Card Expandido */
+/* Card Expandido (Estilo DataGIS - Padrão Modal e Containers Brancos) */
 .painel-card {
-  width: 390px;
+  width: 400px;
   max-width: calc(100vw - 32px);
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(20px);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 10px 10px -5px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.03);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -515,70 +519,70 @@ function formatarFase(fase) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(30, 41, 59, 0.4);
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
 .painel-titulo-wrapper {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .ponto-status-topo {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #64748b;
+  background: #94a3b8;
 }
 
 .ponto-status-topo.ponto-ativo {
-  background: #10b981;
-  box-shadow: 0 0 10px #10b981;
+  background: #16a34a;
+  box-shadow: 0 0 0 3px #dcfce7;
 }
 
 .painel-titulo {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 700;
-  color: #f8fafc;
+  color: #0f172a;
 }
 
 .painel-subtitulo {
-  margin: 2px 0 0 0;
-  font-size: 0.75rem;
-  color: #94a3b8;
+  margin: 1px 0 0 0;
+  font-size: 0.73rem;
+  color: #64748b;
 }
 
 .painel-acoes-topo {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .btn-icone-painel {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   background: transparent;
   border: 1px solid transparent;
-  color: #94a3b8;
+  color: #64748b;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
 .btn-icone-painel:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f8fafc;
-  border-color: rgba(255, 255, 255, 0.1);
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #e2e8f0;
 }
 
 .btn-icone-painel svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .girando {
@@ -593,36 +597,37 @@ function formatarFase(fase) {
 /* Abas */
 .painel-abas {
   display: flex;
-  padding: 8px 12px;
-  gap: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(15, 23, 42, 0.6);
+  padding: 6px 12px;
+  gap: 4px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
 .aba-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 9999px;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
   background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 0.78rem;
-  font-weight: 500;
+  border: 1px solid transparent;
+  color: #64748b;
+  font-size: 0.77rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
 .aba-btn:hover {
-  color: #f1f5f9;
-  background: rgba(255, 255, 255, 0.05);
+  color: #1e293b;
+  background: #f1f5f9;
 }
 
 .aba-btn--ativa {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  font-weight: 600;
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .dot-aba {
@@ -630,9 +635,9 @@ function formatarFase(fase) {
   height: 6px;
   border-radius: 50%;
 }
-.dot--bronze { background: #38bdf8; }
-.dot--silver { background: #34d399; }
-.dot--gold { background: #fbbf24; }
+.dot--bronze { background: #d97706; }
+.dot--silver { background: #7c3aed; }
+.dot--gold { background: #15803d; }
 
 .aba-badge {
   display: inline-flex;
@@ -641,33 +646,38 @@ function formatarFase(fase) {
   height: 16px;
   padding: 0 5px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.15);
+  background: #f1f5f9;
+  color: #475569;
   font-size: 0.68rem;
   font-weight: 700;
 }
-.aba-badge--bronze { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
-.aba-badge--silver { background: rgba(52, 211, 153, 0.2); color: #34d399; }
-.aba-badge--gold { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+.aba-badge--bronze { background: #fef3c7; color: #92400e; }
+.aba-badge--silver { background: #ede9fe; color: #5b21b6; }
+.aba-badge--gold { background: #dcfce7; color: #166534; }
 
 /* Conteúdo */
 .painel-conteudo {
   padding: 14px 16px;
-  max-height: 400px;
+  max-height: 390px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  background: #ffffff;
 }
 
 .painel-conteudo::-webkit-scrollbar {
-  width: 5px;
+  width: 6px;
 }
 .painel-conteudo::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f8fafc;
 }
 .painel-conteudo::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.painel-conteudo::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* Estado Vazio */
@@ -676,33 +686,33 @@ function formatarFase(fase) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px;
+  padding: 36px 16px;
   text-align: center;
-  color: #64748b;
 }
 
 .icone-vazio {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   margin-bottom: 8px;
-  opacity: 0.7;
+  color: #94a3b8;
 }
 
 .vazio-titulo {
   margin: 0;
   font-size: 0.88rem;
-  font-weight: 600;
-  color: #94a3b8;
+  font-weight: 700;
+  color: #334155;
 }
 
 .vazio-sub {
-  margin-top: 4px;
-  font-size: 0.75rem;
+  margin-top: 3px;
+  font-size: 0.76rem;
+  color: #64748b;
 }
 
 /* Divisores de Seção */
 .secao-divider {
-  margin-top: 4px;
+  margin-top: 2px;
   display: flex;
   align-items: center;
 }
@@ -710,26 +720,33 @@ function formatarFase(fase) {
 .secao-tag {
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  padding: 2px 8px;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
   border-radius: 4px;
 }
-.tag--bronze { background: rgba(56, 189, 248, 0.12); color: #38bdf8; }
-.tag--silver { background: rgba(52, 211, 153, 0.12); color: #34d399; }
-.tag--gold { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
+.tag--bronze { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.tag--silver { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+.tag--gold { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
 
 /* Cards de Tarefas */
 .card-tarefa {
-  background: rgba(30, 41, 59, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 12px;
-  transition: all 0.2s ease;
+  padding: 12px 14px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.card-tarefa:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06);
 }
 
 .card-tarefa--executando {
-  border-color: rgba(56, 189, 248, 0.3);
-  background: rgba(30, 41, 59, 0.85);
+  border-color: #86efac;
+  background: #f0fdf4;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.08);
 }
 
 .card-tarefa-topo {
@@ -745,29 +762,29 @@ function formatarFase(fase) {
 }
 
 .tarefa-nome {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #f1f5f9;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .tarefa-fase {
-  font-size: 0.72rem;
-  color: #94a3b8;
+  font-size: 0.73rem;
+  color: #64748b;
   margin-top: 2px;
 }
 
 .tarefa-percentual {
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   font-weight: 700;
-  color: #f8fafc;
+  color: #15803d;
 }
 
 /* Trilho e Barra de Progresso */
 .trilho-progresso {
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: #e2e8f0;
   border-radius: 9999px;
-  margin: 10px 0 8px 0;
+  margin: 9px 0 8px 0;
   overflow: hidden;
 }
 
@@ -778,15 +795,15 @@ function formatarFase(fase) {
 }
 
 .barra--bronze {
-  background: linear-gradient(90deg, #0284c7, #38bdf8);
+  background: linear-gradient(90deg, #d97706, #f59e0b);
 }
 
 .barra--silver {
-  background: linear-gradient(90deg, #059669, #34d399);
+  background: linear-gradient(90deg, #7c3aed, #a855f7);
 }
 
 .barra--gold {
-  background: linear-gradient(90deg, #d97706, #fbbf24);
+  background: linear-gradient(90deg, #15803d, #22c55e);
 }
 
 /* Rodapé do Card */
@@ -799,8 +816,8 @@ function formatarFase(fase) {
 }
 
 .tarefa-detalhe {
-  font-size: 0.72rem;
-  color: #94a3b8;
+  font-size: 0.73rem;
+  color: #64748b;
 }
 
 .botoes-atalho-grupo {
@@ -809,32 +826,33 @@ function formatarFase(fase) {
 }
 
 .btn-atalho-tarefa {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: 6px;
-  color: #cbd5e1;
-  font-size: 0.72rem;
-  font-weight: 500;
-  padding: 3px 8px;
+  color: #15803d;
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 3px 9px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
 .btn-atalho-tarefa:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.25);
+  background: #f0fdf4;
+  border-color: #15803d;
+  color: #166534;
 }
 
 .btn-atalho--alerta {
-  border-color: rgba(248, 113, 113, 0.3);
-  color: #f87171;
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
 }
 
 .btn-atalho--alerta:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: #fee2e2;
   border-color: #ef4444;
-  color: #fca5a5;
+  color: #991b1b;
 }
 
 /* Grid de Camadas Gold */
@@ -843,51 +861,56 @@ function formatarFase(fase) {
   grid-template-columns: repeat(2, 1fr);
   gap: 6px;
   margin: 8px 0;
-  padding: 6px;
-  background: rgba(15, 23, 42, 0.4);
-  border-radius: 6px;
+  padding: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 
 .item-camada-mapa {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.68rem;
+  font-size: 0.70rem;
   padding: 2px 4px;
 }
 
 .camada-nome {
-  color: #94a3b8;
+  color: #334155;
+  font-weight: 500;
 }
 
 .camada-badge {
-  font-size: 0.65rem;
+  font-size: 0.66rem;
   font-weight: 600;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #94a3b8;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
 }
 
 .badge--concluida {
-  background: rgba(52, 211, 153, 0.2);
-  color: #34d399;
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
 }
 
 .badge--andamento {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
 }
 
 /* Transições Vue */
 .painel-slide-enter-active,
 .painel-slide-leave-active {
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .painel-slide-enter-from,
 .painel-slide-leave-to {
   opacity: 0;
-  transform: translateY(12px) scale(0.96);
+  transform: translateY(10px) scale(0.97);
 }
 </style>
