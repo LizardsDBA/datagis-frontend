@@ -104,7 +104,9 @@ export function buscarFeicoesQueCruzam(camada, selecao) {
 }
 
 /**
- * Código do município ou imóvel sob o ponto clicado, ou null.
+ * Município ou imóvel sob o ponto (clique ou mouse parado): `{ codigo, rotulo }`, ou null.
+ * O rótulo é o nome do município (ou o código do imóvel) e serve pra mostrar o nome até
+ * de município que ainda não tem imóvel publicado — esse não está na lista de indicadores.
  *
  * O ponto vai com o SRID explícito (EWKT): no WFS 2.0 o GeoServer lê um POINT sem SRID
  * no sistema da camada, e o EPSG:4674 oficial é latitude-primeiro — POINT(lon lat)
@@ -112,6 +114,8 @@ export function buscarFeicoesQueCruzam(camada, selecao) {
  * entrega de fato (WGS84, lon/lat), e o GeoServer converte sozinho.
  */
 export async function identificarNoPonto(camada, lng, lat) {
-  const geo = await buscarGeoJson(camada, `INTERSECTS(GEOMETRIA, SRID=4326;POINT(${lng} ${lat}))`, 'COD_NATURAL')
-  return geo.features[0]?.properties?.COD_NATURAL ?? null
+  const geo = await buscarGeoJson(camada, `INTERSECTS(GEOMETRIA, SRID=4326;POINT(${lng} ${lat}))`, 'COD_NATURAL,ROTULO')
+  const propriedades = geo.features[0]?.properties
+  if (!propriedades?.COD_NATURAL) return null
+  return { codigo: String(propriedades.COD_NATURAL), rotulo: propriedades.ROTULO ?? null }
 }
