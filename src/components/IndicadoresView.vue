@@ -20,6 +20,9 @@
  * sem ele o pior resultado seria pintado de verde.
  */
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 import { listarTiposIndicador } from '../services/goldService'
 import {
   listarIndicadoresPorImovel,
@@ -27,6 +30,10 @@ import {
 } from '../services/consultaIndicadoresService'
 
 const TAMANHO_PAGINA = 50
+const route = useRoute()
+const router = useRouter()
+// A tabela não tem item de menu: abre pelo "Ver em tabela" do mapa (LIZARDS-35) e este botão volta
+const podeVerMapa = temPermissao(PERMISSOES.CONJUNTO_VISUALIZAR)
 
 const ORDEM_DIMENSOES = ['CONSERVACAO', 'TERRITORIAL', 'AMBIENTAL']
 const ROTULO_DIMENSAO = {
@@ -129,7 +136,44 @@ watch([busca, filtroMunicipioCod], () => {
   pagina.value = 0
 })
 
-onMounted(carregarInicial)
+/**
+ * Vindo do mapa (/conjuntos, LIZARDS-35) com ?municipio=<cod IBGE> ou
+ * ?imovel=<código CAR>: a tela abre já filtrada e com o detalhe do item aberto.
+ * Código que não existe na resposta é ignorado.
+ */
+async function abrirItemDaUrl() {
+  const { municipio, imovel } = route?.query || {}
+  if (imovel) {
+    await carregarImoveis()
+    const achado = (imoveis.value || []).find((i) => i.codImovel === imovel)
+    if (!achado) return
+    visao.value = 'imovel'
+    busca.value = achado.codImovel
+    selecionado.value = { tipo: 'imovel', dado: achado }
+    return
+  }
+  if (municipio) {
+    const achado = municipios.value.find((m) => String(m.codIbge) === String(municipio))
+    if (!achado) return
+    busca.value = achado.nome || String(achado.codIbge)
+    selecionado.value = { tipo: 'municipio', dado: achado }
+  }
+}
+
+/** Volta pro mapa no item aberto (município ou imóvel), ou no recorte inteiro. */
+function verNoMapa() {
+  const { tipo, dado } = selecionado.value
+  let query = {}
+  if (dado && tipo === 'imovel') query = { imovel: dado.codImovel }
+  else if (dado && tipo === 'municipio') query = { municipio: String(dado.codIbge) }
+  else if (visao.value === 'imovel' && filtroMunicipioCod.value) query = { municipio: filtroMunicipioCod.value }
+  router?.push({ path: '/conjuntos', query })
+}
+
+onMounted(async () => {
+  await carregarInicial()
+  await abrirItemDaUrl()
+})
 
 // ------------------------------------------------------------------ indicadores
 
@@ -397,7 +441,18 @@ function chaveDaLinha(linha) {
   <div class="pagina-indicadores">
     <header class="topo-pagina">
       <h1 class="titulo">Indicadores e Resultados</h1>
-      <button class="btn-secundario" :disabled="carregando" @click="atualizar">Atualizar</button>
+      <div class="topo-acoes">
+        <button
+          v-if="podeVerMapa"
+          class="btn-secundario"
+          data-acao="ver-mapa"
+          :title="selecionado.dado ? 'Ver este item no mapa' : 'Ver no mapa'"
+          @click="verNoMapa"
+        >
+          Ver no mapa
+        </button>
+        <button class="btn-secundario" :disabled="carregando" @click="atualizar">Atualizar</button>
+      </div>
     </header>
 
     <section class="faixa-resumo" aria-label="Totais do recorte publicado">
@@ -684,6 +739,11 @@ function chaveDaLinha(linha) {
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+.topo-acoes {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .titulo {
