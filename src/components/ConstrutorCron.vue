@@ -22,12 +22,40 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'update:completo'])
 
 const ligado = ref(Boolean(props.modelValue))
-const modo = ref(props.modelValue ? 'personalizado' : null)
+const modo = ref(null)
 const hora = ref(null)
 const minuto = ref(null)
 const diaDaSemana = ref(null)
 const diaDoMes = ref(null)
-const textoPersonalizado = ref(props.modelValue || '')
+const textoPersonalizado = ref('')
+
+const DIAS_VALIDOS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+
+// Reconhece os três formatos que o próprio construtor gera e abre no modo certo, com os
+// campos preenchidos; qualquer outra expressão abre em "Personalizado", como antes.
+function carregar(cron) {
+  const diario = cron.match(/^0 (\d{1,2}) (\d{1,2}) \* \* \?$/)
+  const semanal = cron.match(/^0 (\d{1,2}) (\d{1,2}) \? \* ([A-Z]{3})$/)
+  const mensal = cron.match(/^0 (\d{1,2}) (\d{1,2}) (\d{1,2}) \* \?$/)
+  const horario = (m) => noIntervalo(Number(m[2]), 0, 23) && noIntervalo(Number(m[1]), 0, 59)
+
+  if (diario && horario(diario)) {
+    modo.value = 'diario'
+  } else if (semanal && horario(semanal) && DIAS_VALIDOS.includes(semanal[3])) {
+    modo.value = 'semanal'
+    diaDaSemana.value = semanal[3]
+  } else if (mensal && horario(mensal) && noIntervalo(Number(mensal[3]), 1, 31)) {
+    modo.value = 'mensal'
+    diaDoMes.value = Number(mensal[3])
+  } else {
+    modo.value = 'personalizado'
+    textoPersonalizado.value = cron
+    return
+  }
+  const partes = diario || semanal || mensal
+  minuto.value = Number(partes[1])
+  hora.value = Number(partes[2])
+}
 
 const diasDaSemana = [
   { valor: 'MON', rotulo: 'Segunda' },
@@ -50,6 +78,8 @@ const modoExibido = computed({
 function noIntervalo(valor, minimo, maximo) {
   return Number.isInteger(valor) && valor >= minimo && valor <= maximo
 }
+
+if (props.modelValue) carregar(props.modelValue)
 
 const horarioValido = computed(() => noIntervalo(hora.value, 0, 23) && noIntervalo(minuto.value, 0, 59))
 
@@ -108,10 +138,15 @@ watch(
 // O que o proprio construtor emitiu volta igual e e ignorado.
 watch(() => props.modelValue, (novo) => {
   if ((novo || '') === cronGerado.value) return
+  // Bloqueado não religa: um horário que chegue de fora é devolvido vazio
+  if (props.bloqueado) {
+    if (novo) emit('update:modelValue', '')
+    return
+  }
   if (novo) {
+    limparEscolha()
     ligado.value = true
-    modo.value = 'personalizado'
-    textoPersonalizado.value = novo
+    carregar(novo)
   } else {
     ligado.value = false
   }
