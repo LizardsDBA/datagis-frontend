@@ -8,7 +8,7 @@
  * Tela nova e isolada — não reaproveita nada de QuarentenaView.vue/ConjuntosView.vue de
  * propósito, só a mesma ideia visual (cards, tabela, badges).
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { apiFetch } from '../services/http'
 import { useRoute } from 'vue-router'
 import {
@@ -57,6 +57,126 @@ const total = ref(0)
 const itensAtuais = ref([])
 const carregandoTabela = ref(false)
 const erroTabela = ref(null)
+
+// --- ESTADOS DO PAINEL DE PESQUISA (DUAS CAIXAS - TASK LIZARDS-40) ---
+const painelFiltrosAberto = ref(true)
+const filtroId = ref('')
+const termoBusca = ref('')
+
+function limparFiltros() {
+  filtroId.value = ''
+  termoBusca.value = ''
+}
+
+// Filtro direcionado: Caixa 'ID' busca estritamente na 1ª coluna da esquerda
+const itensFiltrados = computed(() => {
+  if (!itensAtuais.value || !Array.isArray(itensAtuais.value)) {
+    return []
+  }
+
+  const idProcurado = filtroId.value.toLowerCase().trim()
+  const termoProcurado = termoBusca.value.toLowerCase().trim()
+
+  if (!idProcurado && !termoProcurado) {
+    return itensAtuais.value
+  }
+
+  return itensAtuais.value.filter((item) => {
+    const dadosLinha = item.dados || item
+    const entradas = Object.entries(dadosLinha)
+
+    // 1. Valida a caixa ID: Pega rigorosamente a PRIMEIRA coluna da esquerda (posição 0)
+    let bateuId = true
+    if (idProcurado && entradas.length > 0) {
+      const [primeiraChave, primeiroValor] = entradas[0]
+      if (primeiroValor === null || primeiroValor === undefined) {
+        bateuId = false
+      } else {
+        bateuId = String(primeiroValor).toLowerCase().includes(idProcurado)
+      }
+    }
+
+    // 2. Valida a caixa Nome: Varre as demais colunas por correspondência de texto
+    let bateuNome = true
+    if (termoProcurado) {
+      bateuNome = Object.values(dadosLinha).some((valor) => {
+        if (valor === null || valor === undefined) return false
+        return String(valor).toLowerCase().includes(termoProcurado)
+      })
+    }
+
+    return bateuId && bateuNome
+  })
+})
+
+// --- LÓGICA DE FILTRAGEM E PAGINAÇÃO RÍGIDA (TASK LIZARDS-40) ---
+
+// Monitora a digitação e alterna entre o modo de busca total e o modo paginado (25 por página)
+watch([filtroId, termoBusca], async ([novoId, novoTermo]) => {
+  pagina.value = 0
+  const idLimpo = (novoId || '').trim()
+  const termoLimpo = (novoTermo || '').trim()
+
+  if (idLimpo !== '' || termoLimpo !== '') {
+    // Se digitou algo: carrega o lote completo para encontrar em qualquer página
+    await carregarTodosOsRegistrosDoLote()
+  } else {
+    // Se está em branco: RESTAURA rigorosamente a busca paginada de 25 registros do servidor
+    await carregarPaginaAtual()
+  }
+})
+
+// Bate o martelo em exatamente quais 25 registros devem ir para a tabela
+const itensExibidos = computed(() => {
+  const temFiltroAtivo = filtroId.value.trim() !== '' || termoBusca.value.trim() !== ''
+
+  // 1. SEM FILTRO: Limita ESTRITAMENTE aos 25 registros da página atual do servidor
+  if (!temFiltroAtivo) {
+    return (itensAtuais.value || []).slice(0, TAMANHO_PAGINA)
+  }
+
+  // 2. COM FILTRO DIGITADO: Fatia a lista filtrada em blocos de 25 por página
+  const inicio = pagina.value * TAMANHO_PAGINA
+  return itensFiltrados.value.slice(inicio, inicio + TAMANHO_PAGINA)
+})
+
+// Calcula o total exato de páginas para a barra de navegação
+const totalPaginasCalculado = computed(() => {
+  const temFiltroAtivo = filtroId.value.trim() !== '' || termoBusca.value.trim() !== ''
+  const totalRegistros = temFiltroAtivo ? itensFiltrados.value.length : total.value
+  return Math.max(1, Math.ceil(totalRegistros / TAMANHO_PAGINA))
+})
+
+async function carregarTodosOsRegistrosDoLote() {
+  if (!loteResumo.value) return
+  carregandoTabela.value = true
+  erroTabela.value = null
+  try {
+    const totalDoLote = loteResumo.value.quantidadeRegistros || 1000
+    if (camadaAtiva.value === 'BRONZE') {
+      const resultado = await buscarBronze(loteResumo.value.loteId, 0, totalDoLote)
+      itensAtuais.value = resultado.itens
+      total.value = resultado.total
+    } else if (camadaAtiva.value === 'SILVER') {
+      const resultado = await buscarSilver(loteResumo.value.loteId, 0, totalDoLote)
+      itensAtuais.value = resultado.itens
+      total.value = resultado.total
+    } else {
+      await garantirQuarentenaCarregada()
+      total.value = quarentenaItensBrutos.value.length
+      itensAtuais.value = quarentenaItensBrutos.value.map((item) => ({
+        registroBrutoId: item.registroBrutoId,
+        temGeometria: false,
+        geometriaWkt: null,
+        dados: normalizarItemQuarentena(item),
+      }))
+    }
+  } catch (e) {
+    erroTabela.value = e.message
+  } finally {
+    carregandoTabela.value = false
+  }
+}
 
 const quarentenaItensBrutos = ref([])
 const quarentenaCarregada = ref(false)
@@ -258,6 +378,53 @@ onMounted(async () => {
         </button>
       </div>
 
+<!-- PAINEL DE PESQUISA COM DUAS CAIXAS (TASK LIZARDS-40) -->
+<section class="card-pesquisa">
+  <div class="header-pesquisa">
+    <h3>Pesquisa no Conjunto de Dados</h3>
+    <button 
+      type="button" 
+      class="btn-recolher" 
+      @click="painelFiltrosAberto = !painelFiltrosAberto"
+    >
+      {{ painelFiltrosAberto ? 'Recolher ▲' : 'Expandir ▼' }}
+    </button>
+  </div>
+
+  <div v-show="painelFiltrosAberto" class="corpo-filtros">
+    <!-- Caixinha 1: Apenas ID -->
+    <div class="grupo-campo busca-id">
+      <label for="filtro-id">ID:</label>
+      <input
+        id="filtro-id"
+        v-model="filtroId"
+        type="text"
+        class="input-texto"
+        placeholder="Ex: 1, 2, 3..."
+      />
+    </div>
+
+    <!-- Caixinha 2: Nome -->
+    <div class="grupo-campo busca-ampla">
+      <label for="filtro-termo">Nome:</label>
+      <input
+        id="filtro-termo"
+        v-model="termoBusca"
+        type="text"
+        class="input-texto"
+        placeholder="Ex: Amazônia, Peabiru, Nova Olímpia..."
+      />
+    </div>
+
+    <!-- Botão de Limpar -->
+    <div v-if="filtroId || termoBusca" class="grupo-campo acoes">
+      <button type="button" class="btn-limpar" @click="limparFiltros">
+        Limpar Filtros
+      </button>
+    </div>
+  </div>
+</section>
+
       <section class="cartao">
         <div v-if="carregandoTabela" class="estado-carregando">
           <div class="spinner-grande"></div>
@@ -266,8 +433,8 @@ onMounted(async () => {
 
         <div v-else-if="erroTabela" class="estado-vazio estado-vazio--erro">{{ erroTabela }}</div>
 
-        <div v-else-if="!itensAtuais.length" class="estado-vazio">
-          Nenhum registro encontrado na camada {{ rotuloCamada(camadaAtiva) }} para este lote.
+        <div v-else-if="!itensFiltrados.length" class="estado-vazio">
+          Nenhum registro encontrado na camada {{ rotuloCamada(camadaAtiva) }} para os parâmetros informados.
         </div>
 
         <div v-else class="tabela-responsiva-wrapper">
@@ -279,7 +446,7 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in itensAtuais" :key="item.registroBrutoId">
+              <tr v-for="item in itensExibidos" :key="item.registroBrutoId">
                 <td v-for="coluna in colunasDinamicas" :key="coluna">
                   {{ item.dados?.[coluna] === null || item.dados?.[coluna] === undefined ? '—' : item.dados[coluna] }}
                 </td>
@@ -324,11 +491,14 @@ onMounted(async () => {
           </table>
         </div>
 
-        <div v-if="itensAtuais.length" class="controles-paginacao">
-          <button :disabled="pagina === 0" @click="irParaPagina(pagina - 1)">← Anterior</button>
-          <span>Página {{ pagina + 1 }} de {{ totalPaginas }} ({{ total }} registros)</span>
-          <button :disabled="pagina + 1 >= totalPaginas" @click="irParaPagina(pagina + 1)">Próxima →</button>
-        </div>
+        <div v-if="itensFiltrados.length" class="controles-paginacao">
+  <button :disabled="pagina === 0" @click="irParaPagina(pagina - 1)">← Anterior</button>
+  <span>
+    Página {{ pagina + 1 }} de {{ totalPaginasCalculado }} 
+    ({{ (filtroId || termoBusca) ? itensFiltrados.length : total }} registros)
+  </span>
+  <button :disabled="pagina + 1 >= totalPaginasCalculado" @click="irParaPagina(pagina + 1)">Próxima →</button>
+</div>
       </section>
     </template>
 
@@ -388,6 +558,86 @@ onMounted(async () => {
   margin: 0.15rem 0 0;
   font-size: 0.88rem;
   color: #64748b;
+}
+
+/* Painel de Filtros (LIZARDS-40) */
+.card-pesquisa {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.header-pesquisa {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-pesquisa h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.corpo-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: flex-end;
+}
+
+.grupo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grupo-campo label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.busca-id {
+  flex-basis: 180px;
+}
+
+.busca-ampla {
+  flex-grow: 1;
+}
+
+.input-texto {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.input-texto:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.btn-recolher, .btn-limpar {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-limpar:hover {
+  color: #dc2626;
 }
 
 .seletor-camadas {
@@ -541,9 +791,43 @@ onMounted(async () => {
     transform: rotate(360deg);
   }
 }
+
 /* ==========================================================================
    Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
    ========================================================================== */
+:root[data-tema="escuro"] .card-pesquisa {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .header-pesquisa h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .grupo-campo label {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .input-texto {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .input-texto:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-recolher,
+:root[data-tema="escuro"] .btn-limpar {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-limpar:hover {
+  color: var(--cor-erro);
+}
+
 :root[data-tema="escuro"] .etiqueta {
   color: var(--cor-texto-rotulo);
 }
