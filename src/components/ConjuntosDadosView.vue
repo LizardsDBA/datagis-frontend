@@ -10,7 +10,7 @@
  */
 import { ref, computed, watch, onMounted } from 'vue'
 import { apiFetch } from '../services/http'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   buscarUltimoLote,
   buscarBronze,
@@ -27,6 +27,7 @@ import { temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 
 const route = useRoute()
+const router = useRouter()
 const fonteId = route.params.fonteId
 
 const TAMANHO_PAGINA = 25
@@ -66,6 +67,14 @@ const termoBusca = ref('')
 function limparFiltros() {
   filtroId.value = ''
   termoBusca.value = ''
+}
+
+function voltar() {
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/fontes')
+  }
 }
 
 // Filtro direcionado: Caixa 'ID' busca estritamente na 1ª coluna da esquerda
@@ -348,7 +357,12 @@ onMounted(async () => {
 <template>
   <div class="pagina-conjunto-dados">
     <header class="topo-pagina">
-      <p class="etiqueta">CONJUNTO DE DADOS</p>
+  <div class="linha-cabecalho">
+    <button type="button" class="btn-voltar" title="Voltar para a tela anterior" @click="voltar">
+      ← Voltar
+    </button>
+    <p class="etiqueta">CONJUNTO DE DADOS</p>
+  </div>
       <h1 class="titulo">{{ loteResumo?.fonteDadoNomeExibicao || 'Carregando…' }}</h1>
       <p v-if="loteResumo" class="subtitulo">
         Lote #{{ loteResumo.loteId }} — {{ loteResumo.quantidadeRegistros }} registros —
@@ -790,6 +804,44 @@ onMounted(async () => {
   to {
     transform: rotate(360deg);
   }
+}
+
+.linha-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-voltar {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-voltar:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* Adaptado para o Tema Escuro (LIZARDS-38) */
+:root[data-tema="escuro"] .btn-voltar {
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .btn-voltar:hover {
+  background: var(--cor-borda);
+  color: var(--cor-texto-titulo);
 }
 
 /* ==========================================================================
