@@ -42,9 +42,15 @@ const formVazio = () => ({
   campoGeometriaLon: '',
   separadorCsv: ',',
   ativo: true,
+  // Não aparece no formulário (é definida no Mapeamento de Colunas), mas vai no salvar:
+  // o PUT grava o que receber, e sem ela a edição apagava a tabela Silver da fonte
+  entidadeSilver: null,
 })
 
 const form = ref(formVazio())
+
+// Falso enquanto a atualização automática está ligada sem frequência e horário escolhidos
+const agendamentoCompleto = ref(true)
 
 // A tela abre direto na lista; o formulario de cadastro/edicao vira pop-up.
 const modalAberto = ref(false)
@@ -242,6 +248,7 @@ function editar(fonte) {
     campoGeometriaLon: fonte.campoGeometriaLon || '',
     separadorCsv: fonte.separadorCsv || ',',
     ativo: fonte.ativo,
+    entidadeSilver: fonte.entidadeSilver || null,
   }
   sucesso.value = false
   erro.value = null
@@ -249,6 +256,7 @@ function editar(fonte) {
 }
 
 async function salvar() {
+  if (!agendamentoCompleto.value) return
   enviando.value = true
   erro.value = null
   sucesso.value = false
@@ -589,10 +597,17 @@ onUnmounted(() => {
         </template>
 
         <div class="campo-grupo campo-grupo--full">
-          <label class="campo-label">
-            Agendamento Automático de Execução (Quartz Cron)
-            <ConstrutorCron v-model="form.cronExpressao" />
-          </label>
+          <!-- div, e não label: dentro de um label, clicar em qualquer texto da caixa
+               acionava o primeiro controle dela (o interruptor) e desligava o agendamento -->
+          <div class="campo-label">
+            Agendamento Automático de Execução
+            <ConstrutorCron
+              v-model="form.cronExpressao"
+              v-model:completo="agendamentoCompleto"
+              :bloqueado="form.tipoAquisicao === 'UPLOAD_MANUAL'"
+              motivo-bloqueio="Fonte de upload manual não tem atualização automática: os dados mudam quando um arquivo novo é enviado."
+            />
+          </div>
         </div>
 
         <div class="campo-grupo campo-grupo--checkbox">
@@ -605,7 +620,7 @@ onUnmounted(() => {
 
         <!-- Mensagens e Ações -->
         <div class="acoes-formulario campo-grupo--full">
-          <button type="submit" class="botao-principal" :disabled="enviando">
+          <button type="submit" class="botao-principal" :disabled="enviando || !agendamentoCompleto">
             <span v-if="enviando" class="spinner-sm"></span>
             <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
           </button>
@@ -735,8 +750,12 @@ onUnmounted(() => {
                   <template v-if="fonte.cronExpressao">
                     <div class="agendamento-texto">{{ descreverCron(fonte.cronExpressao) }}</div>
                     <code class="agendamento-cron">{{ fonte.cronExpressao }}</code>
+                    <!-- O backend não agenda fonte inativa: o horário fica guardado, mas não roda -->
+                    <div v-if="!fonte.ativo" class="agendamento-pausado">Pausado: fonte inativa</div>
                   </template>
-                  <span v-else class="agendamento-vazio">Somente manual</span>
+                  <!-- Upload manual atualiza quando alguém envia arquivo; as demais só não têm horário -->
+                  <span v-else-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'" class="agendamento-vazio">Por envio de arquivo</span>
+                  <span v-else class="agendamento-vazio">Sem agendamento</span>
                 </td>
 
                 <!-- Última Execução e Detalhes de Erro Completos -->
@@ -1795,6 +1814,13 @@ onUnmounted(() => {
   color: #94a3b8;
 }
 
+.agendamento-pausado {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b45309;
+}
+
 .btn-executar:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -2194,6 +2220,10 @@ onUnmounted(() => {
 
 :root[data-tema="escuro"] .agendamento-vazio {
   color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .agendamento-pausado {
+  color: var(--cor-alerta);
 }
 
 :root[data-tema="escuro"] .badge-mapeamento--ok {
