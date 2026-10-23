@@ -26,6 +26,10 @@ const erro = ref('')
 const sucesso = ref('')
 let temporizadorSucesso = null
 
+// --- NOVOS FILTROS DROPDOWN (TASK LIZARDS-40) ---
+const filtroPerfil = ref('TODOS')
+const filtroStatus = ref('TODOS')
+
 // Modal de cadastro/edição
 const modal = ref(null) // null | 'novo' | 'editar'
 const erroModal = ref('')
@@ -64,13 +68,69 @@ const permissoesEfetivasDoForm = computed(() =>
     .filter((codigo) => permissoesDosPerfis.value.has(codigo) || form.permissoesAvulsas.includes(codigo)),
 )
 
+// Função para resetar todos os filtros para o estado inicial
+function limparFiltros() {
+  busca.value = ''
+  filtroPerfil.value = 'TODOS'
+  filtroStatus.value = 'TODOS'
+}
+
+// Computada atualizada com busca por início de texto (.startsWith)
+const usuariosFiltrados = computed(() => {
+  const termoTexto = busca.value.toLowerCase().trim()
+
+  return usuarios.value.filter((usuario) => {
+    // 1. Filtro por Texto pelo COMEÇO das palavras/campos
+    let bateuTexto = true
+    if (termoTexto) {
+      const nome = (usuario.nome || '').toLowerCase()
+      const sobrenome = (usuario.sobrenome || '').toLowerCase()
+      const login = (usuario.login || '').toLowerCase()
+      const email = (usuario.email || '').toLowerCase()
+
+      // Verifica se o login, e-mail, nome ou sobrenome COMEÇAM com o texto digitado
+      const bateuLogin = login.startsWith(termoTexto)
+      const bateuEmail = email.startsWith(termoTexto)
+      const bateuNome = nome.startsWith(termoTexto)
+      const bateuSobrenome = sobrenome.startsWith(termoTexto)
+
+      bateuTexto = bateuLogin || bateuEmail || bateuNome || bateuSobrenome
+    }
+
+    // 2. Filtro por Perfil / Tipo de Acesso
+    let bateuPerfil = true
+    if (filtroPerfil.value !== 'TODOS') {
+      bateuPerfil =
+        usuario.perfis &&
+        usuario.perfis.some((p) => {
+          const codigoUpper = String(p).toUpperCase()
+          const perfilSelecionadoUpper = filtroPerfil.value.toUpperCase()
+          return (
+            codigoUpper === perfilSelecionadoUpper ||
+            codigoUpper.includes(perfilSelecionadoUpper)
+          )
+        })
+    }
+
+    // 3. Filtro por Status (Ativo / Inativo)
+    let bateuStatus = true
+    if (filtroStatus.value === 'ATIVO') {
+      bateuStatus = usuario.ativo === true
+    } else if (filtroStatus.value === 'INATIVO') {
+      bateuStatus = usuario.ativo === false
+    }
+
+    return bateuTexto && bateuPerfil && bateuStatus
+  })
+})
+
 const ehOProprioUsuario = (usuario) => usuario.login === sessao.login
 
 async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    const [lista, cat] = await Promise.all([buscarUsuarios(busca.value), buscarCatalogoAcesso()])
+    const [lista, cat] = await Promise.all([buscarUsuarios(''), buscarCatalogoAcesso()])
     usuarios.value = lista
     catalogo.value = cat
   } catch (e) {
@@ -236,7 +296,8 @@ onUnmounted(() => {
     <div v-if="sucesso" class="alerta alerta--sucesso">✓ {{ sucesso }}</div>
 
     <section class="card-secao">
-      <form class="barra-busca" @submit.prevent="carregar">
+      <!-- BARRA DE BUSCA E FILTROS EM TEMPO REAL (TASK LIZARDS-40) -->
+      <form class="barra-busca" @submit.prevent>
         <input
           v-model="busca"
           class="campo-texto"
@@ -244,11 +305,36 @@ onUnmounted(() => {
           placeholder="Buscar por login, nome ou e-mail"
           aria-label="Buscar usuário"
         />
-        <button class="btn-secundario" type="submit">Buscar</button>
+
+        <!-- Filtro por Tipo de Acesso / Perfil -->
+        <select v-model="filtroPerfil" class="seletor-filtro" aria-label="Filtrar por Perfil">
+          <option value="TODOS">Todos os Perfis</option>
+          <option value="ADMINISTRADOR">Administrador</option>
+          <option value="ANALISTA">Analista</option>
+          <option value="AUDITOR">Auditor</option>
+          <option value="OPERADOR">Operador</option>
+        </select>
+
+        <!-- Filtro por Status -->
+        <select v-model="filtroStatus" class="seletor-filtro" aria-label="Filtrar por Status">
+          <option value="TODOS">Todos os Status</option>
+          <option value="ATIVO">Ativo</option>
+          <option value="INATIVO">Inativo</option>
+        </select>
+
+        <!-- Botão de Limpar (Exibido apenas quando houver filtro ativo) -->
+        <button
+          v-if="busca || filtroPerfil !== 'TODOS' || filtroStatus !== 'TODOS'"
+          type="button"
+          class="btn-limpar-filtros"
+          @click="limparFiltros"
+        >
+          Limpar
+        </button>
       </form>
 
       <p v-if="carregando" class="estado-vazio">Carregando usuários…</p>
-      <p v-else-if="!usuarios.length" class="estado-vazio">Nenhum usuário encontrado.</p>
+      <p v-else-if="!usuariosFiltrados.length" class="estado-vazio">Nenhum usuário encontrado para os parâmetros informados.</p>
 
       <div v-else class="tabela-container">
         <table class="tabela-dados">
@@ -262,7 +348,7 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="usuario in usuarios" :key="usuario.id">
+            <tr v-for="usuario in usuariosFiltrados" :key="usuario.id">
               <td>
                 <div class="usuario-nome">{{ [usuario.nome, usuario.sobrenome].filter(Boolean).join(' ') || usuario.login }}</div>
                 <div class="usuario-detalhe">{{ usuario.login }} · {{ usuario.email || 'sem e-mail' }}</div>
@@ -552,12 +638,14 @@ button:disabled {
 .barra-busca {
   display: flex;
   gap: 0.6rem;
-  max-width: 32rem;
+  max-width: 52rem;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .campo-texto {
-  flex: 1;
-  width: 100%;
+  flex: 2;
+  min-width: 14rem;
   box-sizing: border-box;
   padding: 0.6rem 0.85rem;
   border-radius: 8px;
@@ -570,6 +658,40 @@ button:disabled {
 .campo-texto:focus {
   border-color: #15803d;
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.seletor-filtro {
+  flex: 1;
+  min-width: 10rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.86rem;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  cursor: pointer;
+}
+
+.seletor-filtro:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.btn-limpar-filtros {
+  background: transparent;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-limpar-filtros:hover {
+  background: #fee2e2;
 }
 
 .estado-vazio {
@@ -868,9 +990,31 @@ button:disabled {
     max-width: none;
   }
 }
+
 /* ==========================================================================
    Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
    ========================================================================== */
+:root[data-tema="escuro"] .seletor-filtro {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .seletor-filtro:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-limpar-filtros {
+  border-color: rgb(248 113 113 / 40%);
+  color: var(--cor-erro);
+  background: transparent;
+}
+
+:root[data-tema="escuro"] .btn-limpar-filtros:hover {
+  background: var(--tenue-erro);
+}
+
 :root[data-tema="escuro"] .etiqueta {
   color: var(--cor-texto-rotulo);
 }
