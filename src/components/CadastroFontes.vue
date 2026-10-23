@@ -42,9 +42,15 @@ const formVazio = () => ({
   campoGeometriaLon: '',
   separadorCsv: ',',
   ativo: true,
+  // Não aparece no formulário (é definida no Mapeamento de Colunas), mas vai no salvar:
+  // o PUT grava o que receber, e sem ela a edição apagava a tabela Silver da fonte
+  entidadeSilver: null,
 })
 
 const form = ref(formVazio())
+
+// Falso enquanto a atualização automática está ligada sem frequência e horário escolhidos
+const agendamentoCompleto = ref(true)
 
 // A tela abre direto na lista; o formulario de cadastro/edicao vira pop-up.
 const modalAberto = ref(false)
@@ -242,6 +248,7 @@ function editar(fonte) {
     campoGeometriaLon: fonte.campoGeometriaLon || '',
     separadorCsv: fonte.separadorCsv || ',',
     ativo: fonte.ativo,
+    entidadeSilver: fonte.entidadeSilver || null,
   }
   sucesso.value = false
   erro.value = null
@@ -249,6 +256,7 @@ function editar(fonte) {
 }
 
 async function salvar() {
+  if (!agendamentoCompleto.value) return
   enviando.value = true
   erro.value = null
   sucesso.value = false
@@ -591,7 +599,7 @@ onUnmounted(() => {
         <div class="campo-grupo campo-grupo--full">
           <label class="campo-label">
             Agendamento Automático de Execução (Quartz Cron)
-            <ConstrutorCron v-model="form.cronExpressao" />
+            <ConstrutorCron v-model="form.cronExpressao" v-model:completo="agendamentoCompleto" />
           </label>
         </div>
 
@@ -605,7 +613,7 @@ onUnmounted(() => {
 
         <!-- Mensagens e Ações -->
         <div class="acoes-formulario campo-grupo--full">
-          <button type="submit" class="botao-principal" :disabled="enviando">
+          <button type="submit" class="botao-principal" :disabled="enviando || !agendamentoCompleto">
             <span v-if="enviando" class="spinner-sm"></span>
             <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
           </button>
