@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { apiFetch } from '../services/http'
 import { useRouter } from 'vue-router'
 import ConstrutorCron from './ConstrutorCron.vue'
@@ -20,6 +20,48 @@ const carregandoLista = ref(false)
 const enviando = ref(false)
 const erro = ref(null)
 const sucesso = ref(false)
+
+// --- ESTADOS DO PAINEL DE FILTROS (LIZARDS-40) ---
+const painelFiltrosAberto = ref(true)
+const termoBusca = ref('')
+const filtroStatus = ref('')
+const filtroModalidade = ref('')
+
+function limparFiltros() {
+  termoBusca.value = ''
+  filtroStatus.value = ''
+  filtroModalidade.value = ''
+}
+
+// Computada para filtrar a lista sem alterar o array 'fontes' original
+const fontesFiltradas = computed(() => {
+  if (!fontes.value || !Array.isArray(fontes.value)) return []
+
+  return fontes.value.filter((fonte) => {
+    // 1. Filtro por Status (Ativa / Inativa)
+    let bateuStatus = true
+    if (filtroStatus.value !== '') {
+      const eAtivo = filtroStatus.value === 'true'
+      bateuStatus = fonte.ativo === eAtivo
+    }
+
+    // 2. Filtro por Modalidade (UPLOAD_MANUAL, API_REST, DOWNLOAD_URL)
+    let bateuModalidade = true
+    if (filtroModalidade.value !== '') {
+      bateuModalidade = fonte.tipoAquisicao === filtroModalidade.value
+    }
+
+    // 3. Busca por texto (varre Nome, Órgão, URL e Formato)
+    let bateuTermo = true
+    const termo = termoBusca.value.toLowerCase().trim()
+    if (termo) {
+      const textoCombinado = `${fonte.nome || ''} ${fonte.orgao || ''} ${fonte.urlOrigem || ''} ${fonte.formatoEsperado || ''}`.toLowerCase()
+      bateuTermo = textoCombinado.includes(termo)
+    }
+
+    return bateuStatus && bateuModalidade && bateuTermo
+  })
+})
 
 // Controle de expansão de mensagens de erro longas por fonte
 const errosExpandidos = reactive({})
@@ -245,7 +287,7 @@ function editar(fonte) {
   }
   sucesso.value = false
   erro.value = null
- modalAberto.value = true
+  modalAberto.value = true
 }
 
 async function salvar() {
@@ -499,132 +541,189 @@ onUnmounted(() => {
       </div>
     </header>
 
+    <!-- PAINEL DE PESQUISA E FILTROS (TASK LIZARDS-40) -->
+    <section class="card-pesquisa">
+      <div class="header-pesquisa">
+        <h3>Pesquisa e Filtros</h3>
+        <button 
+          type="button" 
+          class="btn-recolher" 
+          @click="painelFiltrosAberto = !painelFiltrosAberto"
+        >
+          {{ painelFiltrosAberto ? 'Recolher ▲' : 'Expandir ▼' }}
+        </button>
+      </div>
+
+      <div v-show="painelFiltrosAberto" class="corpo-filtros">
+        <!-- Filtro 1: Status -->
+        <div class="grupo-campo">
+          <label for="filtro-status">Filtrar por Status:</label>
+          <select id="filtro-status" v-model="filtroStatus" class="input-select">
+            <option value="">Todos os Status</option>
+            <option value="true">Ativa</option>
+            <option value="false">Inativa</option>
+          </select>
+        </div>
+
+        <!-- Filtro 2: Modalidade -->
+        <div class="grupo-campo">
+          <label for="filtro-modalidade">Modalidade:</label>
+          <select id="filtro-modalidade" v-model="filtroModalidade" class="input-select">
+            <option value="">Todas as Modalidades</option>
+            <option value="UPLOAD_MANUAL">Upload Manual</option>
+            <option value="API_REST">API REST</option>
+            <option value="DOWNLOAD_URL">Download URL</option>
+          </select>
+        </div>
+
+        <!-- Filtro 3: Busca Textual -->
+        <div class="grupo-campo busca-ampla">
+          <label for="filtro-termo">Buscar Fonte, Órgão ou URL:</label>
+          <div class="input-com-icone">
+            <input
+              id="filtro-termo"
+              v-model="termoBusca"
+              type="text"
+              class="input-texto"
+              placeholder="Ex: IBAMA, GEOJSON, http..."
+            />
+          </div>
+        </div>
+
+        <!-- Limpar Filtros -->
+        <div v-if="termoBusca || filtroStatus !== '' || filtroModalidade !== ''" class="grupo-campo acoes">
+          <button type="button" class="btn-limpar" @click="limparFiltros">
+            Limpar Filtros
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- Seção de Formulário de Cadastro / Edição (em modal) -->
     <div v-if="modalAberto" class="modal-backdrop" @click.self="fecharModal">
       <div class="modal-dialog">
         <button class="btn-fechar" @click="fecharModal" aria-label="Fechar">✕</button>
         <section class="cartao">
-      <div class="cartao-header">
-        <div class="cartao-header-icone">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
-        </div>
-        <div>
-          <h2 class="cartao-titulo">{{ editandoId ? 'Editar Fonte #' + editandoId : 'Cadastrar Nova Fonte de Dados' }}</h2>
-          <p class="cartao-sub">Configure os parâmetros de aquisição, URLs de origem e regras de formato.</p>
-        </div>
-      </div>
-
-      <form class="formulario-grid" @submit.prevent="salvar">
-        <div class="campo-grupo">
-          <label class="campo-label">
-            Nome da Fonte *
-            <input v-model="form.nome" required placeholder="Ex.: IBAMA - Embargos Ambientais" class="campo-input" />
-          </label>
-        </div>
-
-        <div class="campo-grupo">
-          <label class="campo-label">
-            Órgão Emissor / Fornecedor
-            <input v-model="form.orgao" placeholder="Ex.: IBAMA, SICAR, ICMBio, IAT" class="campo-input" />
-          </label>
-        </div>
-
-        <div class="campo-grupo">
-          <label class="campo-label">
-            Modalidade de Aquisição *
-            <select v-model="form.tipoAquisicao" class="campo-select">
-              <option value="UPLOAD_MANUAL">Upload manual (.zip, .csv, shapefile)</option>
-              <option value="API_REST">API REST / GeoServer WFS</option>
-              <option value="DOWNLOAD_URL">Download direto por URL</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="campo-grupo" v-if="form.tipoAquisicao !== 'UPLOAD_MANUAL'">
-          <label class="campo-label">
-            URL de Origem (Endpoint / Download) *
-            <input v-model="form.urlOrigem" required placeholder="https://dados.gov.br/api/geospatial..." class="campo-input" />
-          </label>
-        </div>
-
-        <div class="campo-grupo">
-          <label class="campo-label">
-            Formato Esperado
-            <select v-model="form.formatoEsperado" class="campo-select">
-              <option value="">Indefinido / Autodetectar</option>
-              <option value="SHAPEFILE">Shapefile (.zip com shp, shx, dbf, prj)</option>
-              <option value="GEOJSON">GeoJSON</option>
-              <option value="CSV">CSV com coordenadas</option>
-              <option value="JSON">JSON / GeoServices</option>
-            </select>
-          </label>
-        </div>
-
-        <template v-if="form.formatoEsperado === 'CSV'">
-          <div class="campo-grupo">
-            <label class="campo-label">
-              Separador de Campo
-              <select v-model="form.separadorCsv" class="campo-select">
-                <option v-for="opcao in OPCOES_SEPARADOR_CSV" :key="opcao.valor" :value="opcao.valor">
-                  {{ opcao.rotulo }}
-                </option>
-              </select>
-            </label>
+          <div class="cartao-header">
+            <div class="cartao-header-icone">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="cartao-titulo">{{ editandoId ? 'Editar Fonte #' + editandoId : 'Cadastrar Nova Fonte de Dados' }}</h2>
+              <p class="cartao-sub">Configure os parâmetros de aquisição, URLs de origem e regras de formato.</p>
+            </div>
           </div>
-          <div class="campo-grupo">
-            <label class="campo-label">
-              Nome da Coluna de Latitude
-              <input v-model="form.campoGeometriaLat" placeholder="Ex.: latitude, lat, Y" class="campo-input" />
-            </label>
-          </div>
-          <div class="campo-grupo">
-            <label class="campo-label">
-              Nome da Coluna de Longitude
-              <input v-model="form.campoGeometriaLon" placeholder="Ex.: longitude, lon, long, X" class="campo-input" />
-            </label>
-          </div>
-        </template>
 
-        <div class="campo-grupo campo-grupo--full">
-          <label class="campo-label">
-            Agendamento Automático de Execução (Quartz Cron)
-            <ConstrutorCron v-model="form.cronExpressao" />
-          </label>
-        </div>
+          <form class="formulario-grid" @submit.prevent="salvar">
+            <div class="campo-grupo">
+              <label class="campo-label">
+                Nome da Fonte *
+                <input v-model="form.nome" required placeholder="Ex.: IBAMA - Embargos Ambientais" class="campo-input" />
+              </label>
+            </div>
 
-        <div class="campo-grupo campo-grupo--checkbox">
-          <label class="checkbox-custom">
-            <input v-model="form.ativo" type="checkbox" />
-            <span class="checkbox-box"></span>
-            <span class="checkbox-texto">Fonte ativa para ingestão</span>
-          </label>
-        </div>
+            <div class="campo-grupo">
+              <label class="campo-label">
+                Órgão Emissor / Fornecedor
+                <input v-model="form.orgao" placeholder="Ex.: IBAMA, SICAR, ICMBio, IAT" class="campo-input" />
+              </label>
+            </div>
 
-        <!-- Mensagens e Ações -->
-        <div class="acoes-formulario campo-grupo--full">
-          <button type="submit" class="botao-principal" :disabled="enviando">
-            <span v-if="enviando" class="spinner-sm"></span>
-            <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
-          </button>
+            <div class="campo-grupo">
+              <label class="campo-label">
+                Modalidade de Aquisição *
+                <select v-model="form.tipoAquisicao" class="campo-select">
+                  <option value="UPLOAD_MANUAL">Upload manual (.zip, .csv, shapefile)</option>
+                  <option value="API_REST">API REST / GeoServer WFS</option>
+                  <option value="DOWNLOAD_URL">Download direto por URL</option>
+                </select>
+              </label>
+            </div>
 
-         <button type="button" class="botao-secundario" @click="fecharModal">
-            Cancelar
-          </button>
-        </div>
+            <div class="campo-grupo" v-if="form.tipoAquisicao !== 'UPLOAD_MANUAL'">
+              <label class="campo-label">
+                URL de Origem (Endpoint / Download) *
+                <input v-model="form.urlOrigem" required placeholder="https://dados.gov.br/api/geospatial..." class="campo-input" />
+              </label>
+            </div>
 
-        
-        <div v-if="erro" class="alerta-erro campo-grupo--full">
-          ✕ Falha: {{ erro }}
-        </div>
-      </form>
+            <div class="campo-grupo">
+              <label class="campo-label">
+                Formato Esperado
+                <select v-model="form.formatoEsperado" class="campo-select">
+                  <option value="">Indefinido / Autodetectar</option>
+                  <option value="SHAPEFILE">Shapefile (.zip com shp, shx, dbf, prj)</option>
+                  <option value="GEOJSON">GeoJSON</option>
+                  <option value="CSV">CSV com coordenadas</option>
+                  <option value="JSON">JSON / GeoServices</option>
+                </select>
+              </label>
+            </div>
+
+            <template v-if="form.formatoEsperado === 'CSV'">
+              <div class="campo-grupo">
+                <label class="campo-label">
+                  Separador de Campo
+                  <select v-model="form.separadorCsv" class="campo-select">
+                    <option v-for="opcao in OPCOES_SEPARADOR_CSV" :key="opcao.valor" :value="opcao.valor">
+                      {{ opcao.rotulo }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <div class="campo-grupo">
+                <label class="campo-label">
+                  Nome da Coluna de Latitude
+                  <input v-model="form.campoGeometriaLat" placeholder="Ex.: latitude, lat, Y" class="campo-input" />
+                </label>
+              </div>
+              <div class="campo-grupo">
+                <label class="campo-label">
+                  Nome da Coluna de Longitude
+                  <input v-model="form.campoGeometriaLon" placeholder="Ex.: longitude, lon, long, X" class="campo-input" />
+                </label>
+              </div>
+            </template>
+
+            <div class="campo-grupo campo-grupo--full">
+              <label class="campo-label">
+                Agendamento Automático de Execução (Quartz Cron)
+                <ConstrutorCron v-model="form.cronExpressao" />
+              </label>
+            </div>
+
+            <div class="campo-grupo campo-grupo--checkbox">
+              <label class="checkbox-custom">
+                <input v-model="form.ativo" type="checkbox" />
+                <span class="checkbox-box"></span>
+                <span class="checkbox-texto">Fonte ativa para ingestão</span>
+              </label>
+            </div>
+
+            <!-- Mensagens e Ações -->
+            <div class="acoes-formulario campo-grupo--full">
+              <button type="submit" class="botao-principal" :disabled="enviando">
+                <span v-if="enviando" class="spinner-sm"></span>
+                <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
+              </button>
+
+              <button type="button" class="botao-secundario" @click="fecharModal">
+                Cancelar
+              </button>
+            </div>
+
+            <div v-if="erro" class="alerta-erro campo-grupo--full">
+              ✕ Falha: {{ erro }}
+            </div>
+          </form>
         </section>
       </div>
     </div>
 
-        <div v-if="sucesso" class="alerta-sucesso alerta-pagina">
+    <div v-if="sucesso" class="alerta-sucesso alerta-pagina">
       ✓ Fonte salva com sucesso! O catálogo de dados foi atualizado.
     </div>
 
@@ -632,7 +731,7 @@ onUnmounted(() => {
     <section class="cartao">
       <div class="cartao-header cartao-header--tabela">
         <div>
-          <h2 class="cartao-titulo">Fontes Cadastradas ({{ fontes.length }})</h2>
+          <h2 class="cartao-titulo">Fontes Cadastradas ({{ fontesFiltradas.length }})</h2>
           <p class="cartao-sub">Execute a extração dos dados ou envie novos lotes através dos botões de ação.</p>
         </div>
       </div>
@@ -652,6 +751,16 @@ onUnmounted(() => {
         <small>Preencha o formulário acima para adicionar a primeira fonte.</small>
       </div>
 
+      <div v-else-if="!fontesFiltradas.length" class="estado-vazio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
+        </svg>
+        <p>Nenhuma fonte encontrada para os parâmetros informados.</p>
+        <small>Tente alterar ou limpar os campos do painel de pesquisa acima.</small>
+      </div>
+
       <div v-else class="tabela-responsiva-wrapper">
         <table class="tabela-fontes">
           <thead>
@@ -667,7 +776,7 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <template v-for="fonte in fontes" :key="fonte.id">
+            <template v-for="fonte in fontesFiltradas" :key="fonte.id">
               <tr class="linha-fonte">
                 <!-- Nome e Órgão e URL exposta -->
                 <td class="celula-fonte-principal">
@@ -678,7 +787,7 @@ onUnmounted(() => {
                   <div class="fonte-orgao-texto">
                     {{ fonte.orgao ? 'Órgão: ' + fonte.orgao : 'Sem órgão informado' }}
                   </div>
-                  <!-- Indicador de Status do Mapeamento Silver (exibido apenas quando pendente) -->
+                  <!-- Indicador de Status do Mapeamento Silver -->
                   <div v-if="!fonte.mapeamentoCompleto || !fonte.entidadeSilver" class="linha-status-silver">
                     <span
                       v-if="fonte.entidadeSilver"
@@ -695,7 +804,6 @@ onUnmounted(() => {
                       Sem Tabela Silver
                     </span>
                   </div>
-                  <!-- Informação que antes estava escondida: URL de origem exposta diretamente -->
                   <div v-if="fonte.urlOrigem" class="fonte-url-preview" :title="fonte.urlOrigem">
                     <span class="url-texto">{{ fonte.urlOrigem }}</span>
                   </div>
@@ -730,7 +838,7 @@ onUnmounted(() => {
                   </span>
                 </td>
 
-                <!-- Agendamento automático (cron do Quartz) -->
+                <!-- Agendamento automático -->
                 <td class="celula-agendamento">
                   <template v-if="fonte.cronExpressao">
                     <div class="agendamento-texto">{{ descreverCron(fonte.cronExpressao) }}</div>
@@ -739,7 +847,7 @@ onUnmounted(() => {
                   <span v-else class="agendamento-vazio">Somente manual</span>
                 </td>
 
-                <!-- Última Execução e Detalhes de Erro Completos -->
+                <!-- Última Execução -->
                 <td class="celula-ultima-execucao">
                   <div class="data-execucao">{{ formatarData(fonte.ultimaExecucaoEm) }}</div>
 
@@ -750,7 +858,6 @@ onUnmounted(() => {
                     </span>
                   </div>
 
-                  <!-- Mensagem de erro sem truncamento e com toggle de expansão -->
                   <div v-if="fonte.ultimoStatusExecucao === 'ERRO' && fonte.ultimoErroMensagem" class="container-erro-fonte">
                     <p class="mensagem-erro-texto" :class="{ 'erro-expandido': errosExpandidos[fonte.id] }">
                       {{ fonte.ultimoErroMensagem }}
@@ -1039,6 +1146,81 @@ onUnmounted(() => {
 .btn-recarregar svg {
   width: 1rem;
   height: 1rem;
+}
+
+/* Painel de Filtros (LIZARDS-40) */
+.card-pesquisa {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.header-pesquisa {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-pesquisa h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.corpo-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: flex-end;
+}
+
+.grupo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grupo-campo label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.busca-ampla {
+  flex-grow: 1;
+}
+
+.input-select, .input-texto {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.input-select:focus, .input-texto:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.btn-recolher, .btn-limpar {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-limpar:hover {
+  color: #dc2626;
 }
 
 /* Cartões Principais */
@@ -1841,9 +2023,45 @@ onUnmounted(() => {
   color: #64748b;
   border: 1px solid #cbd5e1;
 }
+
 /* ==========================================================================
    Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
    ========================================================================== */
+:root[data-tema="escuro"] .card-pesquisa {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .header-pesquisa h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .grupo-campo label {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .input-select,
+:root[data-tema="escuro"] .input-texto {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .input-select:focus,
+:root[data-tema="escuro"] .input-texto:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-recolher,
+:root[data-tema="escuro"] .btn-limpar {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-limpar:hover {
+  color: var(--cor-erro);
+}
+
 :root[data-tema="escuro"] .etiqueta {
   color: var(--cor-texto-rotulo);
 }
