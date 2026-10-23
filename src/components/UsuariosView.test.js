@@ -371,7 +371,7 @@ describe('UsuariosView', () => {
     expect(wrapper.find('.formulario-usuario input[type="checkbox"]:not([value])').exists()).toBe(false)
   })
 
-  it('edição salva dados e substitui os acessos', async () => {
+  it('edição que mexe só nos acessos não regrava os dados', async () => {
     const wrapper = await montar()
     await wrapper.findAll('tbody tr')[1].find('button').trigger('click')
 
@@ -379,12 +379,37 @@ describe('UsuariosView', () => {
     await wrapper.find('form.formulario-usuario').trigger('submit')
     await flushPromises()
 
+    expect(definirRoles).toHaveBeenCalledWith('u-maria', [])
+    expect(atualizarUsuario).not.toHaveBeenCalled()
+  })
+
+  it('edição que mexe só nos dados não regrava os acessos', async () => {
+    const wrapper = await montar()
+    await wrapper.findAll('tbody tr')[1].find('button').trigger('click')
+
+    await wrapper.find('#campo-sobrenome').setValue('Souza')
+    await wrapper.find('form.formulario-usuario').trigger('submit')
+    await flushPromises()
+
     expect(atualizarUsuario).toHaveBeenCalledWith('u-maria', {
       nome: 'Maria',
-      sobrenome: 'Silva',
+      sobrenome: 'Souza',
       email: 'maria@x.com',
       ativo: true,
     })
-    expect(definirRoles).toHaveBeenCalledWith('u-maria', [])
+    expect(definirRoles).not.toHaveBeenCalled()
+  })
+
+  it('salvar sem mudar nada não chama o backend e avisa', async () => {
+    const wrapper = await montar()
+    await wrapper.findAll('tbody tr')[0].find('button').trigger('click')
+
+    await wrapper.find('form.formulario-usuario').trigger('submit')
+    await flushPromises()
+
+    expect(atualizarUsuario).not.toHaveBeenCalled()
+    expect(definirRoles).not.toHaveBeenCalled()
+    expect(wrapper.find('.alerta--info').text()).toBe('Nenhuma alteração para salvar.')
+    expect(wrapper.find('form.formulario-usuario').exists()).toBe(true)
   })
 })
