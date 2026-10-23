@@ -241,7 +241,13 @@ function abrirEdicao(usuario) {
     perfis: [...usuario.perfis],
     permissoesAvulsas: [...usuario.permissoesAvulsas],
   })
+  // Como estava ao abrir: o salvar só chama o que mudou (cada chamada vira uma linha no log)
+  original = {
+    dados: dadosDoForm(),
+    roles: rolesDe(usuario.perfis, usuario.permissoesAvulsas),
+  }
   erroForm.value = ''
+  avisoForm.value = ''
   tela.value = 'editar'
 }
 
@@ -254,14 +260,37 @@ function fecharSenha() {
 }
 
 /** Avulsa já coberta por perfil não precisa ser gravada separada. */
-function rolesDoForm() {
-  const avulsas = form.permissoesAvulsas.filter((p) => !permissoesDosPerfis.value.has(p))
-  return [...form.perfis, ...avulsas]
+function rolesDe(perfis, permissoesAvulsas) {
+  const cobertas = new Set(
+    catalogo.value.perfis.filter((p) => perfis.includes(p.codigo)).flatMap((p) => p.permissoes),
+  )
+  return [...perfis, ...permissoesAvulsas.filter((p) => !cobertas.has(p))]
 }
 
+function rolesDoForm() {
+  return rolesDe(form.perfis, form.permissoesAvulsas)
+}
+
+function dadosDoForm() {
+  return { nome: form.nome, sobrenome: form.sobrenome, email: form.email, ativo: form.ativo }
+}
+
+let original = null
+const avisoForm = ref('')
+const mesmoConjunto = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort())
+
 async function salvar() {
-  salvando.value = true
   erroForm.value = ''
+  avisoForm.value = ''
+  const dados = dadosDoForm()
+  const roles = rolesDoForm()
+  const dadosMudaram = tela.value === 'editar' && JSON.stringify(dados) !== JSON.stringify(original.dados)
+  const rolesMudaram = tela.value === 'editar' && !mesmoConjunto(roles, original.roles)
+  if (tela.value === 'editar' && !dadosMudaram && !rolesMudaram) {
+    avisoForm.value = 'Nenhuma alteração para salvar.'
+    return
+  }
+  salvando.value = true
   try {
     if (tela.value === 'novo') {
       await criarUsuario({
@@ -274,14 +303,10 @@ async function salvar() {
       })
       mostrarSucesso(`Usuário ${form.login} cadastrado. Ele vai trocar a senha no primeiro acesso.`)
     } else {
-      // Ativar/desativar fica no botão da lista; aqui só repete o estado atual
-      await atualizarUsuario(form.id, {
-        nome: form.nome,
-        sobrenome: form.sobrenome,
-        email: form.email,
-        ativo: form.ativo,
-      })
-      await definirRoles(form.id, rolesDoForm())
+      // Ativar/desativar fica no botão da lista; aqui só repete o estado atual.
+      // Só chama o que mudou: editar só o nome não grava "perfis alterados" no log.
+      if (dadosMudaram) await atualizarUsuario(form.id, dados)
+      if (rolesMudaram) await definirRoles(form.id, roles)
       mostrarSucesso(`Acessos de ${form.login} atualizados.`)
     }
     voltarALista()
@@ -693,6 +718,7 @@ onUnmounted(() => {
     <!-- Cadastro / edição -->
     <form v-else class="card-secao formulario-usuario" @submit.prevent="salvar">
       <div v-if="erroForm" class="alerta alerta--erro">✕ {{ erroForm }}</div>
+      <div v-if="avisoForm" class="alerta alerta--info" role="status">{{ avisoForm }}</div>
 
       <div class="linha-form">
         <label class="rotulo-form" for="campo-login">Login</label>
@@ -1078,6 +1104,12 @@ button:disabled {
   background: #fee2e2;
   color: #991b1b;
   border: 1px solid #fecaca;
+}
+
+.alerta--info {
+  background: var(--status-info-bg);
+  color: var(--status-info-texto);
+  border: 1px solid var(--status-info-borda);
 }
 
 .alerta--sucesso {
