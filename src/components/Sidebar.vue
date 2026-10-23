@@ -86,11 +86,13 @@ const categorias = [
         permissao: PERMISSOES.AUDITORIA_VISUALIZAR,
       },
       {
-        rota: '/admin/usuarios',
-        rotulo: 'Usuários e Acessos',
+        rota: '/admin/controle-acesso',
+        rotulo: 'Controle de Acesso',
         icone: 'usuarios',
-        descricao: 'Perfis e Permissões',
+        descricao: 'Usuários, perfis e permissões',
         permissao: PERMISSOES.USUARIO_GERENCIAR,
+        // As telas do Controle de Acesso abrem pelo painel; o item continua marcado nelas
+        rotasRelacionadas: ['/admin/'],
       },
     ],
   },
@@ -251,7 +253,7 @@ function navegar() {
                 <line x1="8" y1="13" x2="16" y2="13" />
                 <line x1="8" y1="17" x2="13" y2="17" />
               </svg>
-              <!-- Ícone para Usuários e Acessos -->
+              <!-- Ícone para Controle de Acesso -->
               <svg v-else-if="item.icone === 'usuarios'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
