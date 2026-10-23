@@ -1,0 +1,196 @@
+/*
+ * Estilo comum das telas do Controle de Acesso (painel, perfis, matriz e log de acessos).
+ * Só usa as variáveis do style.css, que o tema escuro já remapeia: não precisa de bloco
+ * :root[data-tema="escuro"] aqui.
+ */
+.pagina-acesso {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.link-voltar {
+  align-self: flex-start;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--cor-primaria);
+  text-decoration: none;
+}
+
+.link-voltar:hover {
+  text-decoration: underline;
+}
+
+.etiqueta {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cor-primaria);
+}
+
+.titulo {
+  font-size: 1.65rem;
+  color: var(--cor-slate-900);
+  letter-spacing: -0.02em;
+}
+
+.subtitulo {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--cor-slate-500);
+  max-width: 52rem;
+}
+
+.card-secao {
+  background: var(--cor-branco);
+  border: 1px solid var(--cor-slate-200);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--sombra-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.aviso-leitura {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  background: var(--status-info-bg);
+  color: var(--status-info-texto);
+  border: 1px solid var(--status-info-borda);
+}
+
+.alerta-erro {
+  padding: 0.85rem 1.15rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  background: var(--status-erro-bg);
+  color: var(--status-erro-texto);
+  border: 1px solid var(--status-erro-borda);
+}
+
+.estado-vazio {
+  color: var(--cor-slate-500);
+  font-size: 0.9rem;
+}
+
+.texto-fraco {
+  color: var(--cor-slate-400);
+  font-size: 0.8rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.1rem 0.25rem 0.1rem 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.badge--perfil {
+  background: var(--status-info-bg);
+  color: var(--status-info-texto);
+  border: 1px solid var(--status-info-borda);
+}
+
+.badge--permissao {
+  background: var(--status-neutro-bg);
+  color: var(--status-neutro-texto);
+  border: 1px solid var(--status-neutro-borda);
+  font-family: var(--fonte-mono);
+  font-weight: 600;
+}
+
+.badge--sucesso {
+  background: var(--status-sucesso-bg);
+  color: var(--status-sucesso-texto);
+  border: 1px solid var(--status-sucesso-borda);
+}
+
+.badge--erro {
+  background: var(--status-erro-bg);
+  color: var(--status-erro-texto);
+  border: 1px solid var(--status-erro-borda);
+}
+
+.badge--alerta {
+  background: var(--status-alerta-bg);
+  color: var(--status-alerta-texto);
+  border: 1px solid var(--status-alerta-borda);
+}
+
+.tabela-container {
+  border-radius: 8px;
+  border: 1px solid var(--cor-slate-200);
+  overflow-x: auto;
+}
+
+.tabela-dados {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  text-align: left;
+}
+
+.tabela-dados th {
+  background: var(--cor-slate-50);
+  padding: 0.8rem 1rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--cor-slate-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--cor-slate-200);
+  white-space: nowrap;
+}
+
+.tabela-dados td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--cor-slate-100);
+  vertical-align: middle;
+  color: var(--cor-slate-700);
+}
+
+.campo-texto,
+.campo-select {
+  box-sizing: border-box;
+  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--cor-slate-300);
+  font-size: 0.86rem;
+  outline: none;
+  color: var(--cor-slate-800);
+  background: var(--cor-branco);
+}
+
+.campo-texto:focus,
+.campo-select:focus {
+  border-color: var(--cor-primaria);
+}
+
+.btn-secundario {
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--cor-branco);
+  color: var(--cor-slate-700);
+  border: 1px solid var(--cor-slate-300);
+}
+
+.btn-secundario:hover:not(:disabled) {
+  background: var(--cor-slate-50);
+}
+
+.btn-secundario:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
