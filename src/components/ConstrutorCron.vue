@@ -13,7 +13,12 @@
 // algo o v-model:completo fica falso (o formulario bloqueia o salvar).
 import { ref, computed, watch } from 'vue'
 
-const props = defineProps({ modelValue: { type: String, default: '' } })
+const props = defineProps({
+  modelValue: { type: String, default: '' },
+  // Ex.: fonte de upload manual - não há de onde buscar dado novo, então não se agenda
+  bloqueado: { type: Boolean, default: false },
+  motivoBloqueio: { type: String, default: '' },
+})
 const emit = defineEmits(['update:modelValue', 'update:completo'])
 
 const ligado = ref(Boolean(props.modelValue))
@@ -90,6 +95,15 @@ watch(ligado, (agora) => {
   if (!agora) limparEscolha()
 })
 
+// Bloqueado (ou passou a ser, ao trocar a modalidade), o agendamento é desligado e limpo
+watch(
+  () => props.bloqueado,
+  (bloqueado) => {
+    if (bloqueado) ligado.value = false
+  },
+  { immediate: true },
+)
+
 // Se o formulario mudar o valor por fora (ex.: reset depois de salvar), acompanha.
 // O que o proprio construtor emitiu volta igual e e ignorado.
 watch(() => props.modelValue, (novo) => {
@@ -107,7 +121,7 @@ watch(() => props.modelValue, (novo) => {
 <template>
   <div class="construtor-cron" :class="{ 'construtor-cron--desligado': !ligado }">
     <label class="interruptor">
-      <input v-model="ligado" type="checkbox" role="switch" class="interruptor-entrada" />
+      <input v-model="ligado" type="checkbox" role="switch" class="interruptor-entrada" :disabled="bloqueado" />
       <span class="interruptor-trilho" aria-hidden="true"></span>
       <span class="interruptor-texto">
         Atualização automática:
@@ -170,6 +184,8 @@ watch(() => props.modelValue, (novo) => {
       class="texto-personalizado"
       placeholder="0 0 3 * * ?"
     />
+
+    <p v-if="bloqueado && motivoBloqueio" class="aviso-bloqueio">{{ motivoBloqueio }}</p>
 
     <p v-if="!completo" class="aviso-incompleto" role="alert">
       Escolha a frequência e o horário para ligar a atualização automática.
@@ -310,6 +326,17 @@ watch(() => props.modelValue, (novo) => {
   color: #666;
 }
 
+.interruptor-entrada:disabled + .interruptor-trilho {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aviso-bloqueio {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
 .aviso-incompleto {
   margin: 0;
   font-size: 0.78rem;
@@ -377,5 +404,9 @@ watch(() => props.modelValue, (novo) => {
 
 :root[data-tema="escuro"] .aviso-incompleto {
   color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .aviso-bloqueio {
+  color: var(--cor-texto-terciario);
 }
 </style>
