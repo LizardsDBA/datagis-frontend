@@ -375,7 +375,17 @@ onMounted(async () => {
         <p class="etiqueta">CONJUNTO DE DADOS</p>
       </div>
 
-      <h1 class="titulo">{{ loteResumo?.fonteDadoNomeExibicao || 'Carregando…' }}</h1>
+      <div class="linha-titulo-comparar">
+        <h1 class="titulo">{{ loteResumo?.fonteDadoNomeExibicao || 'Carregando…' }}</h1>
+        <button
+          v-if="loteResumo"
+          class="botao-comparar-lotes"
+          title="Comparar com o lote anterior (diff entre lotes)"
+          @click="modalComparacaoLotes = true"
+        >
+          ⇄ Comparar lotes
+        </button>
+      </div>
       <p v-if="loteResumo" class="subtitulo">
         Lote #{{ loteResumo.loteId }} — {{ loteResumo.quantidadeRegistros }} registros —
         promovido em {{ formatarData(loteResumo.dataExecucao) }}
@@ -585,6 +595,12 @@ onMounted(async () => {
   font-size: 1.5rem;
   color: #0f172a;
   margin: 0;
+}
+
+.linha-titulo-comparar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .topo-titulo-linha {
