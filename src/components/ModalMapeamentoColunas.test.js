@@ -14,6 +14,8 @@ const {
   mockAtualizarEntidadeSilver,
   mockLimparTodosMapeamentos,
   mockSalvarMapeamentos,
+  mockSincronizarMapeamentosAtributo,
+  mockRemoverMapeamentoPorAtributo,
 } = vi.hoisted(() => ({
   mockMapeamentos: [
     {
@@ -29,6 +31,8 @@ const {
   mockAtualizarEntidadeSilver: vi.fn().mockResolvedValue({ id: 1, entidadeSilver: 'imovel_rural' }),
   mockLimparTodosMapeamentos: vi.fn().mockResolvedValue(true),
   mockSalvarMapeamentos: vi.fn().mockImplementation((fonteId, lista) => Promise.resolve(lista)),
+  mockSincronizarMapeamentosAtributo: vi.fn().mockImplementation((fonteId, attr, lista) => Promise.resolve(lista)),
+  mockRemoverMapeamentoPorAtributo: vi.fn().mockResolvedValue(true),
 }))
 
 vi.mock('../services/quarentenaService', () => ({
@@ -37,6 +41,8 @@ vi.mock('../services/quarentenaService', () => ({
     return Promise.resolve([...mockMapeamentos])
   }),
   salvarMapeamentos: mockSalvarMapeamentos,
+  sincronizarMapeamentosAtributo: mockSincronizarMapeamentosAtributo,
+  removerMapeamentoPorAtributo: mockRemoverMapeamentoPorAtributo,
   excluirMapeamento: vi.fn().mockResolvedValue(true),
   limparTodosMapeamentosFonte: mockLimparTodosMapeamentos,
   buscarEsquemasSilver: vi.fn().mockResolvedValue([
@@ -373,4 +379,52 @@ describe('ModalMapeamentoColunas — Fluxo Guiado por Tabela Silver', () => {
     expect(wrapper.find('.custom-atributo-wrapper').exists()).toBe(false)
     expect(wrapper.find('.btn-voltar-select').exists()).toBe(false)
   })
+
+  it('permite adicionar múltiplos inputs de coluna origem e salva mapeamento para cada um', async () => {
+    wrapper = mount(ModalMapeamentoColunas, {
+      props: {
+        fonte: { id: 1, nome: 'Nova Fonte', entidadeSilver: 'imovel_rural' },
+      },
+    })
+    await flushPromises()
+
+    // O botão de adicionar outra coluna de origem deve estar no card de formulário
+    const btnAddOrigem = wrapper.find('.card-formulario .btn-adicionar-origem')
+    expect(btnAddOrigem.exists()).toBe(true)
+
+    // Inicialmente deve haver 1 input de origem
+    let inputsOrigem = wrapper.findAll('.input-origem')
+    expect(inputsOrigem).toHaveLength(1)
+
+    // Clica no botão para adicionar mais uma coluna de origem
+    await btnAddOrigem.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    inputsOrigem = wrapper.findAll('.input-origem')
+    expect(inputsOrigem).toHaveLength(2)
+
+    // Preenche as duas colunas de origem
+    await inputsOrigem[0].setValue('num_car')
+    await inputsOrigem[1].setValue('numero_car')
+
+    // Seleciona o atributo de destino
+    const selectAtributo = wrapper.find('.atributo-select-wrapper select')
+    await selectAtributo.setValue('situacao_imovel')
+    await selectAtributo.trigger('change')
+
+    // Submete o formulário
+    await wrapper.find('.card-formulario form').trigger('submit')
+    await flushPromises()
+
+    // Deve ter chamado salvarMapeamentos com 2 itens apontando para situacao_imovel
+    expect(mockSalvarMapeamentos).toHaveBeenCalled()
+    const chamadaSalvar = mockSalvarMapeamentos.mock.calls[mockSalvarMapeamentos.mock.calls.length - 1]
+    expect(chamadaSalvar[0]).toBe(1)
+    expect(chamadaSalvar[1]).toHaveLength(2)
+    expect(chamadaSalvar[1][0].colunaOrigem).toBe('num_car')
+    expect(chamadaSalvar[1][0].atributoDestino).toBe('situacao_imovel')
+    expect(chamadaSalvar[1][1].colunaOrigem).toBe('numero_car')
+    expect(chamadaSalvar[1][1].atributoDestino).toBe('situacao_imovel')
+  })
 })
+

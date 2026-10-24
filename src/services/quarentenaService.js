@@ -119,8 +119,35 @@ export async function salvarMapeamentos(fonteId, mapeamentos) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(mapeamentos),
   })
-  if (!resp.ok) throw new Error('Falha ao salvar mapeamentos')
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || 'Falha ao salvar mapeamentos')
+  }
   return resp.json()
+}
+
+export async function sincronizarMapeamentosAtributo(fonteId, atributoDestino, mapeamentos) {
+  const resp = await apiFetch(`/api/fontes/${fonteId}/mapeamentos/atributo/${encodeURIComponent(atributoDestino)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mapeamentos),
+  })
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || 'Falha ao sincronizar mapeamentos do atributo')
+  }
+  return resp.json()
+}
+
+export async function removerMapeamentoPorAtributo(fonteId, atributoDestino) {
+  const resp = await apiFetch(`/api/fontes/${fonteId}/mapeamentos/atributo/${encodeURIComponent(atributoDestino)}`, {
+    method: 'DELETE',
+  })
+  if (!resp.ok) {
+    const corpoErro = await resp.json().catch(() => null)
+    throw new Error(corpoErro?.erro || corpoErro?.message || 'Falha ao remover mapeamentos do atributo')
+  }
+  return true
 }
 
 export async function excluirMapeamento(fonteId, id) {
