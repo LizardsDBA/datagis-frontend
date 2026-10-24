@@ -26,7 +26,7 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'modulos_fiscais', label: 'Módulos Fiscais', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'municipio', label: 'Município (Código IBGE / Nome)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'data_registro', label: 'Data de Registro', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: true },
+      { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: false },
     ],
     dominios: [
       { tabela: 'situacao_imovel', label: 'situacao_imovel (AT, PE, CA, SU...)' },
@@ -45,7 +45,7 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'area_ha', label: 'Área Total (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'bioma', label: 'Bioma Predominante', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'bioma' },
       { nome: 'ato_legal', label: 'Ato Legal de Criação', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: true },
+      { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: false },
     ],
     dominios: [
       { tabela: 'tipo_area_protegida', label: 'tipo_area_protegida (Proteção Integral, Uso Sustentável, TI...)' },
@@ -948,10 +948,6 @@ function remover(id) {
                 <span>Validar CPF / CNPJ</span>
               </label>
               <label class="check-item">
-                <input type="checkbox" v-model="novoMapeamento.validarRecortePr" />
-                <span>Validar Limite PR</span>
-              </label>
-              <label class="check-item">
                 <input type="checkbox" v-model="novoMapeamento.impedirRegressao" />
                 <span>Bloquear Regressão</span>
               </label>
@@ -1022,7 +1018,6 @@ function remover(id) {
                     <span v-if="map.obrigatorio" class="tag-regra tag-regra--obrig">Obrigatório</span>
                     <span v-if="map.validarGeometria" class="tag-regra tag-regra--geo">Geometria</span>
                     <span v-if="map.validarCpfCnpj" class="tag-regra tag-regra--doc">CPF/CNPJ</span>
-                    <span v-if="map.validarRecortePr" class="tag-regra tag-regra--pr">Paraná</span>
                     <span v-if="map.impedirRegressao" class="tag-regra tag-regra--regr">Anti-regressão</span>
 
                     <!-- Regra de Integridade Cruzada (Ref Silver) -->
