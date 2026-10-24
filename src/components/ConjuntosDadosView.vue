@@ -359,7 +359,22 @@ onMounted(async () => {
 <template>
   <div class="pagina-conjunto-dados">
     <header class="topo-pagina">
-      <p class="etiqueta">CONJUNTO DE DADOS</p>
+      <div class="topo-titulo-linha">
+        <button 
+          type="button" 
+          class="btn-voltar" 
+          title="Voltar para o Cadastro de Fontes" 
+          @click="voltar"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="icone-voltar">
+            <path d="M19 12H5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Voltar
+        </button>
+        <p class="etiqueta">CONJUNTO DE DADOS</p>
+      </div>
+
       <h1 class="titulo">{{ loteResumo?.fonteDadoNomeExibicao || 'Carregando…' }}</h1>
       <p v-if="loteResumo" class="subtitulo">
         Lote #{{ loteResumo.loteId }} — {{ loteResumo.quantidadeRegistros }} registros —
@@ -843,36 +858,50 @@ onMounted(async () => {
   gap: 0.75rem;
 }
 
+/* Linha superior do título com o botão de voltar */
+.topo-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Botão Voltar Verde (Padrão DataGis) */
 .btn-voltar {
-  background: transparent;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 0.25rem 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
-  transition: all 0.15s ease;
   display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #16a34a;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .btn-voltar:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: #dcfce7;
+  border-color: #15803d;
+  transform: translateX(-2px);
+}
+
+.icone-voltar {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 /* Adaptado para o Tema Escuro (LIZARDS-38) */
 :root[data-tema="escuro"] .btn-voltar {
-  border-color: var(--cor-borda);
-  color: var(--cor-texto-secundario);
-  background: var(--cor-superficie-elevada);
+  background: var(--cor-primaria-tenue, rgba(34, 197, 94, 0.1));
+  border-color: var(--cor-primaria-borda, #16a34a);
+  color: var(--cor-link, #4ade80);
 }
 
 :root[data-tema="escuro"] .btn-voltar:hover {
-  background: var(--cor-borda);
-  color: var(--cor-texto-titulo);
+  background: var(--cor-primaria-borda, #16a34a);
+  color: #ffffff;
 }
 
 /* ==========================================================================
