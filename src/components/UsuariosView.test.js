@@ -180,7 +180,7 @@ describe('UsuariosView', () => {
   it('procurar filtra a lista sem chamar o backend de novo', async () => {
     const wrapper = await montar()
 
-    await wrapper.find('.controle-busca input').setValue('silva')
+    await wrapper.find('.barra-busca input').setValue('silva')
 
     const linhas = wrapper.findAll('tbody tr')
     expect(linhas).toHaveLength(1)

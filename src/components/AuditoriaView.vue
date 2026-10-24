@@ -34,6 +34,62 @@ const totalPaginas = computed(() => Math.max(1, Math.ceil(total.value / TAMANHO_
 // Filtros da última busca feita: o JSON do filtro usa estes, não o que está digitado e não filtrado
 let filtrosAplicados = { ...filtros }
 
+// ---------- SELETOR DE DATA CUSTOMIZADO (LIZARDS-56) ----------
+const calendarioAberto = ref(null) // 'de' | 'ate' | null
+const dataExibidaNav = ref(new Date())
+
+function abrirCalendario(campo) {
+  calendarioAberto.value = calendarioAberto.value === campo ? null : campo
+}
+
+function fecharCalendarios() {
+  calendarioAberto.value = null
+}
+
+const mesAnoFormatado = computed(() => {
+  return dataExibidaNav.value.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+})
+
+function navegarMes(delta) {
+  const novaData = new Date(dataExibidaNav.value)
+  novaData.setMonth(novaData.getMonth() + delta)
+  dataExibidaNav.value = novaData
+}
+
+const diasDoMes = computed(() => {
+  const ano = dataExibidaNav.value.getFullYear()
+  const mes = dataExibidaNav.value.getMonth()
+  const primeiroDiaSemana = new Date(ano, mes, 1).getDay()
+  const ultimoDia = new Date(ano, mes + 1, 0).getDate()
+  
+  const dias = []
+  for (let i = 0; i < primeiroDiaSemana; i++) {
+    dias.push(null)
+  }
+  for (let d = 1; d <= ultimoDia; d++) {
+    const dataStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    dias.push({ dia: d, iso: dataStr })
+  }
+  return dias
+})
+
+function selecionarData(iso, campo) {
+  filtros[campo] = iso
+  fecharCalendarios()
+}
+
+function selecionarHoje(campo) {
+  const hoje = new Date().toISOString().split('T')[0]
+  filtros[campo] = hoje
+  fecharCalendarios()
+}
+
+function formatarDataBR(iso) {
+  if (!iso) return 'dd/mm/aaaa'
+  const [ano, mes, dia] = iso.split('-')
+  return `${dia}/${mes}/${ano}`
+}
+
 async function carregar(novaPagina = 0) {
   carregando.value = true
   erro.value = ''
@@ -235,17 +291,22 @@ function fecharJson() {
 }
 
 function aoPressionarTecla(evento) {
-  if (evento.key === 'Escape') fecharJson()
+  if (evento.key === 'Escape') {
+    fecharJson()
+    fecharCalendarios()
+  }
 }
 
 onMounted(() => {
   carregar(0)
   carregarLogins()
   window.addEventListener('keydown', aoPressionarTecla)
+  window.addEventListener('click', fecharCalendarios)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', aoPressionarTecla)
+  window.removeEventListener('click', fecharCalendarios)
 })
 </script>
 
@@ -300,14 +361,108 @@ onUnmounted(() => {
             <option value="false">Falha ou negado</option>
           </select>
         </label>
-        <label class="campo">
+
+        <!-- Campo DE (Calendário Customizado) -->
+<!-- Campo DE (Calendário Customizado) -->
+        <div class="campo campo-datepicker">
           <span>De</span>
-          <input v-model="filtros.de" class="campo-texto" type="date" />
-        </label>
-        <label class="campo">
+          <button 
+            type="button" 
+            class="campo-texto btn-datepicker" 
+            @click.stop="abrirCalendario('de')"
+          >
+            <span :class="{ 'texto-vazio': !filtros.de }">{{ formatarDataBR(filtros.de) }}</span>
+            <svg class="icone-calendario" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </button>
+
+          <!-- Popover do Calendário DataGis (Adicionada classe --direita) -->
+          <div v-if="calendarioAberto === 'de'" class="popover-calendario popover-calendario--direita" @click.stop>
+            <div class="cal-cabecalho">
+              <span class="cal-titulo">{{ mesAnoFormatado }}</span>
+              <div class="cal-nav">
+                <button type="button" @click="navegarMes(-1)">‹</button>
+                <button type="button" @click="navegarMes(1)">›</button>
+              </div>
+            </div>
+            <div class="cal-grid-dias-semana">
+              <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+            </div>
+            <div class="cal-grid-dias">
+              <template v-for="(item, idx) in diasDoMes" :key="idx">
+                <span v-if="!item" class="dia-vazio"></span>
+                <button 
+                  v-else 
+                  type="button" 
+                  class="btn-dia" 
+                  :class="{ 'btn-dia--selecionado': filtros.de === item.iso }"
+                  @click="selecionarData(item.iso, 'de')"
+                >
+                  {{ item.dia }}
+                </button>
+              </template>
+            </div>
+            <div class="cal-rodape">
+              <button type="button" class="btn-cal-acao" @click="selecionarData('', 'de')">Limpar</button>
+              <button type="button" class="btn-cal-acao btn-cal-acao--hoje" @click="selecionarHoje('de')">Hoje</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Campo ATÉ (Calendário Customizado) -->
+        <div class="campo campo-datepicker">
           <span>Até</span>
-          <input v-model="filtros.ate" class="campo-texto" type="date" />
-        </label>
+          <button 
+            type="button" 
+            class="campo-texto btn-datepicker" 
+            @click.stop="abrirCalendario('ate')"
+          >
+            <span :class="{ 'texto-vazio': !filtros.ate }">{{ formatarDataBR(filtros.ate) }}</span>
+            <svg class="icone-calendario" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </button>
+
+          <!-- Popover do Calendário DataGis -->
+          <div v-if="calendarioAberto === 'ate'" class="popover-calendario" @click.stop>
+            <div class="cal-cabecalho">
+              <span class="cal-titulo">{{ mesAnoFormatado }}</span>
+              <div class="cal-nav">
+                <button type="button" @click="navegarMes(-1)">‹</button>
+                <button type="button" @click="navegarMes(1)">›</button>
+              </div>
+            </div>
+            <div class="cal-grid-dias-semana">
+              <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+            </div>
+            <div class="cal-grid-dias">
+              <template v-for="(item, idx) in diasDoMes" :key="idx">
+                <span v-if="!item" class="dia-vazio"></span>
+                <button 
+                  v-else 
+                  type="button" 
+                  class="btn-dia" 
+                  :class="{ 'btn-dia--selecionado': filtros.ate === item.iso }"
+                  @click="selecionarData(item.iso, 'ate')"
+                >
+                  {{ item.dia }}
+                </button>
+              </template>
+            </div>
+            <div class="cal-rodape">
+              <button type="button" class="btn-cal-acao" @click="selecionarData('', 'ate')">Limpar</button>
+              <button type="button" class="btn-cal-acao btn-cal-acao--hoje" @click="selecionarHoje('ate')">Hoje</button>
+            </div>
+          </div>
+        </div>
+
         <div class="filtros-acoes">
           <button type="submit" class="btn-primario">Filtrar</button>
           <button type="button" class="btn-secundario" @click="limparFiltros">Limpar</button>
@@ -460,7 +615,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ---------- Usuário alterado e JSON (só variáveis do style.css: o tema escuro já vem junto) ---------- */
 .usuario-alvo {
   margin-top: 0.2rem;
   font-size: 0.8rem;
@@ -793,6 +947,141 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
 }
 
+/* ==========================================================================
+   Calendário Customizado DataGis (Popover 100% Verde & Harmonioso)
+   ========================================================================== */
+.campo-datepicker {
+  position: relative;
+  min-width: 10.5rem;
+}
+
+.btn-datepicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.texto-vazio {
+  color: #94a3b8;
+}
+
+.icone-calendario {
+  width: 1rem;
+  height: 1rem;
+  color: #15803d;
+  flex-shrink: 0;
+}
+
+.popover-calendario {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.4rem;
+  z-index: 1000;
+  width: 250px;
+  padding: 0.85rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.popover-calendario--direita {
+  left: auto;
+  right: 0;
+}
+
+.cal-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cal-titulo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: #0f172a;
+}
+
+.cal-nav button {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0 0.3rem;
+}
+
+.cal-nav button:hover {
+  color: #15803d;
+}
+
+.cal-grid-dias-semana,
+.cal-grid-dias {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.2rem;
+  text-align: center;
+}
+
+.cal-grid-dias-semana span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.btn-dia {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0;
+  font-size: 0.8rem;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-dia:hover {
+  background: #f0fdf4;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.btn-dia--selecionado {
+  background: #15803d !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.cal-rodape {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.5rem;
+}
+
+.btn-cal-acao {
+  background: transparent;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.btn-cal-acao--hoje {
+  color: #15803d;
+}
+
 .filtros-acoes {
   display: flex;
   gap: 0.5rem;
@@ -920,8 +1209,9 @@ button:disabled {
   font-size: 0.84rem;
   color: #475569;
 }
+
 /* ==========================================================================
-   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   Tema escuro (LIZARDS-38) — padronização completa do seletor e do popover
    ========================================================================== */
 :root[data-tema="escuro"] .etiqueta {
   color: var(--cor-texto-rotulo);
@@ -953,6 +1243,40 @@ button:disabled {
 :root[data-tema="escuro"] .campo-texto:focus {
   border-color: var(--cor-primaria);
   box-shadow: none;
+}
+
+:root[data-tema="escuro"] .texto-vazio {
+  color: var(--cor-texto-terciario, #64748b);
+}
+
+:root[data-tema="escuro"] .popover-calendario {
+  background: var(--cor-superficie, #0f172a);
+  border-color: var(--cor-borda-forte, #334155);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-tema="escuro"] .cal-titulo,
+:root[data-tema="escuro"] .btn-dia {
+  color: var(--cor-texto, #f8fafc);
+}
+
+:root[data-tema="escuro"] .icone-calendario,
+:root[data-tema="escuro"] .btn-cal-acao--hoje {
+  color: var(--cor-primaria, #22c55e);
+}
+
+:root[data-tema="escuro"] .btn-dia:hover {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--cor-link, #4ade80);
+}
+
+:root[data-tema="escuro"] .btn-dia--selecionado {
+  background: var(--cor-primaria, #22c55e) !important;
+  color: #0f172a !important;
+}
+
+:root[data-tema="escuro"] .cal-rodape {
+  border-top-color: var(--cor-borda, #1e293b);
 }
 
 :root[data-tema="escuro"] .btn-primario {

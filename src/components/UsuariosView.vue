@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Administração de usuários e controle de acesso (LIZARDS-47).
+ * Administração de usuários e controle de acesso (LIZARDS-47 / LIZARDS-40).
  *
  * Perfis são pacotes de permissões; o usuário pode ter vários perfis e ainda permissões
  * avulsas. A tela mostra sempre as permissões EFETIVAS (perfis expandidos + avulsas), que
@@ -37,8 +37,19 @@ const erro = ref('')
 const sucesso = ref('')
 let temporizadorSucesso = null
 
-// Lista: busca, ordenação, paginação e linha expandida
+// --- FILTROS DE BUSCA, DROPDOWNS E LIMPEZA (TASK LIZARDS-40) ---
 const busca = ref('')
+const filtroPerfil = ref('TODOS')
+const filtroStatus = ref('TODOS')
+
+function limparFiltros() {
+  busca.value = ''
+  filtroPerfil.value = 'TODOS'
+  filtroStatus.value = 'TODOS'
+  pagina.value = 1
+}
+
+// Lista: ordenação, paginação e linha expandida (sprint-2)
 const tamanhoPagina = ref(50)
 const pagina = ref(1)
 const ordenacao = reactive({ coluna: 'login', crescente: true })
@@ -127,17 +138,56 @@ function valorOrdenacao(usuario, coluna) {
   return normalizar(usuario[coluna])
 }
 
+// Computada unificada: Filtra por Texto (startsWith), Perfil, Status e Aplica Ordenação
 const usuariosFiltrados = computed(() => {
-  const termo = normalizar(busca.value.trim())
-  const lista = termo
-    ? usuarios.value.filter((u) =>
-        normalizar(
-          [u.login, u.nome, u.sobrenome, u.email, ...u.perfis.map(nomeDoPerfil), ...u.permissoesAvulsas].join(' '),
-        ).includes(termo),
-      )
-    : [...usuarios.value]
+  const termoTexto = normalizar(busca.value.trim())
+
+  const filtrados = usuarios.value.filter((usuario) => {
+    // 1. Filtro por Texto pelo COMEÇO das palavras/campos
+    let bateuTexto = true
+    if (termoTexto) {
+      const nome = normalizar(usuario.nome)
+      const sobrenome = normalizar(usuario.sobrenome)
+      const login = normalizar(usuario.login)
+      const email = normalizar(usuario.email)
+
+      const bateuLogin = login.startsWith(termoTexto)
+      const bateuEmail = email.startsWith(termoTexto)
+      const bateuNome = nome.startsWith(termoTexto)
+      const bateuSobrenome = sobrenome.startsWith(termoTexto)
+
+      bateuTexto = bateuLogin || bateuEmail || bateuNome || bateuSobrenome
+    }
+
+    // 2. Filtro por Perfil / Tipo de Acesso
+    let bateuPerfil = true
+    if (filtroPerfil.value !== 'TODOS') {
+      bateuPerfil =
+        usuario.perfis &&
+        usuario.perfis.some((p) => {
+          const codigoUpper = String(p).toUpperCase()
+          const perfilSelecionadoUpper = filtroPerfil.value.toUpperCase()
+          return (
+            codigoUpper === perfilSelecionadoUpper ||
+            codigoUpper.includes(perfilSelecionadoUpper)
+          )
+        })
+    }
+
+    // 3. Filtro por Status (Ativo / Inativo)
+    let bateuStatus = true
+    if (filtroStatus.value === 'ATIVO') {
+      bateuStatus = usuario.ativo === true
+    } else if (filtroStatus.value === 'INATIVO') {
+      bateuStatus = usuario.ativo === false
+    }
+
+    return bateuTexto && bateuPerfil && bateuStatus
+  })
+
+  // Aplica a ordenação
   const sinal = ordenacao.crescente ? 1 : -1
-  return lista.sort((a, b) => {
+  return filtrados.sort((a, b) => {
     const va = valorOrdenacao(a, ordenacao.coluna)
     const vb = valorOrdenacao(b, ordenacao.coluna)
     return va < vb ? -sinal : va > vb ? sinal : 0
@@ -172,7 +222,6 @@ function alternarExpandido(id) {
   expandidos.value = novo
 }
 
-// O mesmo id aparece no Log de Auditoria (usuarioId e rotas /api/admin/usuarios/{id})
 const idCopiado = ref(null)
 
 async function copiarId(usuario) {
@@ -241,7 +290,6 @@ function abrirEdicao(usuario) {
     perfis: [...usuario.perfis],
     permissoesAvulsas: [...usuario.permissoesAvulsas],
   })
-  // Como estava ao abrir: o salvar só chama o que mudou (cada chamada vira uma linha no log)
   original = {
     dados: dadosDoForm(),
     roles: rolesDe(usuario.perfis, usuario.permissoesAvulsas),
@@ -259,7 +307,6 @@ function fecharSenha() {
   usuarioSenha.value = null
 }
 
-/** Avulsa já coberta por perfil não precisa ser gravada separada. */
 function rolesDe(perfis, permissoesAvulsas) {
   const cobertas = new Set(
     catalogo.value.perfis.filter((p) => perfis.includes(p.codigo)).flatMap((p) => p.permissoes),
@@ -303,8 +350,6 @@ async function salvar() {
       })
       mostrarSucesso(`Usuário ${form.login} cadastrado. Ele vai trocar a senha no primeiro acesso.`)
     } else {
-      // Ativar/desativar fica no botão da lista; aqui só repete o estado atual.
-      // Só chama o que mudou: editar só o nome não grava "perfis alterados" no log.
       if (dadosMudaram) await atualizarUsuario(form.id, dados)
       if (rolesMudaram) await definirRoles(form.id, roles)
       mostrarSucesso(`Acessos de ${form.login} atualizados.`)
@@ -318,7 +363,6 @@ async function salvar() {
   }
 }
 
-// Confirmação de desativar/reativar: janela própria, com o efeito explicado
 const usuarioConfirmar = ref(null)
 const alterandoAtivo = ref(false)
 const botaoCancelarConfirmacao = ref(null)
@@ -326,7 +370,6 @@ const botaoCancelarConfirmacao = ref(null)
 async function alternarAtivo(usuario) {
   usuarioConfirmar.value = usuario
   await nextTick()
-  // Foco no Cancelar: um Enter sem querer não desativa ninguém
   botaoCancelarConfirmacao.value?.focus()
 }
 
@@ -375,8 +418,6 @@ async function salvarSenha() {
   }
 }
 
-// Exportação e importação em CSV
-// Exportação: o usuário escolhe CSV ou PDF num menu
 const menuExportarAberto = ref(false)
 const exportando = ref(false)
 const menuExportar = ref(null)
@@ -413,7 +454,7 @@ const importando = ref(false)
 const nomeArquivoImportacao = ref('')
 const erroArquivoImportacao = ref('')
 const linhasImportacao = ref([])
-const resultadosImportacao = ref({}) // linha -> { ok, mensagem }
+const resultadosImportacao = ref({})
 const progressoImportacao = ref(0)
 
 const linhasValidas = computed(() => linhasImportacao.value.filter((l) => !l.erros.length))
@@ -454,7 +495,6 @@ async function aoEscolherArquivo(evento) {
   }
 }
 
-/** Cadastra um por vez: a linha que falhar no Keycloak não impede as outras. */
 async function importarUsuarios() {
   const fila = linhasValidas.value
   if (!fila.length) return
@@ -548,29 +588,56 @@ onUnmounted(() => {
 
     <!-- Lista -->
     <section v-if="tela === 'lista'" class="card-secao">
+      <!-- BARRA DE LISTA E FILTROS EM TEMPO REAL (TASK LIZARDS-40) -->
       <div class="barra-lista">
         <label class="controle-tamanho">
           Mostrar
           <select v-model.number="tamanhoPagina" class="campo-select" aria-label="Registros por página" @change="pagina = 1">
             <option v-for="n in OPCOES_TAMANHO" :key="n" :value="n">{{ n }}</option>
           </select>
-          registros por página
+          registros
         </label>
-        <label class="controle-busca">
-          Procurar
+
+        <form class="barra-busca" @submit.prevent>
           <input
             v-model="busca"
             class="campo-texto"
             type="search"
-            placeholder="Login, nome, e-mail ou perfil"
-            aria-label="Procurar usuário"
+            placeholder="Buscar por login, nome ou e-mail"
+            aria-label="Buscar usuário"
             @input="pagina = 1"
           />
-        </label>
+
+          <!-- Filtro por Perfil -->
+          <select v-model="filtroPerfil" class="seletor-filtro" aria-label="Filtrar por Perfil" @change="pagina = 1">
+            <option value="TODOS">Todos os Perfis</option>
+            <option value="ADMINISTRADOR">Administrador</option>
+            <option value="ANALISTA">Analista</option>
+            <option value="AUDITOR">Auditor</option>
+            <option value="OPERADOR">Operador</option>
+          </select>
+
+          <!-- Filtro por Status -->
+          <select v-model="filtroStatus" class="seletor-filtro" aria-label="Filtrar por Status" @change="pagina = 1">
+            <option value="TODOS">Todos os Status</option>
+            <option value="ATIVO">Ativo</option>
+            <option value="INATIVO">Inativo</option>
+          </select>
+
+          <!-- Botão de Limpar -->
+          <button
+            v-if="busca || filtroPerfil !== 'TODOS' || filtroStatus !== 'TODOS'"
+            type="button"
+            class="btn-limpar-filtros"
+            @click="limparFiltros"
+          >
+            Limpar
+          </button>
+        </form>
       </div>
 
       <p v-if="carregando" class="estado-vazio">Carregando usuários…</p>
-      <p v-else-if="!usuariosFiltrados.length" class="estado-vazio">Nenhum usuário encontrado.</p>
+      <p v-else-if="!usuariosFiltrados.length" class="estado-vazio">Nenhum usuário encontrado para os parâmetros informados.</p>
 
       <div v-else class="tabela-container">
         <table class="tabela-dados">
@@ -1129,6 +1196,15 @@ button:disabled {
   gap: 1rem;
 }
 
+.barra-busca {
+  display: flex;
+  gap: 0.6rem;
+  flex: 1;
+  max-width: 42rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .campo-texto,
 .campo-select {
   box-sizing: border-box;
@@ -1142,8 +1218,8 @@ button:disabled {
 }
 
 .campo-texto {
-  flex: 1;
-  width: 100%;
+  flex: 2;
+  min-width: 12rem;
 }
 
 .campo-select {
@@ -1151,9 +1227,39 @@ button:disabled {
 }
 
 .campo-texto:focus,
-.campo-select:focus {
+.campo-select:focus,
+.seletor-filtro:focus {
   border-color: #15803d;
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.seletor-filtro {
+  flex: 1;
+  min-width: 9rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.86rem;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  cursor: pointer;
+}
+
+.btn-limpar-filtros {
+  background: transparent;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-limpar-filtros:hover {
+  background: #fee2e2;
 }
 
 .estado-vazio {
@@ -1183,18 +1289,12 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-.controle-tamanho,
-.controle-busca {
+.controle-tamanho {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.84rem;
   color: #475569;
-}
-
-.controle-busca .campo-texto {
-  width: 18rem;
-  flex: none;
 }
 
 .tabela-container {
@@ -1483,7 +1583,7 @@ button:disabled {
   background: #f8fafc;
 }
 
-/* Formulário de página inteira: rótulo à esquerda, campo à direita */
+/* Formulário de página inteira */
 .formulario-usuario {
   gap: 0;
   padding: 0.5rem 1.5rem 1.25rem;
@@ -1658,7 +1758,7 @@ button:disabled {
   align-self: center;
 }
 
-/* Confirmação de desativar/reativar (só variáveis do style.css: escuro já vem junto) */
+/* Confirmação de desativar/reativar */
 .modal-confirmacao {
   max-width: 480px;
 }
@@ -1833,19 +1933,65 @@ button:disabled {
   color: #94a3b8;
 }
 
+.grupo {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.75rem 1rem 1rem;
+  margin: 0;
+}
+
+.grupo legend {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 0.35rem;
+}
+
+.opcao {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+}
+
+.opcao:last-child {
+  border-bottom: none;
+}
+
+.opcao input {
+  margin-top: 0.2rem;
+}
+
+.opcao-desc {
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.opcao code {
+  font-size: 0.8rem;
+  color: #0f172a;
+}
+
+.via-perfil {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #0369a1;
+}
+
 @media (max-width: 760px) {
   .acoes-topo {
     width: 100%;
   }
 
-  .controle-busca {
+  .barra-busca {
+    max-width: none;
     width: 100%;
-  }
-
-  .controle-busca .campo-texto {
-    width: auto;
-    flex: 1;
-    min-width: 0;
   }
 
   .linha-form {
@@ -1868,8 +2014,29 @@ button:disabled {
 }
 
 /* ==========================================================================
-   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   Tema escuro (LIZARDS-38)
    ========================================================================== */
+:root[data-tema="escuro"] .seletor-filtro {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .seletor-filtro:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-limpar-filtros {
+  border-color: rgb(248 113 113 / 40%);
+  color: var(--cor-erro);
+  background: transparent;
+}
+
+:root[data-tema="escuro"] .btn-limpar-filtros:hover {
+  background: var(--tenue-erro);
+}
+
 :root[data-tema="escuro"] .etiqueta {
   color: var(--cor-texto-rotulo);
 }
@@ -1954,8 +2121,7 @@ button:disabled {
 }
 
 :root[data-tema="escuro"] .estado-vazio,
-:root[data-tema="escuro"] .controle-tamanho,
-:root[data-tema="escuro"] .controle-busca {
+:root[data-tema="escuro"] .controle-tamanho {
   color: var(--cor-texto-terciario);
 }
 
@@ -2109,5 +2275,41 @@ button:disabled {
 :root[data-tema="escuro"] .modal-footer {
   background: var(--cor-superficie-elevada);
   border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .grupo {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .grupo legend {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .campo {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .campo small {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .opcao {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .opcao-desc {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .opcao code {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .via-perfil {
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .resumo-efetivas {
+  color: var(--cor-texto-secundario);
 }
 </style>
