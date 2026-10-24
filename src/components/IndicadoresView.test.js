@@ -8,6 +8,11 @@ import {
 } from '../services/consultaIndicadoresService'
 
 vi.mock('../services/goldService', () => ({ listarTiposIndicador: vi.fn() }))
+// Rota falsa: a query é editável por teste (vindo do mapa, LIZARDS-35).
+const rota = vi.hoisted(() => ({ query: {}, push: vi.fn() }))
+vi.mock('vue-router', () => ({ useRoute: () => rota, useRouter: () => ({ push: rota.push }) }))
+const permissoes = vi.hoisted(() => ({ lista: ['conjunto:visualizar'] }))
+vi.mock('../auth/autenticacao', () => ({ temPermissao: (p) => permissoes.lista.includes(p) }))
 vi.mock('../services/consultaIndicadoresService', () => ({
     listarIndicadoresPorMunicipio: vi.fn(),
     listarIndicadoresPorImovel: vi.fn(),
@@ -113,7 +118,11 @@ beforeEach(() => {
     listarIndicadoresPorImovel.mockResolvedValue(IMOVEIS)
 })
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => {
+    vi.clearAllMocks()
+    rota.query = {}
+    permissoes.lista = ['conjunto:visualizar']
+})
 
 describe('IndicadoresView', () => {
     // ------------------------------------------------------------------ abertura
@@ -472,5 +481,75 @@ describe('IndicadoresView', () => {
             .filter((texto) => /editar|excluir|apagar|salvar|cadastrar|nov[oa]/i.test(texto))
 
         expect(acoes).toEqual([])
+    })
+})
+
+describe('IndicadoresView — vindo do mapa (LIZARDS-35)', () => {
+    it('?municipio= abre filtrado no município e com o detalhe dele aberto', async () => {
+        rota.query = { municipio: '4119905' }
+        const wrapper = mount(IndicadoresView)
+        await flushPromises()
+
+        expect(linhasDe(wrapper)).toHaveLength(1)
+        expect(linhasDe(wrapper)[0].text()).toContain('Ponta Grossa')
+        expect(wrapper.findAll('.linha-detalhe')).toHaveLength(1)
+    })
+
+    it('?imovel= abre na aba de imóveis com o imóvel aberto', async () => {
+        rota.query = { visao: 'imovel', imovel: IMOVEIS[1].codImovel }
+        const wrapper = mount(IndicadoresView)
+        await flushPromises()
+
+        expect(abas(wrapper)[1].classes()).toContain('aba-pagina--ativa')
+        expect(listarIndicadoresPorImovel).toHaveBeenCalledTimes(1)
+        expect(linhasDe(wrapper)).toHaveLength(1)
+        expect(wrapper.findAll('.linha-detalhe')).toHaveLength(1)
+    })
+
+    it('código que não existe é ignorado: tela abre como sempre', async () => {
+        rota.query = { municipio: '9999999' }
+        const wrapper = mount(IndicadoresView)
+        await flushPromises()
+
+        expect(linhasDe(wrapper)).toHaveLength(2)
+        expect(wrapper.find('.linha-detalhe').exists()).toBe(false)
+    })
+})
+
+describe('IndicadoresView — botão Ver no mapa (LIZARDS-35)', () => {
+    it('sem item aberto, volta pro mapa no recorte inteiro', async () => {
+        const wrapper = mount(IndicadoresView)
+        await flushPromises()
+
+        const botao = wrapper.get('[data-acao="ver-mapa"]')
+        expect(botao.text()).toBe('Ver no mapa')
+        await botao.trigger('click')
+        expect(rota.push).toHaveBeenLastCalledWith({ path: '/conjuntos', query: {} })
+    })
+
+    it('com município aberto, volta pro mapa nele', async () => {
+        rota.query = { municipio: '4119905' }
+        const wrapper = mount(IndicadoresView)
+        await flushPromises()
+
+        await wrapper.get('[data-acao="ver-mapa"]').trigger('click')
+        expect(rota.push).toHaveBeenLastCalledWith({ path: '/conjuntos', query: { municipio: '4119905' } })
+    })
+
+    it('com imóvel aberto, volta pro mapa no imóvel', async () => {
+        rota.query = { visao: 'imovel', imovel: IMOVEIS[1].codImovel }
+        const wrapper = mount(IndicadoresView)
+        await flushPromises()
+
+        await wrapper.get('[data-acao="ver-mapa"]').trigger('click')
+        expect(rota.push).toHaveBeenLastCalledWith({ path: '/conjuntos', query: { imovel: IMOVEIS[1].codImovel } })
+    })
+
+    it('sem permissão de ver o mapa, o botão não aparece', async () => {
+        permissoes.lista = []
+        const wrapper = mount(IndicadoresView)
+        await flushPromises()
+
+        expect(wrapper.find('[data-acao="ver-mapa"]').exists()).toBe(false)
     })
 })

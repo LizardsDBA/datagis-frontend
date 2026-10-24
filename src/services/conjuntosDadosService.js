@@ -77,3 +77,20 @@ export async function buscarComparacaoCamadas(registroBrutoId, origem, destino) 
   }
   return resp.json()
 }
+
+/**
+ * Diff entre os dois últimos lotes promovidos de uma fonte (atual vs anterior), similar
+ * ao "git diff" entre commits. Suporta paginação e filtro por situação (ADICIONADO,
+ * REMOVIDO, MODIFICADO, INALTERADO).
+ */
+export async function buscarComparacaoLotes(fonteId, pagina = 0, tamanho = 25, filtroSituacao = null) {
+  let url = `/api/conjuntos-dados/fontes/${fonteId}/comparacao-lotes?pagina=${pagina}&tamanho=${tamanho}`
+  if (filtroSituacao) url += `&filtroSituacao=${filtroSituacao}`
+  const resp = await apiFetch(url)
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => null)
+    throw new Error(data?.erro || `Falha ao comparar lotes da fonte ${fonteId}`)
+  }
+  return resp.json()
+}
+

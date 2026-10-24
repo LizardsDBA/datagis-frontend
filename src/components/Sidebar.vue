@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { nomeDoPerfil, sair, sessao, temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 import { alternarTema, estadoTema } from '../tema'
@@ -64,22 +65,13 @@ const categorias = [
     itens: [
       {
         rota: '/conjuntos',
-        rotulo: 'Conjuntos e Cobertura',
-        icone: 'conjuntos',
-        descricao: 'Cadastro e Mapa Territorial',
-        permissao: PERMISSOES.CONJUNTO_VISUALIZAR,
-      },
-    ],
-  },
-  {
-    titulo: 'Publicação & Resultados (Gold)',
-    itens: [
-      {
-        rota: '/indicadores',
         rotulo: 'Indicadores e Resultados',
-        icone: 'indicadores',
-        descricao: 'Consulta por município e imóvel',
-        permissao: PERMISSOES.INDICADOR_VISUALIZAR,
+        icone: 'conjuntos',
+        descricao: 'Indicadores, Mapa e Cobertura',
+        permissao: PERMISSOES.CONJUNTO_VISUALIZAR,
+        // Mesma área em duas telas: o mapa (/conjuntos) e a tabela (/indicadores), que abre
+        // pelo botão "Ver em tabela" do mapa (LIZARDS-35)
+        rotasRelacionadas: ['/indicadores'],
       },
     ],
   },
@@ -94,15 +86,24 @@ const categorias = [
         permissao: PERMISSOES.AUDITORIA_VISUALIZAR,
       },
       {
-        rota: '/admin/usuarios',
-        rotulo: 'Usuários e Acessos',
+        rota: '/admin/controle-acesso',
+        rotulo: 'Controle de Acesso',
         icone: 'usuarios',
-        descricao: 'Perfis e Permissões',
+        descricao: 'Usuários, perfis e permissões',
         permissao: PERMISSOES.USUARIO_GERENCIAR,
+        // As telas do Controle de Acesso abrem pelo painel; o item continua marcado nelas
+        rotasRelacionadas: ['/admin/'],
       },
     ],
   },
 ]
+
+// Tela aberta a partir de outra (ex.: a tabela /indicadores, aberta pelo mapa) marca o
+// item de origem como ativo, pra o menu não ficar sem nenhum item destacado.
+const route = useRoute()
+function ativoPorRelacao(item) {
+  return (item.rotasRelacionadas || []).some((r) => route?.path?.startsWith(r))
+}
 
 // Mantém o filtro estrito de permissões da sprint-2 por perfil de usuário
 const categoriasVisiveis = computed(() => {
@@ -216,6 +217,7 @@ function navegar() {
             :to="item.rota"
             class="item-menu"
             active-class="item-menu--ativo"
+            :class="{ 'item-menu--ativo': ativoPorRelacao(item) }"
             :title="recolhido ? item.rotulo : ''"
             @click="navegar"
             @dblclick="lidarDuploClique"
@@ -239,17 +241,10 @@ function navegar() {
                 <path d="M12 8v4" />
                 <path d="M12 16h.01" />
               </svg>
-              <!-- Ícone para Conjuntos e Cobertura -->
+              <!-- Ícone para Indicadores e Resultados (mapa) -->
               <svg v-else-if="item.icone === 'conjuntos'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                 <circle cx="12" cy="10" r="3" />
-              </svg>
-              <!-- Ícone para Indicadores e Resultados -->
-              <svg v-else-if="item.icone === 'indicadores'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="9" y1="9" x2="9" y2="21" />
-                <line x1="3" y1="15" x2="21" y2="15" />
               </svg>
               <!-- Ícone para Logs de Auditoria -->
               <svg v-else-if="item.icone === 'auditoria'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -258,7 +253,7 @@ function navegar() {
                 <line x1="8" y1="13" x2="16" y2="13" />
                 <line x1="8" y1="17" x2="13" y2="17" />
               </svg>
-              <!-- Ícone para Usuários e Acessos -->
+              <!-- Ícone para Controle de Acesso -->
               <svg v-else-if="item.icone === 'usuarios'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />

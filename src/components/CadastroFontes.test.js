@@ -106,12 +106,24 @@ describe('CadastroFontes — coluna de agendamento', () => {
         expect(wrapper.findAll('.agendamento-cron')[0].text()).toBe('0 0 2 * * ?')
     })
 
-    it('marca como manual a fonte sem cron e não inventa tradução para cron personalizado', async () => {
+    it('fonte de upload sem cron aparece como por envio de arquivo e não inventa tradução para cron personalizado', async () => {
         await abrirTela()
         const linhas = wrapper.findAll('.celula-agendamento')
-        expect(linhas[3].text()).toContain('Somente manual')
+        // Fonte 4 é UPLOAD_MANUAL sem cron (LIZARDS-55: antes "Somente manual")
+        expect(linhas[3].text()).toContain('Por envio de arquivo')
         expect(linhas[4].text()).toContain('0 0/15 * * * ?')
         expect(linhas[4].text()).not.toContain('às')
+    })
+
+    it('fonte de API sem cron aparece como sem agendamento', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [
+            { id: 9, nome: 'API sem horário', tipoAquisicao: 'API_REST', cronExpressao: null, ativo: true },
+        ] }))
+        await abrirTela()
+
+        const celula = wrapper.get('.celula-agendamento')
+        expect(celula.text()).toContain('Sem agendamento')
+        expect(celula.text()).not.toContain('Por envio de arquivo')
     })
 })
 
@@ -145,5 +157,80 @@ describe('CadastroFontes — bloqueio de execução por mapeamento incompleto', 
         expect(badges).toHaveLength(2)
         expect(badges[0].text()).toContain('Mapeamento Incompleto (2/5)')
         expect(badges[1].text()).toContain('Mapeamento Incompleto (1/4)')
+    })
+})
+describe('CadastroFontes — editar e agendamento (LIZARDS-55)', () => {
+    // O PUT grava a entidadeSilver que vier no corpo; sem ela, editar apagava a tabela da fonte
+    it('ao editar, o salvar devolve a tabela Silver que a fonte já tinha', async () => {
+        const fonte = { id: 7, nome: 'Fonte com Silver', tipoAquisicao: 'API_REST', urlOrigem: 'http://x', entidadeSilver: 'embargo_ambiental', mapeamentoCompleto: true, cronExpressao: null, ativo: true }
+        const fetchFalso = vi.fn().mockResolvedValue({ ok: true, json: async () => [fonte] })
+        vi.stubGlobal('fetch', fetchFalso)
+        await abrirTela()
+
+        await wrapper.get('.btn-editar').trigger('click')
+        await wrapper.get('.modal-dialog form').trigger('submit')
+        await flushPromises()
+
+        const chamadaPut = fetchFalso.mock.calls.find(([, opcoes]) => opcoes?.method === 'PUT')
+        expect(chamadaPut[0]).toContain('/api/fontes/7')
+        expect(JSON.parse(chamadaPut[1].body).entidadeSilver).toBe('embargo_ambiental')
+    })
+
+    it('com a atualização automática ligada e sem horário escolhido, o salvar fica bloqueado', async () => {
+        await abrirTela()
+        await wrapper.get('.btn-adicionar-fonte').trigger('click')
+        const salvar = () => wrapper.get('.modal-dialog button[type="submit"]')
+
+        expect(salvar().attributes('disabled')).toBeUndefined()
+
+        // Fonte nova nasce como upload manual, que não agenda; troca para uma modalidade que agenda
+        await wrapper.get('.modal-dialog select.campo-select').setValue('API_REST')
+        await wrapper.get('.interruptor-entrada').setValue(true)
+
+        expect(salvar().attributes('disabled')).toBeDefined()
+    })
+})
+
+describe('CadastroFontes — casos de borda do agendamento (LIZARDS-55)', () => {
+    const FONTE_AGENDADA = { id: 8, nome: 'Fonte agendada', tipoAquisicao: 'API_REST', urlOrigem: 'http://x', entidadeSilver: 'embargo_ambiental', mapeamentoCompleto: true, cronExpressao: '0 0 3 * * ?', ativo: true }
+
+    // Antes a caixa ficava dentro de um <label>: clicar em qualquer texto dela acionava o
+    // interruptor e desligava o agendamento sem a pessoa perceber
+    it('clicar no texto da caixa de agendamento não desliga a atualização automática', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [FONTE_AGENDADA] }))
+        wrapper = mount(CadastroFontes, { attachTo: document.body })
+        await flushPromises()
+        await wrapper.get('.btn-editar').trigger('click')
+        const ligado = () => wrapper.get('.interruptor-entrada').element.checked
+        expect(ligado()).toBe(true)
+
+        // Um clique só: com o defeito, dois cliques desligavam e religavam, mascarando o erro
+        wrapper.get('.previa').element.click()
+        await flushPromises()
+
+        expect(ligado()).toBe(true)
+    })
+
+    it('modalidade upload manual trava o agendamento e explica por quê', async () => {
+        await abrirTela()
+        await wrapper.get('.btn-adicionar-fonte').trigger('click')
+        // O cadastro novo já nasce como upload manual
+        expect(wrapper.get('.interruptor-entrada').element.disabled).toBe(true)
+        expect(wrapper.get('.modal-dialog').text()).toContain('Fonte de upload manual não tem atualização automática')
+    })
+
+    it('fonte inativa com horário aparece como pausada na lista', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [{ ...FONTE_AGENDADA, ativo: false }] }))
+        await abrirTela()
+
+        expect(wrapper.text()).toContain('Todo dia às 03:00')
+        expect(wrapper.get('.agendamento-pausado').text()).toBe('Pausado: fonte inativa')
+    })
+
+    it('fonte ativa com horário não aparece como pausada', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [FONTE_AGENDADA] }))
+        await abrirTela()
+
+        expect(wrapper.find('.agendamento-pausado').exists()).toBe(false)
     })
 })

@@ -9,7 +9,7 @@ import { PERMISSOES } from '../auth/permissoes'
 
 const router = useRouter()
 
-// Quem so visualiza fontes (ex.: Analista, Auditor) ve a lista sem os botoes de alterar,
+// Quem só visualiza fontes (ex.: Analista, Auditor) vê a lista sem os botões de alterar,
 // executar ou enviar arquivo (LIZARDS-45); o backend barra com 403 de qualquer jeito.
 const podeGerenciar = temPermissao(PERMISSOES.FONTE_GERENCIAR)
 const podeVerDados = temPermissao(PERMISSOES.DADOS_VISUALIZAR)
@@ -84,9 +84,15 @@ const formVazio = () => ({
   campoGeometriaLon: '',
   separadorCsv: ',',
   ativo: true,
+  // Não aparece no formulário (é definida no Mapeamento de Colunas), mas vai no salvar:
+  // o PUT grava o que receber, e sem ela a edição apagava a tabela Silver da fonte
+  entidadeSilver: null,
 })
 
 const form = ref(formVazio())
+
+// Falso enquanto a atualização automática está ligada sem frequência e horário escolhidos
+const agendamentoCompleto = ref(true)
 
 // A tela abre direto na lista; o formulario de cadastro/edicao vira pop-up.
 const modalAberto = ref(false)
@@ -140,9 +146,6 @@ const FASES_LABEL = {
 }
 const INTERVALO_SONDAGEM_MS = 2000
 
-// value="\t" em HTML puro vira a string literal de 2 caracteres "\t", nao uma
-// tabulacao de verdade - por isso o <select> usa :value ligado a este array (string
-// JS real) em vez de "\t" escrito direto no atributo do <option>.
 const OPCOES_SEPARADOR_CSV = [
   { valor: ',', rotulo: 'Vírgula ( , )' },
   { valor: ';', rotulo: 'Ponto e vírgula ( ; )' },
@@ -284,6 +287,7 @@ function editar(fonte) {
     campoGeometriaLon: fonte.campoGeometriaLon || '',
     separadorCsv: fonte.separadorCsv || ',',
     ativo: fonte.ativo,
+    entidadeSilver: fonte.entidadeSilver || null,
   }
   sucesso.value = false
   erro.value = null
@@ -291,6 +295,7 @@ function editar(fonte) {
 }
 
 async function salvar() {
+  if (!agendamentoCompleto.value) return
   enviando.value = true
   erro.value = null
   sucesso.value = false
@@ -470,8 +475,6 @@ const DIAS_SEMANA_CRON = {
   FRI: 'sexta', SAT: 'sábado', SUN: 'domingo',
 }
 
-// Traduz as expressoes que o ConstrutorCron gera. Qualquer outra (modo
-// "Personalizado") aparece como veio, sem tentar adivinhar.
 function descreverCron(expressao) {
   if (!expressao) return null
   const campos = expressao.trim().split(/\s+/)
@@ -689,10 +692,15 @@ onUnmounted(() => {
             </template>
 
             <div class="campo-grupo campo-grupo--full">
-              <label class="campo-label">
-                Agendamento Automático de Execução (Quartz Cron)
-                <ConstrutorCron v-model="form.cronExpressao" />
-              </label>
+              <div class="campo-label">
+                Agendamento Automático de Execução
+                <ConstrutorCron
+                  v-model="form.cronExpressao"
+                  v-model:completo="agendamentoCompleto"
+                  :bloqueado="form.tipoAquisicao === 'UPLOAD_MANUAL'"
+                  motivo-bloqueio="Fonte de upload manual não tem atualização automática: os dados mudam quando um arquivo novo é enviado."
+                />
+              </div>
             </div>
 
             <div class="campo-grupo campo-grupo--checkbox">
@@ -705,7 +713,7 @@ onUnmounted(() => {
 
             <!-- Mensagens e Ações -->
             <div class="acoes-formulario campo-grupo--full">
-              <button type="submit" class="botao-principal" :disabled="enviando">
+              <button type="submit" class="botao-principal" :disabled="enviando || !agendamentoCompleto">
                 <span v-if="enviando" class="spinner-sm"></span>
                 <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
               </button>
@@ -843,8 +851,10 @@ onUnmounted(() => {
                   <template v-if="fonte.cronExpressao">
                     <div class="agendamento-texto">{{ descreverCron(fonte.cronExpressao) }}</div>
                     <code class="agendamento-cron">{{ fonte.cronExpressao }}</code>
+                    <div v-if="!fonte.ativo" class="agendamento-pausado">Pausado: fonte inativa</div>
                   </template>
-                  <span v-else class="agendamento-vazio">Somente manual</span>
+                  <span v-else-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'" class="agendamento-vazio">Por envio de arquivo</span>
+                  <span v-else class="agendamento-vazio">Sem agendamento</span>
                 </td>
 
                 <!-- Última Execução -->
@@ -1460,7 +1470,6 @@ onUnmounted(() => {
   margin-top: 0.2rem;
 }
 
-/* Informação de URL exposta */
 .fonte-url-preview {
   display: flex;
   align-items: center;
@@ -1874,6 +1883,7 @@ onUnmounted(() => {
     padding: 1.1rem;
   }
 }
+
 /* ----- Cabeçalho: ações ----- */
 .topo-acoes {
   display: flex;
@@ -1977,6 +1987,13 @@ onUnmounted(() => {
   color: #94a3b8;
 }
 
+.agendamento-pausado {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b45309;
+}
+
 .btn-executar:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -2025,7 +2042,7 @@ onUnmounted(() => {
 }
 
 /* ==========================================================================
-   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   Tema escuro (LIZARDS-38)
    ========================================================================== */
 :root[data-tema="escuro"] .card-pesquisa {
   background: var(--cor-superficie);
@@ -2412,6 +2429,10 @@ onUnmounted(() => {
 
 :root[data-tema="escuro"] .agendamento-vazio {
   color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .agendamento-pausado {
+  color: var(--cor-alerta);
 }
 
 :root[data-tema="escuro"] .badge-mapeamento--ok {
