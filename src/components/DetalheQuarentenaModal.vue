@@ -7,6 +7,8 @@ import {
   adicionarValorDominio,
   buscarTiposAreaProtegida,
 } from '../services/quarentenaService'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 
 const props = defineProps({
   item: {
@@ -188,7 +190,12 @@ function gerarSlug(texto) {
     .slice(0, 40)
 }
 
+// Corrigir, revalidar, descartar e cadastrar domínio exigem quarentena:tratar (LIZARDS-45);
+// quem só visualiza (ex.: Auditor) inspeciona o registro sem os botões de ação.
+const podeTratar = temPermissao(PERMISSOES.QUARENTENA_TRATAR)
+
 const podeAdicionarAoDominio = computed(() => {
+  if (!podeTratar) return false
   if (props.item.tipoErroCodigo !== 'VALOR_FORA_DO_DOMINIO') return false
   if (props.item.statusAnaliseCodigo === 'DESCARTADO' || props.item.statusAnaliseCodigo === 'CORRIGIDO_REPROCESSADO') return false
   const tab = props.item.tabelaReferencia
@@ -614,7 +621,7 @@ async function onReprocessar() {
               <button class="btn-copiar-json" @click="copiarPayload" title="Copiar JSON para a área de transferência">
                 {{ copiado ? '✓ Copiado!' : 'Copiar JSON' }}
               </button>
-              <button class="btn-secundario-sm" @click="modoEdicao = !modoEdicao">
+              <button v-if="podeTratar" class="btn-secundario-sm" @click="modoEdicao = !modoEdicao">
                 {{ modoEdicao ? 'Visualizar Formatado' : 'Editar Correção Manual' }}
               </button>
             </div>
@@ -658,7 +665,7 @@ async function onReprocessar() {
           Fechar
         </button>
 
-        <div class="acoes-direita">
+        <div v-if="podeTratar" class="acoes-direita">
           <button
             v-if="podeAdicionarAoDominio && !modoAdicionarDominio"
             type="button"
@@ -1513,6 +1520,364 @@ async function onReprocessar() {
     width: 100%;
     text-align: center;
   }
+}
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .modal-container {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .modal-header {
+  background: var(--cor-superficie-elevada);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tag-entidade {
+  background: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .chave-registro {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .fonte-origem {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-fechar {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .btn-fechar:hover {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .secao-inconsistencia {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .erro-descricao {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .label {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .valor-destaque {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .valor-recebido {
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .motivo-box {
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  border-left-color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .payload-header h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .payload-sub {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-copiar-json,
+:root[data-tema="escuro"] .btn-secundario-sm {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-copiar-json:hover,
+:root[data-tema="escuro"] .btn-secundario-sm:hover {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .json-viewer {
+  background: var(--cor-fundo);
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .campo-textarea,
+:root[data-tema="escuro"] .campo-texto {
+  border-color: var(--cor-borda-forte);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .campo-textarea:focus,
+:root[data-tema="escuro"] .campo-texto:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .dica {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .alerta-erro {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .modal-footer {
+  background: var(--cor-superficie-elevada);
+  border-top-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .btn-cancelar {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-cancelar:hover {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .btn-analise {
+  background: var(--tenue-info);
+  color: var(--cor-info);
+  border-color: rgb(124 180 247 / 30%);
+}
+
+:root[data-tema="escuro"] .btn-analise:hover {
+  background: var(--tenue-info);
+}
+
+:root[data-tema="escuro"] .btn-descartar {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .btn-descartar:hover {
+  background: var(--tenue-erro);
+}
+
+:root[data-tema="escuro"] .btn-reprocessar {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .btn-reprocessar:hover {
+  background: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] .secao-dominio {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .dominio-info h4 {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .dominio-info p {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .dominio-info code {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .btn-toggle-dominio {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .btn-toggle-dominio:hover {
+  background: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] .btn-toggle-dominio.ativo {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-link);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .dominio-formulario {
+  background: var(--cor-superficie);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .campo-readonly {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .campo-ajuda {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .alerta-relacionamento {
+  background: var(--tenue-info);
+  border-color: rgb(124 180 247 / 30%);
+}
+
+:root[data-tema="escuro"] .painel-tipo-ap {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .btn-opcao-tipo {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-opcao-tipo:hover {
+  background: var(--cor-borda);
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .btn-opcao-tipo--ativo {
+  background: var(--cor-info);
+  border-color: var(--cor-info);
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .btn-opcao-tipo--ativo:hover {
+  background: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .tipo-ap-conteudo {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .campo-select {
+  background-color: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .label-sm {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .texto-carregando {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .dica-sugestao {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .relacionamento-info strong {
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .relacionamento-info p {
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .dominio-acoes {
+  border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .btn-cancelar-sm {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-salvar-dominio {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-salvar-dominio:hover:not(:disabled) {
+  background: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] .btn-acao-dominio {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .btn-acao-dominio:hover {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .alerta-sucesso {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .secao-geometria {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .titulo-linha h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .badge-srid {
+  background: var(--tenue-info);
+  color: var(--cor-info);
+  border-color: rgb(124 180 247 / 30%);
+}
+
+:root[data-tema="escuro"] .badge-vertices {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .geometria-sub {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-copiar-wkt {
+  background: var(--cor-info);
+  color: var(--cor-primaria-contraste);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-copiar-wkt:hover {
+  background: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .dica-contador {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .campo-textarea--geometria {
+  background: var(--cor-fundo);
+  color: var(--cor-info);
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .campo-textarea--geometria:focus {
+  border-color: var(--cor-info);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .geometria-guia {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .guia-item {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .guia-item code {
+  background: var(--cor-borda);
+  color: var(--cor-texto-titulo);
 }
 </style>
 

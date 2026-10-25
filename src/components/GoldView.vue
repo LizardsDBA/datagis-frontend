@@ -8,6 +8,12 @@ import {
   listarImoveisPublicados,
   listarTiposIndicador,
 } from '../services/goldService'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
+
+// Cadastrar/editar/desativar tipo de indicador exige indicador:publicar (LIZARDS-46);
+// quem só visualiza (ex.: Auditor) consulta tipos e imóveis publicados.
+const podePublicar = temPermissao(PERMISSOES.INDICADOR_PUBLICAR)
 
 const abaAtiva = ref('tipos')
 
@@ -308,7 +314,7 @@ onUnmounted(() => {
             Cadastre, edite ou desative os tipos que compõem os indicadores Gold. O código é imutável após a criação.
           </p>
         </div>
-        <button class="botao-principal botao-principal--compacto" type="button" @click="abrirCadastroTipo">
+        <button v-if="podePublicar" class="botao-principal botao-principal--compacto" type="button" @click="abrirCadastroTipo">
           + Novo tipo
         </button>
       </div>
@@ -339,7 +345,7 @@ onUnmounted(() => {
               <th>Fonte de dados</th>
               <th>Status</th>
               <th>Cadastrado em</th>
-              <th class="col-acoes-titulo">Ações</th>
+              <th v-if="podePublicar" class="col-acoes-titulo">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -359,7 +365,7 @@ onUnmounted(() => {
                 </span>
               </td>
               <td>{{ formatarData(tipo.dataAdd) }}</td>
-              <td class="celula-acoes">
+              <td v-if="podePublicar" class="celula-acoes">
                 <div class="grupo-botoes-acoes">
                   <button
                     type="button"
@@ -1202,5 +1208,36 @@ onUnmounted(() => {
   .detalhe-grid,
   .indicadores-detalhe-grid { grid-template-columns: 1fr; }
   .modal-overlay { padding: 0.5rem; }
+}
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .botao-principal {
+  background: linear-gradient(135deg, var(--cor-primaria), var(--cor-primaria));
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .campo-busca input:focus,
+:root[data-tema="escuro"] .input-campo:focus {
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .tabela-gold tbody tr:hover td {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .codigo-badge--imovel {
+  background: var(--tenue-info);
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .btn-detalhe {
+  border-color: var(--cor-primaria-borda);
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .btn-detalhe:hover:not(:disabled) {
+  background: var(--cor-primaria-tenue);
 }
 </style>

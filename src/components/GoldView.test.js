@@ -10,6 +10,11 @@ import {
   listarTiposIndicador,
 } from '../services/goldService'
 
+// Sessão de mentira: por padrão o Analista (pode publicar indicadores).
+const { sessaoTeste } = vi.hoisted(() => ({ sessaoTeste: { permissoes: [] } }))
+vi.mock('../auth/autenticacao', () => ({ temPermissao: (p) => !p || sessaoTeste.permissoes.includes(p) }))
+const PERMISSOES_ANALISTA = ['conjunto:visualizar', 'conjunto:gerenciar', 'indicador:visualizar', 'indicador:publicar', 'fonte:visualizar', 'dados:visualizar']
+
 vi.mock('../services/goldService', () => ({
   atualizarTipoIndicador: vi.fn(),
   buscarImovelPublicado: vi.fn(),
@@ -59,6 +64,7 @@ const imoveisFixture = [
 ]
 
 beforeEach(() => {
+  sessaoTeste.permissoes = PERMISSOES_ANALISTA
   vi.resetAllMocks()
   listarTiposIndicador.mockResolvedValue(tiposFixture)
   listarImoveisPublicados.mockResolvedValue(imoveisFixture)
@@ -220,5 +226,15 @@ describe('GoldView', () => {
 
     expect(wrapper.text()).toContain('Já existe um tipo de indicador com o código ISAP')
     expect(wrapper.get('#form-tipo-indicador').exists()).toBe(true)
+  })
+})
+
+describe('GoldView — permissões (LIZARDS-46)', () => {
+  it('quem só visualiza consulta os tipos sem cadastrar, editar ou desativar', async () => {
+    sessaoTeste.permissoes = ['indicador:visualizar']
+    await abrir()
+    expect(wrapper.text()).not.toContain('+ Novo tipo')
+    expect(wrapper.find('.btn-editar').exists()).toBe(false)
+    expect(wrapper.find('.btn-desativar').exists()).toBe(false)
   })
 })

@@ -198,3 +198,198 @@ code, pre {
   color: var(--status-neutro-texto);
   border: 1px solid var(--status-neutro-borda);
 }
+
+/* ==========================================================================
+   Tema escuro (LIZARDS-38)
+   Ativado por data-tema="escuro" no <html> (src/tema.js). O tema claro acima
+   continua sendo o padrão e não foi alterado: tudo daqui para baixo só vale no
+   escuro e só acrescenta regras.
+   ========================================================================== */
+
+/* tema escuro — LIZARDS-38 */
+:root[data-tema="escuro"] {
+  --cor-fundo:                 #0E1319;
+  --cor-superficie:            #151C24;
+  --cor-superficie-elevada:    #1C2530;
+  --cor-borda-suave:           #1E2834;
+  --cor-borda:                 #263241;
+  --cor-borda-forte:           #2C3A4A;
+
+  --cor-texto-titulo:          #F3F7FA;
+  --cor-texto:                 #E6EDF3;
+  --cor-texto-secundario:      #C7D4DF;
+  --cor-texto-terciario:       #9FB0C0;
+  --cor-texto-rotulo:          #8396A6;
+  --cor-texto-desabilitado:    #6F8293;
+
+  --cor-primaria:              #3BAE74;
+  --cor-primaria-hover:        #46C184;
+  --cor-primaria-contraste:    #06140D;
+  --cor-primaria-tenue:        rgb(59 174 116 / 14%);
+  --cor-primaria-borda:        rgb(59 174 116 / 34%);
+  --cor-link:                  #8DD5AE;
+
+  --cor-sucesso:               #4ADE80;
+  --cor-alerta:                #FBBF24;
+  --cor-erro:                  #F87171;
+  --cor-info:                  #7CB4F7;
+  --cor-destaque:              #B49CFB;
+
+  /* etiquetas: cor cheia no texto, 12% no fundo, 30% na borda */
+  --tenue-sucesso:             rgb(74 222 128 / 12%);
+  --tenue-alerta:              rgb(251 191 36 / 12%);
+  --tenue-erro:                rgb(248 113 113 / 12%);
+  --tenue-info:                rgb(124 180 247 / 12%);
+  --tenue-destaque:            rgb(180 156 251 / 12%);
+}
+
+/* Variáveis que já existiam, apontadas para a paleta no escuro. Os nomes não mudam:
+   só o valor. Com isso, as telas que já usam essas variáveis (Indicadores, Gold e os
+   badges .badge-tag--*) escurecem sem precisar ser alteradas. */
+:root[data-tema="escuro"] {
+  --cor-primaria-clara:        var(--cor-primaria-tenue);
+  --cor-primaria-glow:         rgb(59 174 116 / 20%);
+
+  --cor-branco:                var(--cor-superficie);
+  --cor-slate-50:              var(--cor-superficie-elevada);
+  --cor-slate-100:             var(--cor-superficie-elevada);
+  --cor-slate-200:             var(--cor-borda);
+  --cor-slate-300:             var(--cor-borda-forte);
+  --cor-slate-400:             var(--cor-texto-rotulo);
+  --cor-slate-500:             var(--cor-texto-terciario);
+  --cor-slate-600:             var(--cor-texto-secundario);
+  --cor-slate-700:             var(--cor-texto-secundario);
+  --cor-slate-800:             var(--cor-texto);
+  --cor-slate-900:             var(--cor-texto-titulo);
+
+  --status-sucesso-bg:         var(--tenue-sucesso);
+  --status-sucesso-texto:      var(--cor-sucesso);
+  --status-sucesso-borda:      rgb(74 222 128 / 30%);
+  --status-alerta-bg:          var(--tenue-alerta);
+  --status-alerta-texto:       var(--cor-alerta);
+  --status-alerta-borda:       rgb(251 191 36 / 30%);
+  --status-erro-bg:            var(--tenue-erro);
+  --status-erro-texto:         var(--cor-erro);
+  --status-erro-borda:         rgb(248 113 113 / 30%);
+  --status-info-bg:            var(--tenue-info);
+  --status-info-texto:         var(--cor-info);
+  --status-info-borda:         rgb(124 180 247 / 30%);
+  --status-espacial-bg:        var(--tenue-destaque);
+  --status-espacial-texto:     var(--cor-destaque);
+  --status-espacial-borda:     rgb(180 156 251 / 30%);
+  --status-neutro-bg:          var(--cor-superficie-elevada);
+  --status-neutro-texto:       var(--cor-texto-terciario);
+  --status-neutro-borda:       var(--cor-borda);
+
+  /* Controles nativos (select, data, barras de rolagem) também no escuro */
+  color-scheme: dark;
+}
+
+/* Regras globais que no claro usam cor fixa */
+:root[data-tema="escuro"],
+:root[data-tema="escuro"] body {
+  background-color: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] a {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] a:hover {
+  color: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] ::-webkit-scrollbar-track {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] ::-webkit-scrollbar-thumb {
+  background: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--cor-texto-desabilitado);
+}
+
+/* Campos sem cor própria (ex.: busca da Quarentena e de Usuários) usariam o cinza
+   padrão do navegador no escuro. :where() deixa esta regra com prioridade mínima:
+   ela só preenche o que a tela não definiu, nunca passa por cima de regra de tela. */
+:root[data-tema="escuro"] :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  background-color: var(--cor-superficie-elevada);
+  color: var(--cor-texto);
+}
+
+/* Lista aberta dos menus de seleção: o navegador desenha a lista, mas aceita fundo e
+   texto das opções; sem isso o item selecionado aparece em cinza claro no tema escuro. */
+:root[data-tema="escuro"] option {
+  background-color: var(--cor-superficie-elevada);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] option:checked {
+  background-color: var(--cor-borda-forte);
+  color: var(--cor-texto-titulo);
+}
+
+/* Menus de seleção modernos, nos dois temas: lista com cantos arredondados, sombra,
+   opções em "pílula" e ✓ no item escolhido. Só Chrome/Edge 135+ suportam o
+   appearance: base-select; nos outros navegadores o @supports pula tudo e o menu fica
+   como antes. :where() deixa a prioridade em zero: regra de tela continua valendo. */
+@supports (appearance: base-select) {
+  :where(select),
+  :where(select)::picker(select) {
+    appearance: base-select;
+  }
+
+  :where(select)::picker(select) {
+    margin-top: 0.25rem;
+    padding: 0.35rem;
+    border: 1px solid var(--cor-slate-200);
+    border-radius: var(--raio-lg);
+    background: var(--cor-branco);
+    box-shadow: var(--sombra-lg);
+  }
+
+  :where(select) option {
+    padding: 0.45rem 0.65rem;
+    border-radius: var(--raio-sm);
+  }
+
+  :where(select) option:hover {
+    background-color: var(--cor-slate-100);
+  }
+
+  :where(select) option:checked {
+    background-color: var(--cor-primaria-clara);
+    color: var(--cor-primaria);
+    font-weight: 600;
+  }
+
+  :where(select) option::checkmark {
+    color: var(--cor-primaria);
+  }
+
+  :root[data-tema="escuro"] select::picker(select) {
+    background: var(--cor-superficie-elevada);
+    border-color: var(--cor-borda);
+    box-shadow: 0 16px 40px -12px rgb(0 0 0 / 60%);
+  }
+
+  :root[data-tema="escuro"] select option {
+    background-color: transparent;
+  }
+
+  :root[data-tema="escuro"] select option:hover {
+    background-color: var(--cor-borda);
+  }
+
+  :root[data-tema="escuro"] select option:checked {
+    background-color: var(--cor-primaria-tenue);
+    color: var(--cor-link);
+  }
+
+  :root[data-tema="escuro"] select option::checkmark {
+    color: var(--cor-link);
+  }
+}

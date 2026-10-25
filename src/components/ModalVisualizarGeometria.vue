@@ -228,4 +228,78 @@ onUnmounted(() => {
   color: #991b1b;
   font-size: 0.85rem;
 }
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .caixa-modal {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .cabecalho-modal {
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .cabecalho-modal h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .botao-fechar {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .botao-copiar-wkt {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .botao-copiar-wkt:hover {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .aviso-erro {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+}
+
+/* Mapa (LIZARDS-38): continua o mesmo OpenStreetMap; no escuro só a camada de fundo
+   (.leaflet-tile-pane) é escurecida por filtro. Os polígonos ficam em outra camada
+   (.leaflet-overlay-pane) e mantêm as cores. Os elementos do Leaflet são criados por
+   JavaScript, sem a marca de escopo do Vue, por isso o :deep() a partir do container. */
+:root[data-tema="escuro"] .area-mapa {
+  background: var(--cor-fundo);
+}
+
+:root[data-tema="escuro"] .area-mapa :deep(.leaflet-tile-pane) {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+
+:root[data-tema="escuro"] .area-mapa :deep(.leaflet-bar) {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .area-mapa :deep(.leaflet-bar a) {
+  background-color: var(--cor-superficie-elevada);
+  border-bottom-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .area-mapa :deep(.leaflet-bar a:hover) {
+  background-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .area-mapa :deep(.leaflet-control-attribution) {
+  background: rgb(21 28 36 / 80%);
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .area-mapa :deep(.leaflet-control-attribution a) {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .area-mapa :deep(.leaflet-popup-content-wrapper),
+:root[data-tema="escuro"] .area-mapa :deep(.leaflet-popup-tip) {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto);
+}
 </style>

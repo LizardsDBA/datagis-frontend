@@ -8,8 +8,9 @@
  * Tela nova e isolada — não reaproveita nada de QuarentenaView.vue/ConjuntosView.vue de
  * propósito, só a mesma ideia visual (cards, tabela, badges).
  */
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { apiFetch } from '../services/http'
+import { useRoute, useRouter } from 'vue-router'
 import {
   buscarUltimoLote,
   buscarBronze,
@@ -21,8 +22,13 @@ import {
 } from '../services/conjuntosDadosService'
 import ModalVisualizarGeometria from './ModalVisualizarGeometria.vue'
 import ModalRegistroCamada from './ModalRegistroCamada.vue'
+import ModalComparacaoCamadas from './ModalComparacaoCamadas.vue'
+import ModalComparacaoLotes from './ModalComparacaoLotes.vue'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 
 const route = useRoute()
+const router = useRouter()
 const fonteId = route.params.fonteId
 
 const TAMANHO_PAGINA = 25
@@ -54,11 +60,141 @@ const itensAtuais = ref([])
 const carregandoTabela = ref(false)
 const erroTabela = ref(null)
 
+// --- ESTADOS DO PAINEL DE PESQUISA (DUAS CAIXAS - TASK LIZARDS-40) ---
+const painelFiltrosAberto = ref(true)
+const filtroId = ref('')
+const termoBusca = ref('')
+
+function limparFiltros() {
+  filtroId.value = ''
+  termoBusca.value = ''
+}
+
+function voltar() {
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/fontes')
+  }
+}
+
+// Filtro direcionado: Caixa 'ID' busca estritamente na 1ª coluna da esquerda
+const itensFiltrados = computed(() => {
+  if (!itensAtuais.value || !Array.isArray(itensAtuais.value)) {
+    return []
+  }
+
+  const idProcurado = filtroId.value.toLowerCase().trim()
+  const termoProcurado = termoBusca.value.toLowerCase().trim()
+
+  if (!idProcurado && !termoProcurado) {
+    return itensAtuais.value
+  }
+
+  return itensAtuais.value.filter((item) => {
+    const dadosLinha = item.dados || item
+    const entradas = Object.entries(dadosLinha)
+
+    // 1. Valida a caixa ID: Pega rigorosamente a PRIMEIRA coluna da esquerda (posição 0)
+    let bateuId = true
+    if (idProcurado && entradas.length > 0) {
+      const [primeiraChave, primeiroValor] = entradas[0]
+      if (primeiroValor === null || primeiroValor === undefined) {
+        bateuId = false
+      } else {
+        bateuId = String(primeiroValor).toLowerCase().includes(idProcurado)
+      }
+    }
+
+    // 2. Valida a caixa Nome: Varre as demais colunas por correspondência de texto
+    let bateuNome = true
+    if (termoProcurado) {
+      bateuNome = Object.values(dadosLinha).some((valor) => {
+        if (valor === null || valor === undefined) return false
+        return String(valor).toLowerCase().includes(termoProcurado)
+      })
+    }
+
+    return bateuId && bateuNome
+  })
+})
+
+// --- LÓGICA DE FILTRAGEM E PAGINAÇÃO RÍGIDA (TASK LIZARDS-40) ---
+
+// Monitora a digitação e alterna entre o modo de busca total e o modo paginado (25 por página)
+watch([filtroId, termoBusca], async ([novoId, novoTermo]) => {
+  pagina.value = 0
+  const idLimpo = (novoId || '').trim()
+  const termoLimpo = (novoTermo || '').trim()
+
+  if (idLimpo !== '' || termoLimpo !== '') {
+    // Se digitou algo: carrega o lote completo para encontrar em qualquer página
+    await carregarTodosOsRegistrosDoLote()
+  } else {
+    // Se está em branco: RESTAURA rigorosamente a busca paginada de 25 registros do servidor
+    await carregarPaginaAtual()
+  }
+})
+
+// Bate o martelo em exatamente quais 25 registros devem ir para a tabela
+const itensExibidos = computed(() => {
+  const temFiltroAtivo = filtroId.value.trim() !== '' || termoBusca.value.trim() !== ''
+
+  // 1. SEM FILTRO: Limita ESTRITAMENTE aos 25 registros da página atual do servidor
+  if (!temFiltroAtivo) {
+    return (itensAtuais.value || []).slice(0, TAMANHO_PAGINA)
+  }
+
+  // 2. COM FILTRO DIGITADO: Fatia a lista filtrada em blocos de 25 por página
+  const inicio = pagina.value * TAMANHO_PAGINA
+  return itensFiltrados.value.slice(inicio, inicio + TAMANHO_PAGINA)
+})
+
+// Calcula o total exato de páginas para a barra de navegação
+const totalPaginasCalculado = computed(() => {
+  const temFiltroAtivo = filtroId.value.trim() !== '' || termoBusca.value.trim() !== ''
+  const totalRegistros = temFiltroAtivo ? itensFiltrados.value.length : total.value
+  return Math.max(1, Math.ceil(totalRegistros / TAMANHO_PAGINA))
+})
+
+async function carregarTodosOsRegistrosDoLote() {
+  if (!loteResumo.value) return
+  carregandoTabela.value = true
+  erroTabela.value = null
+  try {
+    const totalDoLote = loteResumo.value.quantidadeRegistros || 1000
+    if (camadaAtiva.value === 'BRONZE') {
+      const resultado = await buscarBronze(loteResumo.value.loteId, 0, totalDoLote)
+      itensAtuais.value = resultado.itens
+      total.value = resultado.total
+    } else if (camadaAtiva.value === 'SILVER') {
+      const resultado = await buscarSilver(loteResumo.value.loteId, 0, totalDoLote)
+      itensAtuais.value = resultado.itens
+      total.value = resultado.total
+    } else {
+      await garantirQuarentenaCarregada()
+      total.value = quarentenaItensBrutos.value.length
+      itensAtuais.value = quarentenaItensBrutos.value.map((item) => ({
+        registroBrutoId: item.registroBrutoId,
+        temGeometria: false,
+        geometriaWkt: null,
+        dados: normalizarItemQuarentena(item),
+      }))
+    }
+  } catch (e) {
+    erroTabela.value = e.message
+  } finally {
+    carregandoTabela.value = false
+  }
+}
+
 const quarentenaItensBrutos = ref([])
 const quarentenaCarregada = ref(false)
 
 const modalGeometria = ref(null) // { titulo, wkt }
 const modalRegistro = ref(null) // { titulo, dados, mensagemVazio }
+const modalComparacao = ref(null) // { registroBrutoId, parInicial }
+const modalComparacaoLotes = ref(false)
 
 const totalPaginas = computed(() => Math.max(1, Math.ceil(total.value / TAMANHO_PAGINA)))
 
@@ -70,7 +206,12 @@ const colunasDinamicas = computed(() => {
   return Array.from(chaves)
 })
 
-const outrasCamadas = computed(() => CAMADAS.map((c) => c.valor).filter((v) => v !== camadaAtiva.value))
+// A aba Quarentena le /api/quarentena: so aparece pra quem tem quarentena:visualizar.
+// O Analista ve Bronze e Silver; o Operador e o Auditor veem as tres (LIZARDS-46).
+const camadasPermitidas = CAMADAS.filter(
+  (c) => c.valor !== 'QUARENTENA' || temPermissao(PERMISSOES.QUARENTENA_VISUALIZAR),
+)
+const outrasCamadas = computed(() => camadasPermitidas.map((c) => c.valor).filter((v) => v !== camadaAtiva.value))
 
 function normalizarItemQuarentena(item) {
   const dados = {}
@@ -182,6 +323,14 @@ async function verEmCamada(registro, camadaDestino) {
   }
 }
 
+// Quarentena não tem comparação: o registro rejeitado não existe na Silver nem na Gold.
+function compararRegistro(registro) {
+  modalComparacao.value = {
+    registroBrutoId: registro.registroBrutoId,
+    parInicial: camadaAtiva.value === 'SILVER' ? 'SILVER_GOLD' : 'BRONZE_SILVER',
+  }
+}
+
 function rotuloCamada(valor) {
   return CAMADAS.find((c) => c.valor === valor)?.rotulo || valor
 }
@@ -194,7 +343,7 @@ function formatarData(iso) {
 onMounted(async () => {
   try {
     const [fonteResp, loteResp] = await Promise.all([
-      fetch(`/api/fontes/${fonteId}`).then((r) => (r.ok ? r.json() : null)),
+      apiFetch(`/api/fontes/${fonteId}`).then((r) => (r.ok ? r.json() : null)),
       buscarUltimoLote(fonteId),
     ])
     loteResumo.value = { ...loteResp, fonteDadoNomeExibicao: fonteResp?.nome || loteResp.fonteDadoNome }
@@ -210,8 +359,33 @@ onMounted(async () => {
 <template>
   <div class="pagina-conjunto-dados">
     <header class="topo-pagina">
-      <p class="etiqueta">CONJUNTO DE DADOS</p>
-      <h1 class="titulo">{{ loteResumo?.fonteDadoNomeExibicao || 'Carregando…' }}</h1>
+      <div class="topo-titulo-linha">
+        <button 
+          type="button" 
+          class="btn-voltar" 
+          title="Voltar para o Cadastro de Fontes" 
+          @click="voltar"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="icone-voltar">
+            <path d="M19 12H5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Voltar
+        </button>
+        <p class="etiqueta">CONJUNTO DE DADOS</p>
+      </div>
+
+      <div class="linha-titulo-comparar">
+        <h1 class="titulo">{{ loteResumo?.fonteDadoNomeExibicao || 'Carregando…' }}</h1>
+        <button
+          v-if="loteResumo"
+          class="botao-comparar-lotes"
+          title="Comparar com o lote anterior (diff entre lotes)"
+          @click="modalComparacaoLotes = true"
+        >
+          ⇄ Comparar lotes
+        </button>
+      </div>
       <p v-if="loteResumo" class="subtitulo">
         Lote #{{ loteResumo.loteId }} — {{ loteResumo.quantidadeRegistros }} registros —
         promovido em {{ formatarData(loteResumo.dataExecucao) }}
@@ -230,7 +404,7 @@ onMounted(async () => {
     <template v-else>
       <div class="seletor-camadas">
         <button
-          v-for="camada in CAMADAS"
+          v-for="camada in camadasPermitidas"
           :key="camada.valor"
           class="botao-camada"
           :class="{ 'botao-camada--ativo': camadaAtiva === camada.valor }"
@@ -240,6 +414,53 @@ onMounted(async () => {
         </button>
       </div>
 
+<!-- PAINEL DE PESQUISA COM DUAS CAIXAS (TASK LIZARDS-40) -->
+<section class="card-pesquisa">
+  <div class="header-pesquisa">
+    <h3>Pesquisa no Conjunto de Dados</h3>
+    <button 
+      type="button" 
+      class="btn-recolher" 
+      @click="painelFiltrosAberto = !painelFiltrosAberto"
+    >
+      {{ painelFiltrosAberto ? 'Recolher ▲' : 'Expandir ▼' }}
+    </button>
+  </div>
+
+  <div v-show="painelFiltrosAberto" class="corpo-filtros">
+    <!-- Caixinha 1: Apenas ID -->
+    <div class="grupo-campo busca-id">
+      <label for="filtro-id">ID:</label>
+      <input
+        id="filtro-id"
+        v-model="filtroId"
+        type="text"
+        class="input-texto"
+        placeholder="Ex: 1, 2, 3..."
+      />
+    </div>
+
+    <!-- Caixinha 2: Nome -->
+    <div class="grupo-campo busca-ampla">
+      <label for="filtro-termo">Nome:</label>
+      <input
+        id="filtro-termo"
+        v-model="termoBusca"
+        type="text"
+        class="input-texto"
+        placeholder="Ex: Amazônia, Peabiru, Nova Olímpia..."
+      />
+    </div>
+
+    <!-- Botão de Limpar -->
+    <div v-if="filtroId || termoBusca" class="grupo-campo acoes">
+      <button type="button" class="btn-limpar" @click="limparFiltros">
+        Limpar Filtros
+      </button>
+    </div>
+  </div>
+</section>
+
       <section class="cartao">
         <div v-if="carregandoTabela" class="estado-carregando">
           <div class="spinner-grande"></div>
@@ -248,8 +469,8 @@ onMounted(async () => {
 
         <div v-else-if="erroTabela" class="estado-vazio estado-vazio--erro">{{ erroTabela }}</div>
 
-        <div v-else-if="!itensAtuais.length" class="estado-vazio">
-          Nenhum registro encontrado na camada {{ rotuloCamada(camadaAtiva) }} para este lote.
+        <div v-else-if="!itensFiltrados.length" class="estado-vazio">
+          Nenhum registro encontrado na camada {{ rotuloCamada(camadaAtiva) }} para os parâmetros informados.
         </div>
 
         <div v-else class="tabela-responsiva-wrapper">
@@ -261,7 +482,7 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in itensAtuais" :key="item.registroBrutoId">
+              <tr v-for="item in itensExibidos" :key="item.registroBrutoId">
                 <td v-for="coluna in colunasDinamicas" :key="coluna">
                   {{ item.dados?.[coluna] === null || item.dados?.[coluna] === undefined ? '—' : item.dados[coluna] }}
                 </td>
@@ -283,6 +504,14 @@ onMounted(async () => {
                       Mapa
                     </button>
                     <button
+                      v-if="camadaAtiva !== 'QUARENTENA'"
+                      class="botao-icone botao-icone--comparar"
+                      title="Comparar com a camada vizinha (Bronze → Silver → Gold)"
+                      @click="compararRegistro(item)"
+                    >
+                      Comparar
+                    </button>
+                    <button
                       v-for="destino in outrasCamadas"
                       :key="destino"
                       class="botao-icone botao-icone--texto"
@@ -298,11 +527,14 @@ onMounted(async () => {
           </table>
         </div>
 
-        <div v-if="itensAtuais.length" class="controles-paginacao">
-          <button :disabled="pagina === 0" @click="irParaPagina(pagina - 1)">← Anterior</button>
-          <span>Página {{ pagina + 1 }} de {{ totalPaginas }} ({{ total }} registros)</span>
-          <button :disabled="pagina + 1 >= totalPaginas" @click="irParaPagina(pagina + 1)">Próxima →</button>
-        </div>
+        <div v-if="itensFiltrados.length" class="controles-paginacao">
+  <button :disabled="pagina === 0" @click="irParaPagina(pagina - 1)">← Anterior</button>
+  <span>
+    Página {{ pagina + 1 }} de {{ totalPaginasCalculado }} 
+    ({{ (filtroId || termoBusca) ? itensFiltrados.length : total }} registros)
+  </span>
+  <button :disabled="pagina + 1 >= totalPaginasCalculado" @click="irParaPagina(pagina + 1)">Próxima →</button>
+</div>
       </section>
     </template>
 
@@ -319,6 +551,20 @@ onMounted(async () => {
       :dados="modalRegistro.dados"
       :mensagem-vazio="modalRegistro.mensagemVazio || undefined"
       @fechar="modalRegistro = null"
+    />
+
+    <ModalComparacaoCamadas
+      v-if="modalComparacao"
+      :registro-bruto-id="modalComparacao.registroBrutoId"
+      :par-inicial="modalComparacao.parInicial"
+      @fechar="modalComparacao = null"
+    />
+
+    <ModalComparacaoLotes
+      v-if="modalComparacaoLotes"
+      :fonte-dado-id="Number(fonteId)"
+      :fonte-dado-nome="loteResumo?.fonteDadoNomeExibicao || ''"
+      @fechar="modalComparacaoLotes = false"
     />
   </div>
 </template>
@@ -351,10 +597,123 @@ onMounted(async () => {
   margin: 0;
 }
 
+.linha-titulo-comparar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topo-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.botao-comparar-lotes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.botao-comparar-lotes:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+
 .subtitulo {
   margin: 0.15rem 0 0;
   font-size: 0.88rem;
   color: #64748b;
+}
+
+/* Painel de Filtros (LIZARDS-40) */
+.card-pesquisa {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.header-pesquisa {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-pesquisa h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.corpo-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: flex-end;
+}
+
+.grupo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grupo-campo label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.busca-id {
+  flex-basis: 180px;
+}
+
+.busca-ampla {
+  flex-grow: 1;
+}
+
+.input-texto {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.input-texto:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.btn-recolher, .btn-limpar {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-limpar:hover {
+  color: #dc2626;
 }
 
 .seletor-camadas {
@@ -445,6 +804,11 @@ onMounted(async () => {
   transition: all 0.12s ease;
 }
 
+.botao-icone--comparar {
+  color: #15803d;
+  border-color: #86efac;
+}
+
 .botao-icone:hover {
   background: #f1f5f9;
   border-color: #94a3b8;
@@ -502,5 +866,183 @@ onMounted(async () => {
   to {
     transform: rotate(360deg);
   }
+}
+
+.linha-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Linha superior do título com o botão de voltar */
+.topo-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Botão Voltar Verde (Padrão DataGis) */
+.btn-voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #16a34a;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-voltar:hover {
+  background: #dcfce7;
+  border-color: #15803d;
+  transform: translateX(-2px);
+}
+
+.icone-voltar {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+/* Adaptado para o Tema Escuro (LIZARDS-38) */
+:root[data-tema="escuro"] .btn-voltar {
+  background: var(--cor-primaria-tenue, rgba(34, 197, 94, 0.1));
+  border-color: var(--cor-primaria-borda, #16a34a);
+  color: var(--cor-link, #4ade80);
+}
+
+:root[data-tema="escuro"] .btn-voltar:hover {
+  background: var(--cor-primaria-borda, #16a34a);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .card-pesquisa {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .header-pesquisa h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .grupo-campo label {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .input-texto {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .input-texto:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-recolher,
+:root[data-tema="escuro"] .btn-limpar {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-limpar:hover {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .etiqueta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .botao-comparar-lotes {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .botao-comparar-lotes:hover {
+  background: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .subtitulo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .seletor-camadas {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .botao-camada {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .botao-camada--ativo {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .cartao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados th {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados td {
+  border-bottom-color: var(--cor-borda-suave);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .botao-icone {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .botao-icone--comparar {
+  color: var(--cor-link);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .botao-icone:hover {
+  background: var(--cor-borda);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .controles-paginacao {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .controles-paginacao button {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .estado-carregando,
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-vazio--erro {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .spinner-grande {
+  border-color: var(--cor-borda);
+  border-top-color: var(--cor-primaria);
 }
 </style>

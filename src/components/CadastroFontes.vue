@@ -1,10 +1,18 @@
 <script setup>
-import { reactive, ref, watch, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { apiFetch } from '../services/http'
 import { useRouter } from 'vue-router'
 import ConstrutorCron from './ConstrutorCron.vue'
 import ModalMapeamentoColunas from './ModalMapeamentoColunas.vue'
+import { temPermissao } from '../auth/autenticacao'
+import { PERMISSOES } from '../auth/permissoes'
 
 const router = useRouter()
+
+// Quem só visualiza fontes (ex.: Analista, Auditor) vê a lista sem os botões de alterar,
+// executar ou enviar arquivo (LIZARDS-45); o backend barra com 403 de qualquer jeito.
+const podeGerenciar = temPermissao(PERMISSOES.FONTE_GERENCIAR)
+const podeVerDados = temPermissao(PERMISSOES.DADOS_VISUALIZAR)
 const fonteParaMapeamento = ref(null)
 
 const fontes = ref([])
@@ -12,6 +20,48 @@ const carregandoLista = ref(false)
 const enviando = ref(false)
 const erro = ref(null)
 const sucesso = ref(false)
+
+// --- ESTADOS DO PAINEL DE FILTROS (LIZARDS-40) ---
+const painelFiltrosAberto = ref(true)
+const termoBusca = ref('')
+const filtroStatus = ref('')
+const filtroModalidade = ref('')
+
+function limparFiltros() {
+  termoBusca.value = ''
+  filtroStatus.value = ''
+  filtroModalidade.value = ''
+}
+
+// Computada para filtrar a lista sem alterar o array 'fontes' original
+const fontesFiltradas = computed(() => {
+  if (!fontes.value || !Array.isArray(fontes.value)) return []
+
+  return fontes.value.filter((fonte) => {
+    // 1. Filtro por Status (Ativa / Inativa)
+    let bateuStatus = true
+    if (filtroStatus.value !== '') {
+      const eAtivo = filtroStatus.value === 'true'
+      bateuStatus = fonte.ativo === eAtivo
+    }
+
+    // 2. Filtro por Modalidade (UPLOAD_MANUAL, API_REST, DOWNLOAD_URL)
+    let bateuModalidade = true
+    if (filtroModalidade.value !== '') {
+      bateuModalidade = fonte.tipoAquisicao === filtroModalidade.value
+    }
+
+    // 3. Busca por texto (varre Nome, Órgão, URL e Formato)
+    let bateuTermo = true
+    const termo = termoBusca.value.toLowerCase().trim()
+    if (termo) {
+      const textoCombinado = `${fonte.nome || ''} ${fonte.orgao || ''} ${fonte.urlOrigem || ''} ${fonte.formatoEsperado || ''}`.toLowerCase()
+      bateuTermo = textoCombinado.includes(termo)
+    }
+
+    return bateuStatus && bateuModalidade && bateuTermo
+  })
+})
 
 // Controle de expansão de mensagens de erro longas por fonte
 const errosExpandidos = reactive({})
@@ -34,9 +84,15 @@ const formVazio = () => ({
   campoGeometriaLon: '',
   separadorCsv: ',',
   ativo: true,
+  // Não aparece no formulário (é definida no Mapeamento de Colunas), mas vai no salvar:
+  // o PUT grava o que receber, e sem ela a edição apagava a tabela Silver da fonte
+  entidadeSilver: null,
 })
 
 const form = ref(formVazio())
+
+// Falso enquanto a atualização automática está ligada sem frequência e horário escolhidos
+const agendamentoCompleto = ref(true)
 
 // A tela abre direto na lista; o formulario de cadastro/edicao vira pop-up.
 const modalAberto = ref(false)
@@ -90,9 +146,6 @@ const FASES_LABEL = {
 }
 const INTERVALO_SONDAGEM_MS = 2000
 
-// value="\t" em HTML puro vira a string literal de 2 caracteres "\t", nao uma
-// tabulacao de verdade - por isso o <select> usa :value ligado a este array (string
-// JS real) em vez de "\t" escrito direto no atributo do <option>.
 const OPCOES_SEPARADOR_CSV = [
   { valor: ',', rotulo: 'Vírgula ( , )' },
   { valor: ';', rotulo: 'Ponto e vírgula ( ; )' },
@@ -135,7 +188,7 @@ function iniciarSondagemDeProgresso(fonte) {
   if (est.sondagem) return
   est.sondagem = setInterval(async () => {
     try {
-      const resposta = await fetch(`/api/fontes/${fonte.id}/progresso`)
+      const resposta = await apiFetch(`/api/fontes/${fonte.id}/progresso`)
       if (!resposta.ok) return
       const corpo = await resposta.json()
       if (!corpo.fase) return
@@ -144,6 +197,29 @@ function iniciarSondagemDeProgresso(fonte) {
       est.totalEstimado = corpo.totalEstimado
       est.percentual = corpo.percentual
       est.detalhe = corpo.detalhe
+
+      if (corpo.fase === 'CONCLUIDO') {
+        pararSondagemDeProgresso(fonte)
+        if (est.cronometro) {
+          clearInterval(est.cronometro)
+          est.cronometro = null
+        }
+        est.estado = 'sucesso'
+        est.resultado = {
+          quantidadeRegistros: corpo.registrosProcessados,
+          status: 'CONCLUIDO',
+        }
+        await carregarFontes()
+      } else if (corpo.fase === 'ERRO') {
+        pararSondagemDeProgresso(fonte)
+        if (est.cronometro) {
+          clearInterval(est.cronometro)
+          est.cronometro = null
+        }
+        est.estado = 'erro'
+        est.erro = corpo.detalhe || 'Falha na ingestão da fonte.'
+        await carregarFontes()
+      }
     } catch (e) {
       // Sondagem e so cosmetica - uma falha aqui nao deve interromper a execucao real.
     }
@@ -161,12 +237,40 @@ function pararSondagemDeProgresso(fonte) {
 async function carregarFontes() {
   carregandoLista.value = true
   try {
-    const resposta = await fetch('/api/fontes')
+    const resposta = await apiFetch('/api/fontes')
     fontes.value = await resposta.json()
+    verificarExecucoesAtivas(fontes.value)
   } catch (e) {
     erro.value = 'Não deu pra carregar a lista de fontes.'
   } finally {
     carregandoLista.value = false
+  }
+}
+
+async function verificarExecucoesAtivas(listaFontes) {
+  if (!listaFontes || !Array.isArray(listaFontes)) return
+  for (const fonte of listaFontes) {
+    try {
+      const resp = await apiFetch(`/api/fontes/${fonte.id}/progresso`)
+      if (resp.ok) {
+        const progresso = await resp.json()
+        if (progresso.fase && progresso.fase !== 'CONCLUIDO' && progresso.fase !== 'ERRO' && progresso.fase !== 'OCIOSO') {
+          const est = estadoDe(fonte.id)
+          est.estado = 'executando'
+          est.fase = progresso.fase
+          est.registrosProcessados = progresso.registrosProcessados || 0
+          est.totalEstimado = progresso.totalEstimado || null
+          est.percentual = progresso.percentual || null
+          est.detalhe = progresso.detalhe || null
+          if (!est.cronometro) {
+            est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
+          }
+          iniciarSondagemDeProgresso(fonte)
+        }
+      }
+    } catch (e) {
+      // ignora falhas transitórias
+    }
   }
 }
 
@@ -183,20 +287,22 @@ function editar(fonte) {
     campoGeometriaLon: fonte.campoGeometriaLon || '',
     separadorCsv: fonte.separadorCsv || ',',
     ativo: fonte.ativo,
+    entidadeSilver: fonte.entidadeSilver || null,
   }
   sucesso.value = false
   erro.value = null
- modalAberto.value = true
+  modalAberto.value = true
 }
 
 async function salvar() {
+  if (!agendamentoCompleto.value) return
   enviando.value = true
   erro.value = null
   sucesso.value = false
   try {
     const url = editandoId.value ? `/api/fontes/${editandoId.value}` : '/api/fontes'
     const metodo = editandoId.value ? 'PUT' : 'POST'
-    const resposta = await fetch(url, {
+    const resposta = await apiFetch(url, {
       method: metodo,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value),
@@ -222,23 +328,33 @@ async function executar(fonte) {
   est.erro = null
   est.segundos = 0
   zerarProgresso(est)
+  if (est.cronometro) clearInterval(est.cronometro)
   est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
   iniciarSondagemDeProgresso(fonte)
 
   try {
-    const resposta = await fetch(`/api/fontes/${fonte.id}/executar`, { method: 'POST' })
+    const resposta = await apiFetch(`/api/fontes/${fonte.id}/executar`, { method: 'POST' })
     const corpo = await resposta.json().catch(() => null)
     if (!resposta.ok) {
       throw new Error(corpo?.erro || `O servidor respondeu HTTP ${resposta.status}`)
     }
-    est.resultado = corpo
-    est.estado = 'sucesso'
+    if (resposta.status === 200 && corpo?.quantidadeRegistros !== undefined) {
+      est.resultado = corpo
+      est.estado = 'sucesso'
+      pararSondagemDeProgresso(fonte)
+      if (est.cronometro) {
+        clearInterval(est.cronometro)
+        est.cronometro = null
+      }
+      await carregarFontes()
+    }
   } catch (e) {
     est.erro = e.message
     est.estado = 'erro'
-  } finally {
-    clearInterval(est.cronometro)
-    est.cronometro = null
+    if (est.cronometro) {
+      clearInterval(est.cronometro)
+      est.cronometro = null
+    }
     pararSondagemDeProgresso(fonte)
     await carregarFontes()
   }
@@ -268,6 +384,7 @@ function enviarUpload(fonte, arquivo) {
   est.segundos = 0
   zerarProgresso(est)
   est.progressoUploadPct = 0
+  if (est.cronometro) clearInterval(est.cronometro)
   est.cronometro = setInterval(() => { est.segundos += 1 }, 1000)
 
   return new Promise((resolve) => {
@@ -286,8 +403,10 @@ function enviarUpload(fonte, arquivo) {
     }
 
     const finalizar = async (sucesso, resultadoOuErro) => {
-      clearInterval(est.cronometro)
-      est.cronometro = null
+      if (est.cronometro) {
+        clearInterval(est.cronometro)
+        est.cronometro = null
+      }
       pararSondagemDeProgresso(fonte)
       if (sucesso) {
         est.resultado = resultadoOuErro
@@ -306,7 +425,11 @@ function enviarUpload(fonte, arquivo) {
         corpo = JSON.parse(xhr.responseText)
       } catch (e) {}
       if (xhr.status >= 200 && xhr.status < 300) {
-        finalizar(true, corpo)
+        if (xhr.status === 200 && corpo?.quantidadeRegistros !== undefined) {
+          finalizar(true, corpo)
+        } else {
+          iniciarSondagemDeProgresso(fonte)
+        }
       } else {
         finalizar(false, corpo?.erro || `O servidor respondeu HTTP ${xhr.status}`)
       }
@@ -315,6 +438,31 @@ function enviarUpload(fonte, arquivo) {
     xhr.onerror = () => finalizar(false, 'Falha de rede ao enviar o arquivo.')
     xhr.send(formData)
   })
+}
+
+function podeExecutar(fonte) {
+  if (!fonte) return false
+  return fonte.mapeamentoCompleto === true && !!fonte.entidadeSilver
+}
+
+function obterTooltipExecucao(fonte, tipo) {
+  if (!fonte) return ''
+  if (fonte.mapeamentoCompleto === false) {
+    const faltam = (fonte.totalColunasSilver || 0) - (fonte.totalColunasMapeadas || 0)
+    const nomes = fonte.colunasSilverFaltantes?.length ? ` (${fonte.colunasSilverFaltantes.join(', ')})` : ''
+    return `Mapeamento incompleto: faltam ${faltam > 0 ? faltam : ''} colunas da tabela Silver${nomes}. Mapeie todas as colunas para liberar a ingestão.`
+  }
+  if (!fonte.entidadeSilver) {
+    return 'Mapeamento incompleto: nenhuma tabela Silver configurada para esta fonte.'
+  }
+  return tipo === 'upload'
+    ? 'Enviar arquivo (.zip / shapefile / csv) e executar ingestão'
+    : 'Disparar ingestão remota de ' + fonte.nome
+}
+
+async function fecharModalMapeamento() {
+  fonteParaMapeamento.value = null
+  await carregarFontes()
 }
 
 function formatarData(iso) {
@@ -327,8 +475,6 @@ const DIAS_SEMANA_CRON = {
   FRI: 'sexta', SAT: 'sábado', SUN: 'domingo',
 }
 
-// Traduz as expressoes que o ConstrutorCron gera. Qualquer outra (modo
-// "Personalizado") aparece como veio, sem tentar adivinhar.
 function descreverCron(expressao) {
   if (!expressao) return null
   const campos = expressao.trim().split(/\s+/)
@@ -388,7 +534,7 @@ onUnmounted(() => {
           <span>Atualizar</span>
         </button>
 
-        <button class="btn-adicionar-fonte" @click="abrirCadastro">
+        <button v-if="podeGerenciar" class="btn-adicionar-fonte" @click="abrirCadastro">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14" />
             <path d="M5 12h14" />
@@ -398,132 +544,194 @@ onUnmounted(() => {
       </div>
     </header>
 
+    <!-- PAINEL DE PESQUISA E FILTROS (TASK LIZARDS-40) -->
+    <section class="card-pesquisa">
+      <div class="header-pesquisa">
+        <h3>Pesquisa e Filtros</h3>
+        <button 
+          type="button" 
+          class="btn-recolher" 
+          @click="painelFiltrosAberto = !painelFiltrosAberto"
+        >
+          {{ painelFiltrosAberto ? 'Recolher ▲' : 'Expandir ▼' }}
+        </button>
+      </div>
+
+      <div v-show="painelFiltrosAberto" class="corpo-filtros">
+        <!-- Filtro 1: Status -->
+        <div class="grupo-campo">
+          <label for="filtro-status">Filtrar por Status:</label>
+          <select id="filtro-status" v-model="filtroStatus" class="input-select">
+            <option value="">Todos os Status</option>
+            <option value="true">Ativa</option>
+            <option value="false">Inativa</option>
+          </select>
+        </div>
+
+        <!-- Filtro 2: Modalidade -->
+        <div class="grupo-campo">
+          <label for="filtro-modalidade">Modalidade:</label>
+          <select id="filtro-modalidade" v-model="filtroModalidade" class="input-select">
+            <option value="">Todas as Modalidades</option>
+            <option value="UPLOAD_MANUAL">Upload Manual</option>
+            <option value="API_REST">API REST</option>
+            <option value="DOWNLOAD_URL">Download URL</option>
+          </select>
+        </div>
+
+        <!-- Filtro 3: Busca Textual -->
+        <div class="grupo-campo busca-ampla">
+          <label for="filtro-termo">Buscar Fonte, Órgão ou URL:</label>
+          <div class="input-com-icone">
+            <input
+              id="filtro-termo"
+              v-model="termoBusca"
+              type="text"
+              class="input-texto"
+              placeholder="Ex: IBAMA, GEOJSON, http..."
+            />
+          </div>
+        </div>
+
+        <!-- Limpar Filtros -->
+        <div v-if="termoBusca || filtroStatus !== '' || filtroModalidade !== ''" class="grupo-campo acoes">
+          <button type="button" class="btn-limpar" @click="limparFiltros">
+            Limpar Filtros
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- Seção de Formulário de Cadastro / Edição (em modal) -->
     <div v-if="modalAberto" class="modal-backdrop" @click.self="fecharModal">
       <div class="modal-dialog">
         <button class="btn-fechar" @click="fecharModal" aria-label="Fechar">✕</button>
         <section class="cartao">
-      <div class="cartao-header">
-        <div class="cartao-header-icone">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
-        </div>
-        <div>
-          <h2 class="cartao-titulo">{{ editandoId ? 'Editar Fonte #' + editandoId : 'Cadastrar Nova Fonte de Dados' }}</h2>
-          <p class="cartao-sub">Configure os parâmetros de aquisição, URLs de origem e regras de formato.</p>
-        </div>
-      </div>
-
-      <form class="formulario-grid" @submit.prevent="salvar">
-        <div class="campo-grupo">
-          <label class="campo-label">
-            Nome da Fonte *
-            <input v-model="form.nome" required placeholder="Ex.: IBAMA - Embargos Ambientais" class="campo-input" />
-          </label>
-        </div>
-
-        <div class="campo-grupo">
-          <label class="campo-label">
-            Órgão Emissor / Fornecedor
-            <input v-model="form.orgao" placeholder="Ex.: IBAMA, SICAR, ICMBio, IAT" class="campo-input" />
-          </label>
-        </div>
-
-        <div class="campo-grupo">
-          <label class="campo-label">
-            Modalidade de Aquisição *
-            <select v-model="form.tipoAquisicao" class="campo-select">
-              <option value="UPLOAD_MANUAL">Upload manual (.zip, .csv, shapefile)</option>
-              <option value="API_REST">API REST / GeoServer WFS</option>
-              <option value="DOWNLOAD_URL">Download direto por URL</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="campo-grupo" v-if="form.tipoAquisicao !== 'UPLOAD_MANUAL'">
-          <label class="campo-label">
-            URL de Origem (Endpoint / Download) *
-            <input v-model="form.urlOrigem" required placeholder="https://dados.gov.br/api/geospatial..." class="campo-input" />
-          </label>
-        </div>
-
-        <div class="campo-grupo">
-          <label class="campo-label">
-            Formato Esperado
-            <select v-model="form.formatoEsperado" class="campo-select">
-              <option value="">Indefinido / Autodetectar</option>
-              <option value="SHAPEFILE">Shapefile (.zip com shp, shx, dbf, prj)</option>
-              <option value="GEOJSON">GeoJSON</option>
-              <option value="CSV">CSV com coordenadas</option>
-              <option value="JSON">JSON / GeoServices</option>
-            </select>
-          </label>
-        </div>
-
-        <template v-if="form.formatoEsperado === 'CSV'">
-          <div class="campo-grupo">
-            <label class="campo-label">
-              Separador de Campo
-              <select v-model="form.separadorCsv" class="campo-select">
-                <option v-for="opcao in OPCOES_SEPARADOR_CSV" :key="opcao.valor" :value="opcao.valor">
-                  {{ opcao.rotulo }}
-                </option>
-              </select>
-            </label>
+          <div class="cartao-header">
+            <div class="cartao-header-icone">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="cartao-titulo">{{ editandoId ? 'Editar Fonte #' + editandoId : 'Cadastrar Nova Fonte de Dados' }}</h2>
+              <p class="cartao-sub">Configure os parâmetros de aquisição, URLs de origem e regras de formato.</p>
+            </div>
           </div>
-          <div class="campo-grupo">
-            <label class="campo-label">
-              Nome da Coluna de Latitude
-              <input v-model="form.campoGeometriaLat" placeholder="Ex.: latitude, lat, Y" class="campo-input" />
-            </label>
-          </div>
-          <div class="campo-grupo">
-            <label class="campo-label">
-              Nome da Coluna de Longitude
-              <input v-model="form.campoGeometriaLon" placeholder="Ex.: longitude, lon, long, X" class="campo-input" />
-            </label>
-          </div>
-        </template>
 
-        <div class="campo-grupo campo-grupo--full">
-          <label class="campo-label">
-            Agendamento Automático de Execução (Quartz Cron)
-            <ConstrutorCron v-model="form.cronExpressao" />
-          </label>
-        </div>
+          <form class="formulario-grid" @submit.prevent="salvar">
+            <div class="campo-grupo">
+              <label class="campo-label">
+                Nome da Fonte *
+                <input v-model="form.nome" required placeholder="Ex.: IBAMA - Embargos Ambientais" class="campo-input" />
+              </label>
+            </div>
 
-        <div class="campo-grupo campo-grupo--checkbox">
-          <label class="checkbox-custom">
-            <input v-model="form.ativo" type="checkbox" />
-            <span class="checkbox-box"></span>
-            <span class="checkbox-texto">Fonte ativa para ingestão</span>
-          </label>
-        </div>
+            <div class="campo-grupo">
+              <label class="campo-label">
+                Órgão Emissor / Fornecedor
+                <input v-model="form.orgao" placeholder="Ex.: IBAMA, SICAR, ICMBio, IAT" class="campo-input" />
+              </label>
+            </div>
 
-        <!-- Mensagens e Ações -->
-        <div class="acoes-formulario campo-grupo--full">
-          <button type="submit" class="botao-principal" :disabled="enviando">
-            <span v-if="enviando" class="spinner-sm"></span>
-            <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
-          </button>
+            <div class="campo-grupo">
+              <label class="campo-label">
+                Modalidade de Aquisição *
+                <select v-model="form.tipoAquisicao" class="campo-select">
+                  <option value="UPLOAD_MANUAL">Upload manual (.zip, .csv, shapefile)</option>
+                  <option value="API_REST">API REST / GeoServer WFS</option>
+                  <option value="DOWNLOAD_URL">Download direto por URL</option>
+                </select>
+              </label>
+            </div>
 
-         <button type="button" class="botao-secundario" @click="fecharModal">
-            Cancelar
-          </button>
-        </div>
+            <div class="campo-grupo" v-if="form.tipoAquisicao !== 'UPLOAD_MANUAL'">
+              <label class="campo-label">
+                URL de Origem (Endpoint / Download) *
+                <input v-model="form.urlOrigem" required placeholder="https://dados.gov.br/api/geospatial..." class="campo-input" />
+              </label>
+            </div>
 
-        
-        <div v-if="erro" class="alerta-erro campo-grupo--full">
-          ✕ Falha: {{ erro }}
-        </div>
-      </form>
+            <div class="campo-grupo">
+              <label class="campo-label">
+                Formato Esperado
+                <select v-model="form.formatoEsperado" class="campo-select">
+                  <option value="">Indefinido / Autodetectar</option>
+                  <option value="SHAPEFILE">Shapefile (.zip com shp, shx, dbf, prj)</option>
+                  <option value="GEOJSON">GeoJSON</option>
+                  <option value="CSV">CSV com coordenadas</option>
+                  <option value="JSON">JSON / GeoServices</option>
+                </select>
+              </label>
+            </div>
+
+            <template v-if="form.formatoEsperado === 'CSV'">
+              <div class="campo-grupo">
+                <label class="campo-label">
+                  Separador de Campo
+                  <select v-model="form.separadorCsv" class="campo-select">
+                    <option v-for="opcao in OPCOES_SEPARADOR_CSV" :key="opcao.valor" :value="opcao.valor">
+                      {{ opcao.rotulo }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <div class="campo-grupo">
+                <label class="campo-label">
+                  Nome da Coluna de Latitude
+                  <input v-model="form.campoGeometriaLat" placeholder="Ex.: latitude, lat, Y" class="campo-input" />
+                </label>
+              </div>
+              <div class="campo-grupo">
+                <label class="campo-label">
+                  Nome da Coluna de Longitude
+                  <input v-model="form.campoGeometriaLon" placeholder="Ex.: longitude, lon, long, X" class="campo-input" />
+                </label>
+              </div>
+            </template>
+
+            <div class="campo-grupo campo-grupo--full">
+              <div class="campo-label">
+                Agendamento Automático de Execução
+                <ConstrutorCron
+                  v-model="form.cronExpressao"
+                  v-model:completo="agendamentoCompleto"
+                  :bloqueado="form.tipoAquisicao === 'UPLOAD_MANUAL'"
+                  motivo-bloqueio="Fonte de upload manual não tem atualização automática: os dados mudam quando um arquivo novo é enviado."
+                />
+              </div>
+            </div>
+
+            <div class="campo-grupo campo-grupo--checkbox">
+              <label class="checkbox-custom">
+                <input v-model="form.ativo" type="checkbox" />
+                <span class="checkbox-box"></span>
+                <span class="checkbox-texto">Fonte ativa para ingestão</span>
+              </label>
+            </div>
+
+            <!-- Mensagens e Ações -->
+            <div class="acoes-formulario campo-grupo--full">
+              <button type="submit" class="botao-principal" :disabled="enviando || !agendamentoCompleto">
+                <span v-if="enviando" class="spinner-sm"></span>
+                <span>{{ enviando ? 'Gravando alterações…' : (editandoId ? 'Salvar Alterações' : 'Cadastrar Fonte') }}</span>
+              </button>
+
+              <button type="button" class="botao-secundario" @click="fecharModal">
+                Cancelar
+              </button>
+            </div>
+
+            <div v-if="erro" class="alerta-erro campo-grupo--full">
+              ✕ Falha: {{ erro }}
+            </div>
+          </form>
         </section>
       </div>
     </div>
 
-        <div v-if="sucesso" class="alerta-sucesso alerta-pagina">
+    <div v-if="sucesso" class="alerta-sucesso alerta-pagina">
       ✓ Fonte salva com sucesso! O catálogo de dados foi atualizado.
     </div>
 
@@ -531,7 +739,7 @@ onUnmounted(() => {
     <section class="cartao">
       <div class="cartao-header cartao-header--tabela">
         <div>
-          <h2 class="cartao-titulo">Fontes Cadastradas ({{ fontes.length }})</h2>
+          <h2 class="cartao-titulo">Fontes Cadastradas ({{ fontesFiltradas.length }})</h2>
           <p class="cartao-sub">Execute a extração dos dados ou envie novos lotes através dos botões de ação.</p>
         </div>
       </div>
@@ -551,6 +759,16 @@ onUnmounted(() => {
         <small>Preencha o formulário acima para adicionar a primeira fonte.</small>
       </div>
 
+      <div v-else-if="!fontesFiltradas.length" class="estado-vazio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
+        </svg>
+        <p>Nenhuma fonte encontrada para os parâmetros informados.</p>
+        <small>Tente alterar ou limpar os campos do painel de pesquisa acima.</small>
+      </div>
+
       <div v-else class="tabela-responsiva-wrapper">
         <table class="tabela-fontes">
           <thead>
@@ -566,7 +784,7 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <template v-for="fonte in fontes" :key="fonte.id">
+            <template v-for="fonte in fontesFiltradas" :key="fonte.id">
               <tr class="linha-fonte">
                 <!-- Nome e Órgão e URL exposta -->
                 <td class="celula-fonte-principal">
@@ -577,7 +795,23 @@ onUnmounted(() => {
                   <div class="fonte-orgao-texto">
                     {{ fonte.orgao ? 'Órgão: ' + fonte.orgao : 'Sem órgão informado' }}
                   </div>
-                  <!-- Informação que antes estava escondida: URL de origem exposta diretamente -->
+                  <!-- Indicador de Status do Mapeamento Silver -->
+                  <div v-if="!fonte.mapeamentoCompleto || !fonte.entidadeSilver" class="linha-status-silver">
+                    <span
+                      v-if="fonte.entidadeSilver"
+                      class="badge-mapeamento-status badge-mapeamento--pendente"
+                      :title="'Mapeamento incompleto (' + (fonte.totalColunasMapeadas || 0) + '/' + (fonte.totalColunasSilver || 0) + ' colunas). Faltam: ' + (fonte.colunasSilverFaltantes?.join(', ') || 'colunas') + '. Ingestão bloqueada.'"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                      </svg>
+                      Mapeamento Incompleto ({{ fonte.totalColunasMapeadas || 0 }}/{{ fonte.totalColunasSilver || 0 }})
+                    </span>
+                    <span v-else class="badge-mapeamento-status badge-mapeamento--sem-silver" title="Defina a tabela Silver no mapeamento para liberar a ingestão">
+                      Sem Tabela Silver
+                    </span>
+                  </div>
                   <div v-if="fonte.urlOrigem" class="fonte-url-preview" :title="fonte.urlOrigem">
                     <span class="url-texto">{{ fonte.urlOrigem }}</span>
                   </div>
@@ -612,16 +846,18 @@ onUnmounted(() => {
                   </span>
                 </td>
 
-                <!-- Agendamento automático (cron do Quartz) -->
+                <!-- Agendamento automático -->
                 <td class="celula-agendamento">
                   <template v-if="fonte.cronExpressao">
                     <div class="agendamento-texto">{{ descreverCron(fonte.cronExpressao) }}</div>
                     <code class="agendamento-cron">{{ fonte.cronExpressao }}</code>
+                    <div v-if="!fonte.ativo" class="agendamento-pausado">Pausado: fonte inativa</div>
                   </template>
-                  <span v-else class="agendamento-vazio">Somente manual</span>
+                  <span v-else-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'" class="agendamento-vazio">Por envio de arquivo</span>
+                  <span v-else class="agendamento-vazio">Sem agendamento</span>
                 </td>
 
-                <!-- Última Execução e Detalhes de Erro Completos -->
+                <!-- Última Execução -->
                 <td class="celula-ultima-execucao">
                   <div class="data-execucao">{{ formatarData(fonte.ultimaExecucaoEm) }}</div>
 
@@ -632,7 +868,6 @@ onUnmounted(() => {
                     </span>
                   </div>
 
-                  <!-- Mensagem de erro sem truncamento e com toggle de expansão -->
                   <div v-if="fonte.ultimoStatusExecucao === 'ERRO' && fonte.ultimoErroMensagem" class="container-erro-fonte">
                     <p class="mensagem-erro-texto" :class="{ 'erro-expandido': errosExpandidos[fonte.id] }">
                       {{ fonte.ultimoErroMensagem }}
@@ -657,6 +892,7 @@ onUnmounted(() => {
                 <td class="celula-acoes">
                   <div class="grupo-botoes-acoes">
                     <button
+                      v-if="podeGerenciar"
                       class="btn-acao-circulo btn-editar"
                       title="Editar configurações da fonte"
                       @click="editar(fonte)"
@@ -683,10 +919,10 @@ onUnmounted(() => {
                     </button>
 
                     <button
-                      v-if="fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
+                      v-if="podeGerenciar && fonte.tipoAquisicao === 'UPLOAD_MANUAL'"
                       class="btn-acao-circulo btn-executar"
-                      :disabled="estadoDe(fonte.id).estado === 'executando'"
-                      title="Enviar arquivo (.zip / shapefile / csv) e executar ingestão"
+                      :disabled="!podeExecutar(fonte) || estadoDe(fonte.id).estado === 'executando'"
+                      :title="obterTooltipExecucao(fonte, 'upload')"
                       @click="abrirSeletorArquivo(fonte)"
                       aria-label="Fazer upload de arquivo"
                     >
@@ -699,10 +935,10 @@ onUnmounted(() => {
                     </button>
 
                     <button
-                      v-else
+                      v-else-if="podeGerenciar"
                       class="btn-acao-circulo btn-executar"
-                      :disabled="estadoDe(fonte.id).estado === 'executando'"
-                      :title="'Disparar ingestão remota de ' + fonte.nome"
+                      :disabled="!podeExecutar(fonte) || estadoDe(fonte.id).estado === 'executando'"
+                      :title="obterTooltipExecucao(fonte, 'executar')"
                       @click="executar(fonte)"
                       aria-label="Executar ingestão"
                     >
@@ -713,6 +949,7 @@ onUnmounted(() => {
                     </button>
 
                     <button
+                      v-if="podeVerDados"
                       class="btn-acao-circulo btn-conjunto-dados"
                       title="Ver Conjunto de Dados (Bronze / Silver / Quarentena)"
                       @click="router.push('/conjuntos-dados/' + fonte.id)"
@@ -853,7 +1090,8 @@ onUnmounted(() => {
     <!-- Modal de Mapeamento de Colunas -->
     <ModalMapeamentoColunas
       :fonte="fonteParaMapeamento"
-      @fechar="fonteParaMapeamento = null"
+      @fechar="fecharModalMapeamento"
+      @atualizado="carregarFontes"
     />
   </div>
 </template>
@@ -918,6 +1156,81 @@ onUnmounted(() => {
 .btn-recarregar svg {
   width: 1rem;
   height: 1rem;
+}
+
+/* Painel de Filtros (LIZARDS-40) */
+.card-pesquisa {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.header-pesquisa {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-pesquisa h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.corpo-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: flex-end;
+}
+
+.grupo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grupo-campo label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.busca-ampla {
+  flex-grow: 1;
+}
+
+.input-select, .input-texto {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.input-select:focus, .input-texto:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.btn-recolher, .btn-limpar {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-limpar:hover {
+  color: #dc2626;
 }
 
 /* Cartões Principais */
@@ -1157,7 +1470,6 @@ onUnmounted(() => {
   margin-top: 0.2rem;
 }
 
-/* Informação de URL exposta */
 .fonte-url-preview {
   display: flex;
   align-items: center;
@@ -1571,6 +1883,7 @@ onUnmounted(() => {
     padding: 1.1rem;
   }
 }
+
 /* ----- Cabeçalho: ações ----- */
 .topo-acoes {
   display: flex;
@@ -1674,4 +1987,469 @@ onUnmounted(() => {
   color: #94a3b8;
 }
 
+.agendamento-pausado {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.btn-executar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.linha-status-silver {
+  margin-top: 0.35rem;
+  display: flex;
+  align-items: center;
+}
+
+.badge-mapeamento-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge-mapeamento-status svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.badge-mapeamento--ok {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-mapeamento--pendente {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.badge-mapeamento--sem-silver {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+/* ==========================================================================
+   Tema escuro (LIZARDS-38)
+   ========================================================================== */
+:root[data-tema="escuro"] .card-pesquisa {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .header-pesquisa h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .grupo-campo label {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .input-select,
+:root[data-tema="escuro"] .input-texto {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .input-select:focus,
+:root[data-tema="escuro"] .input-texto:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-recolher,
+:root[data-tema="escuro"] .btn-limpar {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-limpar:hover {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .etiqueta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .subtitulo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-recarregar {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-recarregar:hover:not(:disabled) {
+  background: var(--cor-borda);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .cartao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .cartao-header {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .cartao-header-icone {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .cartao-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .cartao-sub {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .campo-label {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .campo-input,
+:root[data-tema="escuro"] .campo-select {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .campo-input:focus,
+:root[data-tema="escuro"] .campo-select:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .checkbox-custom {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .checkbox-custom input {
+  accent-color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .botao-principal {
+  color: var(--cor-primaria-contraste);
+  background: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .botao-principal:hover:not(:disabled) {
+  background: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] .botao-secundario {
+  color: var(--cor-texto-secundario);
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .botao-secundario:hover {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .alerta-sucesso {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .alerta-erro {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .tabela-fontes th {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-fontes td {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .linha-fonte:hover {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .fonte-id {
+  color: var(--cor-texto-rotulo);
+  background: var(--cor-superficie-elevada);
+  box-shadow: inset 0 0 0 1px var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .fonte-nome {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .fonte-orgao-texto {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .fonte-url-preview {
+  color: var(--cor-info);
+  background: var(--tenue-info);
+  border-color: rgb(124 180 247 / 30%);
+}
+
+:root[data-tema="escuro"] .badge-modalidade {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .modalidade--upload_manual {
+  background: var(--tenue-alerta);
+  color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .modalidade--api_rest {
+  background: var(--tenue-info);
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .modalidade--download_url {
+  background: var(--tenue-destaque);
+  color: var(--cor-destaque);
+}
+
+:root[data-tema="escuro"] .badge-formato {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .tag-geo-hint {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .data-execucao {
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .duracao-texto {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .container-erro-fonte {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .mensagem-erro-texto {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .btn-toggle-erro {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .celula-data-add {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-editar {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-editar:hover {
+  background: var(--cor-borda);
+  color: var(--cor-texto-titulo);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .btn-mapeamento {
+  background: var(--tenue-info);
+  border-color: rgb(124 180 247 / 30%);
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .btn-mapeamento:hover {
+  background: var(--tenue-info);
+  border-color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .btn-executar {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .btn-executar:hover:not(:disabled) {
+  background: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] .btn-conjunto-dados {
+  background: var(--tenue-destaque);
+  border-color: rgb(180 156 251 / 30%);
+  color: var(--cor-destaque);
+}
+
+:root[data-tema="escuro"] .btn-conjunto-dados:hover {
+  background: var(--tenue-destaque);
+  border-color: rgb(180 156 251 / 30%);
+}
+
+:root[data-tema="escuro"] .spinner-grande {
+  border-color: var(--cor-borda);
+  border-top-color: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .linha-resultado td {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .banner-progresso {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .linha-fase {
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .tempo-decorrido {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .detalhe-fase {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .trilho-progresso {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .barra-preenchida {
+  background: linear-gradient(90deg, var(--cor-primaria), var(--cor-primaria));
+}
+
+:root[data-tema="escuro"] .contagem-progresso {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .resultado-banner--neutro {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .resultado-banner--alerta {
+  background: var(--tenue-alerta);
+  border-color: rgb(251 191 36 / 30%);
+  color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .resultado-banner--sucesso {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+  color: var(--cor-sucesso);
+}
+
+:root[data-tema="escuro"] .resultado-banner--erro {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .btn-atalho--quarentena {
+  background: var(--cor-alerta);
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .btn-atalho--quarentena:hover {
+  background: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .btn-atalho--pipeline {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .btn-atalho--pipeline:hover {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .estado-carregando,
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-vazio svg {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .btn-adicionar-fonte {
+  background: var(--cor-primaria);
+  color: var(--cor-primaria-contraste);
+}
+
+:root[data-tema="escuro"] .btn-adicionar-fonte:hover {
+  background: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] .btn-fechar {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .btn-fechar:hover {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .agendamento-texto {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .agendamento-cron {
+  color: var(--cor-texto-terciario);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .agendamento-vazio {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .agendamento-pausado {
+  color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .badge-mapeamento--ok {
+  background: var(--cor-primaria-tenue);
+  color: var(--cor-sucesso);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .badge-mapeamento--pendente {
+  background: var(--tenue-alerta);
+  color: var(--cor-alerta);
+  border-color: rgb(251 191 36 / 30%);
+}
+
+:root[data-tema="escuro"] .badge-mapeamento--sem-silver {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-terciario);
+  border-color: var(--cor-borda-forte);
+}
 </style>
