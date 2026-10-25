@@ -292,6 +292,23 @@ const detalheSubtitulo = computed(() => {
   return `${d.municipioNome || 'Município não identificado'} · ${formatarNumero(d.areaHa)} ha`
 })
 
+/**
+ * Valor complementar em hectares, só para IRL (déficit/excedente de RL frente ao
+ * mínimo do bioma) e IAPP (passivo de APP a recuperar) — pág. 6 do slide oficial.
+ */
+function valorSecundario(tipo, linha) {
+  if (tipo.codigo === 'IRL' && linha.valorIrlDeficitHa != null) {
+    return {
+      rotulo: linha.valorIrlDeficitHa < 0 ? 'Déficit' : 'Excedente',
+      valor: Math.abs(linha.valorIrlDeficitHa),
+    }
+  }
+  if (tipo.codigo === 'IAPP' && linha.valorIappPassivoHa != null) {
+    return { rotulo: 'Passivo', valor: linha.valorIappPassivoHa }
+  }
+  return null
+}
+
 /** Grupos de barras: todas as dimensões, ou só a da aba escolhida. */
 const gruposDoDetalhe = computed(() => {
   const d = selecionado.value.dado
@@ -317,6 +334,7 @@ const gruposDoDetalhe = computed(() => {
         unidadeSimbolo: tipo.unidadeSimbolo || '',
         ehDensidade,
         valor,
+        secundario: valorSecundario(tipo, d),
         faixa: faixaDoValor(tipo, valor),
         largura: posicaoNaEscala(valor, escala),
         marcaBom:
@@ -668,6 +686,9 @@ function chaveDaLinha(linha) {
                               </span>
                               <span v-if="barra.ehDensidade" class="indicador-unidade">
                                 {{ barra.unidadeSimbolo }}
+                              </span>
+                              <span v-if="barra.secundario" class="indicador-unidade">
+                                {{ barra.secundario.rotulo }}: {{ formatarNumero(barra.secundario.valor) }} ha
                               </span>
                             </span>
                           </div>

@@ -274,6 +274,21 @@ function mediaPonderada(lista, campo) {
   return area > 0 ? soma / area : null
 }
 
+/**
+ * Soma de um valor absoluto em hectares (déficit/excedente de RL, passivo de APP) —
+ * mesma semântica SUM() do backend por município: não é percentual, não entra na
+ * média ponderada por área.
+ */
+function somaIndicador(lista, campo) {
+  let soma = null
+  lista.forEach((i) => {
+    const valor = i[campo]
+    if (valor === null || valor === undefined) return
+    soma = (soma ?? 0) + valor
+  })
+  return soma
+}
+
 const linhaDosKpis = computed(() => {
   if (selecao.value?.tipo === 'imovel') return imovelDaSelecao.value
   if (selecao.value?.tipo === 'municipio') return municipioDaSelecao.value
@@ -282,6 +297,8 @@ const linhaDosKpis = computed(() => {
     const campo = campoDoIndicador(t.codigo)
     geral[campo] = mediaPonderada(imoveis.value, campo)
   })
+  geral.valorIrlDeficitHa = somaIndicador(imoveis.value, 'valorIrlDeficitHa')
+  geral.valorIappPassivoHa = somaIndicador(imoveis.value, 'valorIappPassivoHa')
   return geral
 })
 
@@ -1092,6 +1109,15 @@ onUnmounted(() => {
           <span class="kpi-valor">
             {{ formatarNumero(linhaDosKpis?.[campoDoIndicador(t.codigo)]) }}
             <small v-if="linhaDosKpis?.[campoDoIndicador(t.codigo)] != null">{{ t.unidadeSimbolo || '%' }}</small>
+          </span>
+          <!-- IRL: déficit(-)/excedente(+) de RL frente ao mínimo do bioma, em ha -->
+          <span v-if="t.codigo === 'IRL' && linhaDosKpis?.valorIrlDeficitHa != null" class="kpi-dica">
+            {{ linhaDosKpis.valorIrlDeficitHa < 0 ? 'Déficit' : 'Excedente' }}:
+            {{ formatarNumero(Math.abs(linhaDosKpis.valorIrlDeficitHa)) }} ha
+          </span>
+          <!-- IAPP: área de APP declarada sem vegetação nativa, em ha -->
+          <span v-if="t.codigo === 'IAPP' && linhaDosKpis?.valorIappPassivoHa != null" class="kpi-dica">
+            Passivo: {{ formatarNumero(linhaDosKpis.valorIappPassivoHa) }} ha
           </span>
           <!-- Dica com o nome do indicador: a tela é só visual, sem classificar o valor -->
           <div :id="`dica-${t.codigo}`" class="dica-indicador" role="tooltip">
