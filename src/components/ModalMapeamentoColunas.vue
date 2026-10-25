@@ -3,6 +3,8 @@ import { ref, computed, watch } from 'vue'
 import {
   buscarMapeamentos,
   salvarMapeamentos,
+  sincronizarMapeamentosAtributo,
+  removerMapeamentoPorAtributo,
   excluirMapeamento,
   limparTodosMapeamentosFonte,
   buscarEsquemasSilver,
@@ -26,7 +28,7 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'modulos_fiscais', label: 'Módulos Fiscais', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'municipio', label: 'Município (Código IBGE / Nome)', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
       { nome: 'data_registro', label: 'Data de Registro', tipoDado: 'data_iso', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: true },
+      { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: false },
     ],
     dominios: [
       { tabela: 'situacao_imovel', label: 'situacao_imovel (AT, PE, CA, SU...)' },
@@ -45,7 +47,7 @@ const CATALOGO_SILVER_FALLBACK = [
       { nome: 'area_ha', label: 'Área Total (ha)', tipoDado: 'numero', destinoTipo: 'COLUNA', obrigatorio: false, valorMinimo: 0.0 },
       { nome: 'bioma', label: 'Bioma Predominante', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false, tabelaReferencia: 'bioma' },
       { nome: 'ato_legal', label: 'Ato Legal de Criação', tipoDado: 'texto', destinoTipo: 'COLUNA', obrigatorio: false },
-      { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: true },
+      { nome: 'geometria', label: 'Geometria Espacial (Polígono)', tipoDado: 'wkt', destinoTipo: 'GEOMETRIA', obrigatorio: false, validarGeometria: true, validarRecortePr: false },
     ],
     dominios: [
       { tabela: 'tipo_area_protegida', label: 'tipo_area_protegida (Proteção Integral, Uso Sustentável, TI...)' },
@@ -268,8 +270,8 @@ const excluindoCampo = ref(false)
 const atributoDestinoSelecionado = ref('')
 
 const novoMapeamento = ref({
-  id: null,
-  colunaOrigem: '',
+  editandoAtributo: null,
+  colunasOrigem: [''],
   atributoDestino: '',
   destinoTipo: 'COLUNA',
   tipoDado: 'texto',
@@ -282,6 +284,18 @@ const novoMapeamento = ref({
   validarRecortePr: false,
   impedirRegressao: true,
 })
+
+function adicionarColunaOrigem() {
+  novoMapeamento.value.colunasOrigem.push('')
+}
+
+function removerColunaOrigem(index) {
+  if (novoMapeamento.value.colunasOrigem.length > 1) {
+    novoMapeamento.value.colunasOrigem.splice(index, 1)
+  } else {
+    novoMapeamento.value.colunasOrigem[0] = ''
+  }
+}
 
 // Esquema da Silver atualmente selecionada
 const esquemaAtivo = computed(() => {
@@ -320,12 +334,17 @@ const colunasSilverMapeadasNomes = computed(() => {
 
 const colunasSilverUtilizadasParaBloqueio = computed(() => {
   const set = new Set()
+  const editando = novoMapeamento.value.editandoAtributo
+    ? novoMapeamento.value.editandoAtributo.trim().toLowerCase()
+    : null
+
   for (const m of mapeamentos.value) {
-    if (novoMapeamento.value.id && m.id === novoMapeamento.value.id) {
-      continue
-    }
     if (m.destinoTipo !== 'JSON' && m.atributoDestino) {
-      set.add(m.atributoDestino.trim().toLowerCase())
+      const atNorm = m.atributoDestino.trim().toLowerCase()
+      if (editando && atNorm === editando) {
+        continue
+      }
+      set.add(atNorm)
     }
   }
   return set
@@ -335,6 +354,45 @@ function isColunaSilverUtilizada(nomeColuna) {
   if (!nomeColuna) return false
   return colunasSilverUtilizadasParaBloqueio.value.has(nomeColuna.trim().toLowerCase())
 }
+
+const mapeamentosAgrupados = computed(() => {
+  const grupos = []
+  const mapa = new Map()
+
+  for (const m of mapeamentos.value) {
+    if (m.destinoTipo === 'JSON' || !m.atributoDestino) {
+      grupos.push({
+        chave: `json_${m.id || Math.random()}`,
+        atributoDestino: m.atributoDestino || '(json)',
+        colunasOrigem: [m.colunaOrigem],
+        itens: [m],
+        principal: m,
+      })
+      continue
+    }
+
+    const chave = m.atributoDestino.trim().toLowerCase()
+    if (!mapa.has(chave)) {
+      const grupo = {
+        chave,
+        atributoDestino: m.atributoDestino,
+        colunasOrigem: m.colunaOrigem ? [m.colunaOrigem] : [],
+        itens: [m],
+        principal: m,
+      }
+      mapa.set(chave, grupo)
+      grupos.push(grupo)
+    } else {
+      const grupo = mapa.get(chave)
+      if (m.colunaOrigem && !grupo.colunasOrigem.includes(m.colunaOrigem)) {
+        grupo.colunasOrigem.push(m.colunaOrigem)
+      }
+      grupo.itens.push(m)
+    }
+  }
+
+  return grupos
+})
 
 const statusMapeamentoSilver = computed(() => {
   const todasColunas = colunasSilverDisponiveis.value
@@ -532,24 +590,30 @@ function aoTrocarAtributoDestino() {
   }
 }
 
-function editar(map) {
+function editar(itemOuGrupo) {
+  const principal = itemOuGrupo.principal || itemOuGrupo.itens?.[0] || itemOuGrupo
+  const atributo = itemOuGrupo.atributoDestino || principal.atributoDestino
+  const origens = itemOuGrupo.colunasOrigem && itemOuGrupo.colunasOrigem.length > 0
+    ? [...itemOuGrupo.colunasOrigem]
+    : [principal.colunaOrigem || '']
+
   novoMapeamento.value = {
-    id: map.id,
-    colunaOrigem: map.colunaOrigem,
-    atributoDestino: map.atributoDestino,
-    destinoTipo: map.destinoTipo || 'COLUNA',
-    tipoDado: map.tipoDado || 'texto',
-    obrigatorio: !!map.obrigatorio,
-    valorMinimo: map.valorMinimo ?? null,
-    tabelaReferencia: map.tabelaReferencia || '',
-    referenciaEntidadeSilver: map.referenciaEntidadeSilver || '',
-    validarGeometria: !!map.validarGeometria,
-    validarCpfCnpj: !!map.validarCpfCnpj,
-    validarRecortePr: !!map.validarRecortePr,
-    impedirRegressao: map.impedirRegressao !== false,
+    editandoAtributo: atributo,
+    colunasOrigem: origens,
+    atributoDestino: atributo,
+    destinoTipo: principal.destinoTipo || 'COLUNA',
+    tipoDado: principal.tipoDado || 'texto',
+    obrigatorio: !!principal.obrigatorio,
+    valorMinimo: principal.valorMinimo ?? null,
+    tabelaReferencia: principal.tabelaReferencia || '',
+    referenciaEntidadeSilver: principal.referenciaEntidadeSilver || '',
+    validarGeometria: !!principal.validarGeometria,
+    validarCpfCnpj: !!principal.validarCpfCnpj,
+    validarRecortePr: !!principal.validarRecortePr,
+    impedirRegressao: principal.impedirRegressao !== false,
   }
 
-  atributoDestinoSelecionado.value = map.atributoDestino
+  atributoDestinoSelecionado.value = atributo
 
   sucesso.value = null
   erro.value = null
@@ -559,8 +623,8 @@ function editar(map) {
 
 function cancelarEdicao() {
   novoMapeamento.value = {
-    id: null,
-    colunaOrigem: '',
+    editandoAtributo: null,
+    colunasOrigem: [''],
     atributoDestino: '',
     destinoTipo: 'COLUNA',
     tipoDado: 'texto',
@@ -577,16 +641,28 @@ function cancelarEdicao() {
 }
 
 async function salvarCampo() {
-  if (!novoMapeamento.value.colunaOrigem.trim() || !novoMapeamento.value.atributoDestino.trim()) {
-    erro.value = 'Preencha a coluna de origem e o atributo de destino.'
+  const colunasLimpas = (novoMapeamento.value.colunasOrigem || [])
+    .map((c) => (c || '').trim())
+    .filter((c) => c.length > 0)
+
+  if (colunasLimpas.length === 0 || !novoMapeamento.value.atributoDestino.trim()) {
+    erro.value = 'Preencha ao menos uma coluna de origem e o atributo de destino.'
     return
   }
 
+  const colunasLower = colunasLimpas.map((c) => c.toLowerCase())
+  const temDuplicata = new Set(colunasLower).size !== colunasLower.length
+  if (temDuplicata) {
+    erro.value = 'Há colunas de origem duplicadas no formulário.'
+    return
+  }
+
+  const destinoNorm = novoMapeamento.value.atributoDestino.trim()
   if (
     novoMapeamento.value.destinoTipo !== 'JSON' &&
-    isColunaSilverUtilizada(novoMapeamento.value.atributoDestino)
+    isColunaSilverUtilizada(destinoNorm)
   ) {
-    erro.value = `A coluna Silver "${novoMapeamento.value.atributoDestino}" já está mapeada nesta fonte e não pode ser preenchida novamente.`
+    erro.value = `A coluna Silver "${destinoNorm}" já está mapeada nesta fonte e não pode ser preenchida novamente.`
     return
   }
 
@@ -595,10 +671,11 @@ async function salvarCampo() {
   sucesso.value = null
 
   try {
-    const item = {
-      ...novoMapeamento.value,
-      colunaOrigem: novoMapeamento.value.colunaOrigem.trim(),
-      atributoDestino: novoMapeamento.value.atributoDestino.trim(),
+    const itens = colunasLimpas.map((colOrigem) => ({
+      colunaOrigem: colOrigem,
+      atributoDestino: destinoNorm,
+      destinoTipo: novoMapeamento.value.destinoTipo,
+      tipoDado: novoMapeamento.value.tipoDado,
       tabelaDestino: tabelaSilverSelecionada.value || null,
       referenciaEntidadeSilver: novoMapeamento.value.referenciaEntidadeSilver?.trim() || null,
       tabelaReferencia: novoMapeamento.value.tabelaReferencia?.trim() || null,
@@ -606,14 +683,25 @@ async function salvarCampo() {
         novoMapeamento.value.valorMinimo !== '' && novoMapeamento.value.valorMinimo !== null
           ? Number(novoMapeamento.value.valorMinimo)
           : null,
+      obrigatorio: !!novoMapeamento.value.obrigatorio,
+      validarGeometria: !!novoMapeamento.value.validarGeometria,
+      validarCpfCnpj: !!novoMapeamento.value.validarCpfCnpj,
+      validarRecortePr: !!novoMapeamento.value.validarRecortePr,
+      impedirRegressao: novoMapeamento.value.impedirRegressao !== false,
       fonteDadoId: props.fonte.id,
+    }))
+
+    const emEdicao = !!novoMapeamento.value.editandoAtributo
+    if (emEdicao) {
+      await sincronizarMapeamentosAtributo(props.fonte.id, novoMapeamento.value.editandoAtributo, itens)
+    } else {
+      await salvarMapeamentos(props.fonte.id, itens)
     }
 
-    await salvarMapeamentos(props.fonte.id, [item])
     definirMensagemSucesso(
-      novoMapeamento.value.id
-        ? `Mapeamento do campo "${item.colunaOrigem}" atualizado com sucesso!`
-        : `Novo mapeamento para "${item.colunaOrigem}" criado com sucesso!`
+      emEdicao
+        ? `Mapeamento do atributo Silver "${destinoNorm}" atualizado com sucesso!`
+        : `Novo mapeamento para "${destinoNorm}" criado com sucesso!`
     )
 
     cancelarEdicao()
@@ -626,8 +714,8 @@ async function salvarCampo() {
   }
 }
 
-function solicitarRemover(map) {
-  mapeamentoParaExcluir.value = map
+function solicitarRemover(itemOuGrupo) {
+  mapeamentoParaExcluir.value = itemOuGrupo
   popupExcluirCampoAberto.value = true
 }
 
@@ -638,17 +726,23 @@ function cancelarRemoverCampo() {
 
 async function confirmarRemoverCampo() {
   if (!mapeamentoParaExcluir.value) return
-  const map = mapeamentoParaExcluir.value
+  const alvo = mapeamentoParaExcluir.value
   excluindoCampo.value = true
   erro.value = null
 
   try {
-    await excluirMapeamento(props.fonte.id, map.id)
-    if (novoMapeamento.value.id === map.id) {
+    if (alvo.itens && alvo.itens.length === 1 && alvo.itens[0].id && alvo.itens[0].destinoTipo === 'JSON') {
+      await excluirMapeamento(props.fonte.id, alvo.itens[0].id)
+    } else if (alvo.atributoDestino) {
+      await removerMapeamentoPorAtributo(props.fonte.id, alvo.atributoDestino)
+    } else if (alvo.id) {
+      await excluirMapeamento(props.fonte.id, alvo.id)
+    }
+    if (novoMapeamento.value.editandoAtributo === alvo.atributoDestino) {
       cancelarEdicao()
     }
     await carregarMapeamentos()
-    definirMensagemSucesso(`Mapeamento da coluna "${map.colunaOrigem}" removido com sucesso.`)
+    definirMensagemSucesso(`Mapeamento do atributo "${alvo.atributoDestino || alvo.colunaOrigem || 'campo'}" removido com sucesso.`)
     popupExcluirCampoAberto.value = false
     mapeamentoParaExcluir.value = null
     emit('atualizado')
@@ -794,27 +888,63 @@ function remover(id) {
         <section
           v-if="podeEditar && tabelaSilverSelecionada"
           class="card-formulario"
-          :class="{ 'card-formulario--editando': novoMapeamento.id }"
+          :class="{ 'card-formulario--editando': novoMapeamento.editandoAtributo }"
         >
           <div class="secao-topo-form">
             <div class="form-titulo-grupo">
               <span class="etapa-numero">ETAPA 2</span>
               <h3 class="secao-titulo">
-                {{ novoMapeamento.id ? `Editar Mapeamento: ${novoMapeamento.colunaOrigem}` : 'Mapear Novo Campo' }}
+                {{ novoMapeamento.editandoAtributo ? `Editar Mapeamento: ${novoMapeamento.editandoAtributo}` : 'Mapear Novo Campo' }}
               </h3>
             </div>
-            <span v-if="novoMapeamento.id" class="badge-editando">Modo Edição (ID: {{ novoMapeamento.id }})</span>
+            <span v-if="novoMapeamento.editandoAtributo" class="badge-editando">Modo Edição ({{ novoMapeamento.editandoAtributo }})</span>
           </div>
 
           <form class="grid-form" @submit.prevent="salvarCampo">
-            <div class="campo">
-              <label class="rotulo-campo">Coluna de Origem (Dado Bruto) *</label>
-              <input
-                v-model="novoMapeamento.colunaOrigem"
-                required
-                placeholder="Ex: cod_municipio_ibge, num_tad, cpf_cnpj"
-                class="input-form"
-              />
+            <div class="campo campo--origem-container">
+              <label class="rotulo-campo">
+                Coluna(s) de Origem (Dado Bruto) *
+                <span class="dica-info" title="Mapeie um ou mais campos de origem que representam este mesmo atributo Silver.">
+                  <svg class="icone-info-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                </span>
+              </label>
+
+              <div class="lista-inputs-origem">
+                <div
+                  v-for="(col, idx) in novoMapeamento.colunasOrigem"
+                  :key="idx"
+                  class="linha-input-origem"
+                >
+                  <input
+                    v-model="novoMapeamento.colunasOrigem[idx]"
+                    required
+                    :placeholder="idx === 0 ? 'Ex: cod_municipio_ibge, num_tad, cpf_cnpj' : 'Outra coluna de origem alternada'"
+                    class="input-form input-origem"
+                  />
+                  <button
+                    v-if="novoMapeamento.colunasOrigem.length > 1"
+                    type="button"
+                    class="btn-remover-origem"
+                    title="Remover esta coluna de origem"
+                    @click="removerColunaOrigem(idx)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <!-- Botão logo abaixo do input de coluna origem -->
+              <button
+                type="button"
+                class="btn-adicionar-origem"
+                @click="adicionarColunaOrigem"
+              >
+                + Adicionar outra coluna de origem
+              </button>
             </div>
 
             <!-- Coluna de Destino -->
@@ -827,6 +957,7 @@ function remover(id) {
                   v-model="atributoDestinoSelecionado"
                   class="select-form"
                   required
+                  :disabled="!!novoMapeamento.editandoAtributo"
                   @change="aoTrocarAtributoDestino"
                 >
                   <option value="" disabled>-- Selecione a coluna de destino --</option>
@@ -948,10 +1079,6 @@ function remover(id) {
                 <span>Validar CPF / CNPJ</span>
               </label>
               <label class="check-item">
-                <input type="checkbox" v-model="novoMapeamento.validarRecortePr" />
-                <span>Validar Limite PR</span>
-              </label>
-              <label class="check-item">
                 <input type="checkbox" v-model="novoMapeamento.impedirRegressao" />
                 <span>Bloquear Regressão</span>
               </label>
@@ -960,7 +1087,7 @@ function remover(id) {
             <!-- Botões de Ação do Form -->
             <div class="campo-btn">
               <button
-                v-if="novoMapeamento.id"
+                v-if="novoMapeamento.editandoAtributo"
                 type="button"
                 class="btn-cancelar"
                 @click="cancelarEdicao"
@@ -968,7 +1095,7 @@ function remover(id) {
                 Cancelar
               </button>
               <button type="submit" class="btn-adicionar" :disabled="salvando">
-                {{ salvando ? 'Gravando...' : novoMapeamento.id ? 'Salvar Alterações' : '+ Mapear Campo' }}
+                {{ salvando ? 'Gravando...' : novoMapeamento.editandoAtributo ? 'Salvar Alterações' : '+ Mapear Campo' }}
               </button>
             </div>
           </form>
@@ -977,7 +1104,7 @@ function remover(id) {
         <!-- 3. TABELA DE MAPEAMENTOS CADASTRADOS (EXIBIDA APENAS QUANDO HOUVER TABELA SILVER) -->
         <section v-if="tabelaSilverSelecionada" class="secao-tabela">
           <div class="secao-topo">
-            <h3 class="secao-titulo">Colunas Atualmente Mapeadas ({{ mapeamentos.length }})</h3>
+            <h3 class="secao-titulo">Colunas Atualmente Mapeadas ({{ mapeamentosAgrupados.length }})</h3>
             <span v-if="carregando" class="spinner-sm"></span>
           </div>
 
@@ -989,7 +1116,7 @@ function remover(id) {
             <table class="tabela-mapeamentos">
               <thead>
                 <tr>
-                  <th>Coluna Origem</th>
+                  <th>Coluna(s) Origem</th>
                   <th>Atributo Silver</th>
                   <th>Destino</th>
                   <th>Tipo</th>
@@ -999,64 +1126,71 @@ function remover(id) {
               </thead>
               <tbody>
                 <tr
-                  v-for="map in mapeamentos"
-                  :key="map.id"
-                  :class="{ 'linha-ativa': novoMapeamento.id === map.id }"
+                  v-for="grupo in mapeamentosAgrupados"
+                  :key="grupo.chave"
+                  :class="{ 'linha-ativa': novoMapeamento.editandoAtributo === grupo.atributoDestino }"
                 >
                   <td class="coluna-fonte">
-                    <code>{{ map.colunaOrigem }}</code>
+                    <div class="tags-origem-lista">
+                      <code
+                        v-for="origem in grupo.colunasOrigem"
+                        :key="origem"
+                        class="tag-coluna-origem"
+                      >
+                        {{ origem }}
+                      </code>
+                    </div>
                   </td>
                   <td class="coluna-silver">
-                    <strong>{{ map.atributoDestino }}</strong>
+                    <strong>{{ grupo.atributoDestino }}</strong>
                   </td>
                   <td>
-                    <span class="badge-destino" :class="'badge--' + map.destinoTipo?.toLowerCase()">
-                      {{ map.destinoTipo }}
+                    <span class="badge-destino" :class="'badge--' + grupo.principal?.destinoTipo?.toLowerCase()">
+                      {{ grupo.principal?.destinoTipo }}
                     </span>
                   </td>
                   <td>
-                    <span class="tipo-tag">{{ map.tipoDado || 'texto' }}</span>
+                    <span class="tipo-tag">{{ grupo.principal?.tipoDado || 'texto' }}</span>
                   </td>
                   <td class="regras-tags">
                     <!-- Regras de Flags -->
-                    <span v-if="map.obrigatorio" class="tag-regra tag-regra--obrig">Obrigatório</span>
-                    <span v-if="map.validarGeometria" class="tag-regra tag-regra--geo">Geometria</span>
-                    <span v-if="map.validarCpfCnpj" class="tag-regra tag-regra--doc">CPF/CNPJ</span>
-                    <span v-if="map.validarRecortePr" class="tag-regra tag-regra--pr">Paraná</span>
-                    <span v-if="map.impedirRegressao" class="tag-regra tag-regra--regr">Anti-regressão</span>
+                    <span v-if="grupo.principal?.obrigatorio" class="tag-regra tag-regra--obrig">Obrigatório</span>
+                    <span v-if="grupo.principal?.validarGeometria" class="tag-regra tag-regra--geo">Geometria</span>
+                    <span v-if="grupo.principal?.validarCpfCnpj" class="tag-regra tag-regra--doc">CPF/CNPJ</span>
+                    <span v-if="grupo.principal?.impedirRegressao" class="tag-regra tag-regra--regr">Anti-regressão</span>
 
                     <!-- Regra de Integridade Cruzada (Ref Silver) -->
                     <span
-                      v-if="map.referenciaEntidadeSilver"
+                      v-if="grupo.principal?.referenciaEntidadeSilver"
                       class="tag-regra tag-regra--ref"
-                      :title="'Integridade Cruzada ativa contra SILVER.' + map.referenciaEntidadeSilver"
+                      :title="'Integridade Cruzada ativa contra SILVER.' + grupo.principal.referenciaEntidadeSilver"
                     >
-                      Ref: {{ map.referenciaEntidadeSilver }}
+                      Ref: {{ grupo.principal.referenciaEntidadeSilver }}
                     </span>
 
                     <!-- Regra de Domínio -->
                     <span
-                      v-if="map.tabelaReferencia"
+                      v-if="grupo.principal?.tabelaReferencia"
                       class="tag-regra tag-regra--dom"
-                      :title="'Validação de domínio ativa contra SILVER.' + map.tabelaReferencia"
+                      :title="'Validação de domínio ativa contra SILVER.' + grupo.principal.tabelaReferencia"
                     >
-                      Domínio: {{ map.tabelaReferencia }}
+                      Domínio: {{ grupo.principal.tabelaReferencia }}
                     </span>
 
                     <!-- Regra de Valor Mínimo -->
                     <span
-                      v-if="map.valorMinimo !== null && map.valorMinimo !== undefined"
+                      v-if="grupo.principal?.valorMinimo !== null && grupo.principal?.valorMinimo !== undefined"
                       class="tag-regra tag-regra--min"
-                      :title="'Valor numérico mínimo exigido: ' + map.valorMinimo"
+                      :title="'Valor numérico mínimo exigido: ' + grupo.principal.valorMinimo"
                     >
-                      ≥ {{ map.valorMinimo }}
+                      ≥ {{ grupo.principal.valorMinimo }}
                     </span>
                   </td>
                   <td v-if="podeEditar" class="col-acoes">
                     <button
                       class="btn-editar"
                       title="Editar regras deste campo"
-                      @click="editar(map)"
+                      @click="editar(grupo)"
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -1066,7 +1200,7 @@ function remover(id) {
                     <button
                       class="btn-excluir"
                       title="Excluir mapeamento"
-                      @click="solicitarRemover(map)"
+                      @click="solicitarRemover(grupo)"
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6" />
@@ -1156,8 +1290,8 @@ function remover(id) {
         <div class="popup-conteudo">
           <h3 class="popup-titulo">Remover Mapeamento de Coluna</h3>
           <p class="popup-mensagem">
-            Deseja realmente remover o de-para da coluna
-            <code>{{ mapeamentoParaExcluir.colunaOrigem }}</code>
+            Deseja realmente remover o de-para da(s) coluna(s)
+            <code>{{ mapeamentoParaExcluir.colunasOrigem ? mapeamentoParaExcluir.colunasOrigem.join(', ') : (mapeamentoParaExcluir.colunaOrigem || '') }}</code>
             <span v-if="mapeamentoParaExcluir.atributoDestino">
               → <strong>{{ mapeamentoParaExcluir.atributoDestino }}</strong>
             </span>?
@@ -1632,6 +1766,70 @@ function remover(id) {
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
 }
 
+.campo--origem-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.lista-inputs-origem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.linha-input-origem {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.input-origem {
+  flex: 1;
+}
+
+.btn-remover-origem {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: bold;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.btn-remover-origem:hover {
+  background: #fca5a5;
+  color: #991b1b;
+}
+
+.btn-adicionar-origem {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed #15803d;
+  color: #15803d;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 0.2rem;
+}
+
+.btn-adicionar-origem:hover {
+  background: #f0fdf4;
+  border-color: #166534;
+  color: #166534;
+}
+
 .campo-checks {
   grid-column: 1 / -1;
   display: flex;
@@ -1764,6 +1962,24 @@ function remover(id) {
   font-family: monospace;
   font-size: 0.8rem;
   border: 1px solid #e2e8f0;
+}
+
+.tags-origem-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.tag-coluna-origem {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #334155;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.75rem;
+  border: 1px solid #cbd5e1;
 }
 
 .coluna-silver strong {
