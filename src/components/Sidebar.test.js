@@ -123,4 +123,117 @@ describe('Sidebar — Indicadores e Resultados: um item para o mapa e a tabela (
     expect(primeiro.props('to')).toBe('/')
     expect(primeiro.text()).toContain('Home')
   })
+
+  describe('grupo Controle de Acesso', () => {
+    const GERENCIAR = 'usuario:gerenciar'
+    const subitens = (wrapper) =>
+      wrapper.findAllComponents(RouterLinkStub).filter((l) => l.classes().includes('subitem'))
+
+    it('fica fechado fora das telas de administração e abre pelo cabeçalho', async () => {
+      sessaoTeste.permissoes = [GERENCIAR]
+      const wrapper = montar()
+
+      const cabeca = wrapper.find('.grupo-cabeca')
+      expect(cabeca.text()).toContain('Controle de Acesso')
+      expect(cabeca.attributes('aria-expanded')).toBe('false')
+      expect(subitens(wrapper)).toHaveLength(0)
+
+      await cabeca.trigger('click')
+      expect(cabeca.attributes('aria-expanded')).toBe('true')
+      expect(subitens(wrapper).map((l) => [l.text(), l.props('to')])).toEqual([
+        ['Visão geral', '/admin/controle-acesso'],
+        ['Usuários', '/admin/usuarios'],
+        ['Perfis', '/admin/perfis'],
+        ['Matriz de Acesso', '/admin/matriz-acesso'],
+      ])
+
+      await cabeca.trigger('click')
+      expect(subitens(wrapper)).toHaveLength(0)
+    })
+
+    it('abre sozinho quando a tela aberta é de dentro do grupo', () => {
+      sessaoTeste.permissoes = [GERENCIAR]
+      rotaAtual.path = '/admin/usuarios'
+      const wrapper = montar()
+
+      expect(wrapper.find('.grupo-cabeca').attributes('aria-expanded')).toBe('true')
+      expect(wrapper.find('.grupo-cabeca').classes()).toContain('item-menu--ativo')
+    })
+
+    it('cada tela tem o atalho para abrir em nova aba', async () => {
+      sessaoTeste.permissoes = [GERENCIAR]
+      const wrapper = montar()
+      await wrapper.find('.grupo-cabeca').trigger('click')
+
+      const novaAba = wrapper.find('[aria-label="Abrir Usuários em nova aba"]')
+      expect(novaAba.attributes('href')).toBe('/admin/usuarios')
+      expect(novaAba.attributes('target')).toBe('_blank')
+      expect(novaAba.attributes('rel')).toContain('noopener')
+    })
+
+    it('sem a permissão, o grupo não aparece', () => {
+      sessaoTeste.permissoes = []
+      const wrapper = montar()
+
+      expect(wrapper.find('.grupo-cabeca').exists()).toBe(false)
+    })
+
+    function montarComTeleport() {
+      return mount(Sidebar, { global: { stubs: { 'router-link': RouterLinkStub, teleport: true } } })
+    }
+
+    it('com a barra recolhida, o ícone abre um menu flutuante com as telas do grupo', async () => {
+      sessaoTeste.permissoes = [GERENCIAR]
+      const wrapper = montarComTeleport()
+      await wrapper.find('.btn-toggle-desktop').trigger('click')
+
+      expect(wrapper.find('.grupo-cabeca').exists()).toBe(false)
+      const icone = wrapper.find('.grupo-icone-recolhido')
+      expect(icone.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.find('.menu-flutuante').exists()).toBe(false)
+
+      await icone.trigger('click')
+      expect(icone.attributes('aria-expanded')).toBe('true')
+      const menu = wrapper.find('.menu-flutuante')
+      expect(menu.find('.menu-flutuante-titulo').text()).toBe('Controle de Acesso')
+      expect(menu.findAllComponents(RouterLinkStub).map((l) => l.props('to'))).toEqual([
+        '/admin/controle-acesso',
+        '/admin/usuarios',
+        '/admin/perfis',
+        '/admin/matriz-acesso',
+      ])
+      expect(menu.find('[aria-label="Abrir Perfis em nova aba"]').attributes('target')).toBe('_blank')
+    })
+
+    it('o menu flutuante fecha ao escolher uma tela, com Esc e clicando de novo no ícone', async () => {
+      sessaoTeste.permissoes = [GERENCIAR]
+      const wrapper = montarComTeleport()
+      await wrapper.find('.btn-toggle-desktop').trigger('click')
+      const icone = wrapper.find('.grupo-icone-recolhido')
+
+      await icone.trigger('click')
+      await wrapper.find('.menu-flutuante .subitem').trigger('click')
+      expect(wrapper.find('.menu-flutuante').exists()).toBe(false)
+
+      await icone.trigger('click')
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.menu-flutuante').exists()).toBe(false)
+
+      await icone.trigger('click')
+      await icone.trigger('click')
+      expect(wrapper.find('.menu-flutuante').exists()).toBe(false)
+    })
+
+    it('expandir a barra fecha o menu flutuante', async () => {
+      sessaoTeste.permissoes = [GERENCIAR]
+      const wrapper = montarComTeleport()
+      await wrapper.find('.btn-toggle-desktop').trigger('click')
+      await wrapper.find('.grupo-icone-recolhido').trigger('click')
+
+      await wrapper.find('.marca-icone--botao').trigger('click')
+      expect(wrapper.find('.menu-flutuante').exists()).toBe(false)
+      expect(wrapper.find('.grupo-cabeca').exists()).toBe(true)
+    })
+  })
 })
