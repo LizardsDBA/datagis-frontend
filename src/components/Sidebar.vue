@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { nomeDoPerfil, sair, sessao, temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 import { alternarTema, estadoTema } from '../tema'
+import PesquisaTelas from './PesquisaTelas.vue'
 
 defineProps({
   abertoNoMobile: {
@@ -34,6 +35,19 @@ function lidarDuploClique() {
 
 // Estrutura completa agrupada pelas categorias Medalhão (LIZARDS-36) com permissões da sprint-2
 const categorias = [
+  {
+    titulo: 'Tela inicial',
+    itens: [
+      {
+        rota: '/',
+        rotulo: 'Home',
+        icone: 'inicio',
+        descricao: 'Favoritos e atalhos',
+        // Sem permissão: a tela inicial abre pra qualquer usuário logado
+        permissao: null,
+      },
+    ],
+  },
   {
     titulo: 'Ingestão & Qualidade (Bronze)',
     itens: [
@@ -201,6 +215,9 @@ function navegar() {
         </button>
       </div>
 
+      <!-- Pesquisa de telas e botões, logo abaixo do nome do projeto -->
+      <PesquisaTelas v-if="!recolhido" @navegou="navegar" />
+
       <nav class="menu">
         <!-- Renderização agrupada por categorias Medalhão -->
         <div 
@@ -223,8 +240,14 @@ function navegar() {
             @dblclick="lidarDuploClique"
           >
             <div class="icone-wrapper">
+              <!-- Ícone para Home -->
+              <svg v-if="item.icone === 'inicio'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 10.5 12 3l9 7.5" />
+                <path d="M5 9.5V21h14V9.5" />
+                <path d="M10 21v-6h4v6" />
+              </svg>
               <!-- Ícone para Fontes -->
-              <svg v-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg v-else-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <ellipse cx="12" cy="5" rx="8" ry="3" />
                 <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
                 <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
