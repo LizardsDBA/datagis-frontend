@@ -15,7 +15,7 @@ vi.mock('../auth/autenticacao', () => ({
   sair: vi.fn(),
 }))
 const rotaAtual = vi.hoisted(() => ({ path: '/' }))
-vi.mock('vue-router', () => ({ useRoute: () => rotaAtual }))
+vi.mock('vue-router', () => ({ useRoute: () => rotaAtual, useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('../tema', async () => {
   const { reactive } = await import('vue')
   const estadoTema = reactive({ atual: 'claro' })
@@ -113,5 +113,14 @@ describe('Sidebar — Indicadores e Resultados: um item para o mapa e a tabela (
     const item = montar().findAllComponents(RouterLinkStub).find((l) => l.props('to') === '/conjuntos')
 
     expect(item.classes()).not.toContain('item-menu--ativo')
+  })
+  it('a Home fica no topo, na seção Tela inicial, até para quem não tem permissão nenhuma', () => {
+    sessaoTeste.permissoes = []
+    const wrapper = montar()
+
+    expect(wrapper.find('.menu-secao-rotulo').text()).toBe('Tela inicial')
+    const primeiro = wrapper.findAllComponents(RouterLinkStub)[0]
+    expect(primeiro.props('to')).toBe('/')
+    expect(primeiro.text()).toContain('Home')
   })
 })
