@@ -311,5 +311,45 @@ describe('LotesView.vue - Liberação e Quarentena', () => {
     expect(wrapper.text()).toContain('150')
     expect(wrapper.text()).toContain('de 500')
   })
+  it('o X da publicação em andamento só fecha a janela e o botão reabre o andamento', async () => {
+    buscarLotes.mockResolvedValue([
+      { id: 10, fonteDadoNome: 'CAR Homologado', status: 'PROMOVIDO_SILVER', quantidadeRegistros: 100, criadoEm: '2026-10-18T10:00:00Z' },
+    ])
+    obterStatusGold.mockResolvedValue({
+      algumEmAndamento: true,
+      indicadores: { status: 'EM_ANDAMENTO', totalEstimado: 500, totalProcessado: 150, totalSucesso: 150, totalFalha: 0 },
+      camadasMapa: [],
+    })
+
+    wrapper = mount(LotesView)
+    await flushPromises()
+    expect(wrapper.text()).toContain('PROCESSAMENTO EM ANDAMENTO')
+    expect(wrapper.text()).toContain('Pode fechar esta janela')
+
+    await wrapper.find('[aria-label="Fechar (a publicação continua em segundo plano)"]').trigger('click')
+    expect(wrapper.text()).not.toContain('PROCESSAMENTO EM ANDAMENTO')
+    expect(publicarGold).not.toHaveBeenCalled()
+
+    const botao = wrapper.find('.btn-migrar-gold')
+    expect(botao.attributes('disabled')).toBeUndefined()
+    await botao.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('PROCESSAMENTO EM ANDAMENTO')
+  })
+
+  it('clicar fora da janela durante a publicação continua não fechando', async () => {
+    buscarLotes.mockResolvedValue([])
+    obterStatusGold.mockResolvedValue({
+      algumEmAndamento: true,
+      indicadores: { status: 'EM_ANDAMENTO', totalProcessado: 1, totalSucesso: 1, totalFalha: 0 },
+      camadasMapa: [],
+    })
+
+    wrapper = mount(LotesView)
+    await flushPromises()
+    await wrapper.find('.modal-backdrop').trigger('click')
+
+    expect(wrapper.text()).toContain('PROCESSAMENTO EM ANDAMENTO')
+  })
 })
 
