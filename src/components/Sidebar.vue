@@ -186,21 +186,47 @@ function navegar() {
   emit('fechar')
 }
 
-// Barra recolhida: o ícone de um grupo abre um menu flutuante ao lado, com as telas do
-// grupo. Vai pro <body> (Teleport) pra não ser cortado pela rolagem da barra, posicionado
-// pela altura do ícone clicado.
+// Barra recolhida: passar o mouse num ícone mostra, ao lado, o nome da tela; num grupo,
+// também a lista das telas dele. O menu fica aberto enquanto o mouse está no ícone ou no
+// próprio menu. O clique no ícone do grupo abre e fecha (teclado e tela de toque).
+// Vai pro <body> (Teleport) pra não ser cortado pela rolagem da barra, na altura do ícone.
 const flutuante = ref(null) // { item, top, left } | null
+const ATRASO_FECHAR_MS = 200
+let timerFechar = null
+
+function posicionar(item, evento) {
+  const caixa = evento.currentTarget.getBoundingClientRect()
+  flutuante.value = { item, top: caixa.top, left: caixa.right + 4 }
+}
 
 function abrirFlutuante(item, evento) {
+  cancelarFechamento()
   if (flutuante.value?.item.rota === item.rota) {
     fecharFlutuante()
     return
   }
-  const caixa = evento.currentTarget.getBoundingClientRect()
-  flutuante.value = { item, top: caixa.top, left: caixa.right + 8 }
+  posicionar(item, evento)
+}
+
+function mostrarAoPassar(item, evento) {
+  if (!recolhido.value) return
+  cancelarFechamento()
+  posicionar(item, evento)
+}
+
+function cancelarFechamento() {
+  clearTimeout(timerFechar)
+  timerFechar = null
+}
+
+// Atraso curto: dá tempo de levar o mouse do ícone até o menu sem ele sumir
+function agendarFechar() {
+  cancelarFechamento()
+  timerFechar = setTimeout(fecharFlutuante, ATRASO_FECHAR_MS)
 }
 
 function fecharFlutuante() {
+  cancelarFechamento()
   flutuante.value = null
 }
 
@@ -221,6 +247,7 @@ onMounted(() => {
   document.addEventListener('keydown', aoTeclar)
 })
 onUnmounted(() => {
+  cancelarFechamento()
   document.removeEventListener('mousedown', aoClicarFora)
   document.removeEventListener('keydown', aoTeclar)
 })
@@ -314,11 +341,12 @@ onUnmounted(() => {
             type="button"
             class="item-menu grupo-icone-recolhido"
             :class="{ 'item-menu--ativo': ativoPorRelacao(item) }"
-            :title="item.rotulo"
             :aria-label="item.rotulo"
             aria-haspopup="menu"
             :aria-expanded="flutuante?.item.rota === item.rota"
             @click="abrirFlutuante(item, $event)"
+            @mouseenter="mostrarAoPassar(item, $event)"
+            @mouseleave="agendarFechar"
           >
             <div class="icone-wrapper">
               <span class="icone"><IconeTela :nome="item.icone" /></span>
@@ -331,9 +359,11 @@ onUnmounted(() => {
             class="item-menu"
             active-class="item-menu--ativo"
             :class="{ 'item-menu--ativo': ativoPorRelacao(item) }"
-            :title="recolhido ? item.rotulo : ''"
+            :aria-label="recolhido ? item.rotulo : undefined"
             @click="navegar"
             @dblclick="lidarDuploClique"
+            @mouseenter="mostrarAoPassar(item, $event)"
+            @mouseleave="agendarFechar"
           >
             <div class="icone-wrapper">
               <!-- Ícone para Home -->
@@ -443,12 +473,22 @@ onUnmounted(() => {
         <div
           v-if="flutuante"
           class="menu-flutuante"
+          :class="{ 'menu-flutuante--grupo': flutuante.item.filhos }"
           role="menu"
           :aria-label="flutuante.item.rotulo"
           :style="{ top: `${flutuante.top}px`, left: `${flutuante.left}px` }"
+          @mouseenter="cancelarFechamento"
+          @mouseleave="agendarFechar"
         >
-          <p class="menu-flutuante-titulo">{{ flutuante.item.rotulo }}</p>
-          <ul class="grupo-lista grupo-lista--flutuante">
+          <router-link
+            v-if="!flutuante.item.filhos"
+            :to="flutuante.item.rota"
+            class="menu-flutuante-titulo menu-flutuante-titulo--link"
+            role="menuitem"
+            @click="navegar"
+          >{{ flutuante.item.rotulo }}</router-link>
+          <p v-else class="menu-flutuante-titulo">{{ flutuante.item.rotulo }}</p>
+          <ul v-if="flutuante.item.filhos" class="grupo-lista grupo-lista--flutuante">
             <li v-for="filho in filhosVisiveis(flutuante.item)" :key="filho.rota" class="grupo-item">
               <router-link :to="filho.rota" class="subitem" active-class="subitem--ativo" role="menuitem" @click="navegar">
                 <span class="subitem-icone"><IconeTela :nome="filho.icone" /></span>
@@ -1248,26 +1288,48 @@ onUnmounted(() => {
 .menu-flutuante {
   position: fixed;
   z-index: 1000;
-  min-width: 14rem;
-  padding: 0.6rem;
+  padding: 0.35rem;
   border-radius: 10px;
   background: var(--cor-branco);
   border: 1px solid var(--cor-slate-200);
   box-shadow: var(--sombra-md);
 }
 
-.menu-flutuante-titulo {
-  margin: 0 0 0.35rem;
-  padding: 0 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--cor-slate-500);
+.menu-flutuante--grupo {
+  min-width: 14rem;
 }
 
-.grupo-lista--flutuante {
+/* Nome da tela (ou do grupo) ao lado do ícone */
+.menu-flutuante-titulo {
+  display: block;
   margin: 0;
-  padding: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--cor-slate-900);
+  background: var(--cor-slate-100);
+  text-decoration: none;
+}
+
+.menu-flutuante-titulo--link:hover {
+  color: var(--cor-primaria);
+}
+
+/* Telas do grupo embaixo do nome, com a barra de destaque à esquerda */
+.grupo-lista--flutuante {
+  margin: 0.35rem 0 0;
+  padding: 0 0 0 0.35rem;
+  border-left: 3px solid var(--cor-primaria);
+}
+
+/* O nome no menu flutuante é link: sem isto a cor de link do tema escuro passaria por cima */
+:root[data-tema="escuro"] .menu-flutuante-titulo {
+  color: var(--cor-slate-900);
+}
+
+:root[data-tema="escuro"] .menu-flutuante-titulo--link:hover {
+  color: var(--cor-primaria);
 }
 </style>
