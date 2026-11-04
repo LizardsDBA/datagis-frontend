@@ -297,3 +297,19 @@ describe('Sidebar — Indicadores e Resultados: um item para o mapa e a tabela (
     })
   })
 })
+
+describe('Sidebar — nome no rodapé abre a Minha conta', () => {
+  it('o nome e o avatar levam para /minha-conta', () => {
+    const link = montar()
+      .findAllComponents(RouterLinkStub)
+      .find((l) => l.classes().includes('link-conta'))
+
+    expect(link.props('to')).toBe('/minha-conta')
+    expect(link.text()).toContain('Analista Teste')
+  })
+
+  it('com a tela aberta, o link fica marcado', () => {
+    rotaAtual.path = '/minha-conta'
+    expect(montar().find('.link-conta').classes()).toContain('link-conta--ativo')
+  })
+})
