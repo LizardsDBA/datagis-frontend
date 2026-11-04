@@ -515,20 +515,23 @@ onUnmounted(() => {
       </Teleport>
 
       <div class="rodape">
-        <!-- Apenas o avatar centralizado quando recolhido -->
-        <div 
-          class="avatar" 
-          aria-hidden="true" 
-          :title="recolhido ? `${sessao.nome || sessao.login} (${descricaoPerfis})` : ''"
+        <!-- Nome e avatar abrem a Minha conta; recolhida, só o avatar centralizado -->
+        <router-link
+          to="/minha-conta"
+          class="link-conta"
+          :class="{ 'link-conta--ativo': route.path === '/minha-conta' }"
+          :title="recolhido ? `${sessao.nome || sessao.login} (${descricaoPerfis}) - Minha conta` : 'Minha conta'"
+          aria-label="Minha conta"
+          @click="emit('fechar')"
         >
-          {{ iniciais }}
-        </div>
-        
+          <span class="avatar" aria-hidden="true">{{ iniciais }}</span>
+          <span v-if="!recolhido" class="rodape-info">
+            <span class="rodape-nome">{{ sessao.nome || sessao.login }}</span>
+            <span class="rodape-perfil">{{ descricaoPerfis }}</span>
+          </span>
+        </router-link>
+
         <template v-if="!recolhido">
-          <div class="rodape-info">
-            <p class="rodape-nome">{{ sessao.nome || sessao.login }}</p>
-            <p class="rodape-perfil">{{ descricaoPerfis }}</p>
-          </div>
           <button class="btn-tema" :title="rotuloTema" :aria-label="rotuloTema" @click="alternarTema">
             <!-- Sol no escuro (volta pro claro), lua no claro (vai pro escuro) -->
             <svg v-if="temaEscuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -888,6 +891,30 @@ onUnmounted(() => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Nome + avatar: link para a Minha conta */
+.link-conta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem;
+  margin: -0.25rem;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.link-conta:hover,
+.link-conta--ativo {
+  background: #f1f5f9;
+}
+
+.barra-lateral--recolhida .link-conta {
+  flex: 0 0 auto;
+}
+
 .rodape-info {
   display: flex;
   flex-direction: column;
@@ -1126,6 +1153,11 @@ onUnmounted(() => {
   background: var(--cor-primaria);
   color: var(--cor-primaria-contraste);
   box-shadow: none;
+}
+
+:root[data-tema="escuro"] .link-conta:hover,
+:root[data-tema="escuro"] .link-conta--ativo {
+  background: var(--cor-superficie-elevada);
 }
 
 :root[data-tema="escuro"] .rodape-nome {
