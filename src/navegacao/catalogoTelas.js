@@ -128,4 +128,13 @@ export const TELAS = [
     permissao: PERMISSOES.USUARIO_GERENCIAR,
     botoes: [],
   },
+  {
+    // Sem permissão: todo usuário logado abre a própria conta (pelo nome no rodapé do menu)
+    rota: '/minha-conta',
+    cor: '#0ea5e9',
+    titulo: 'Minha conta',
+    descricao: 'Seus dados, troca de nome e de senha',
+    icone: 'conta',
+    botoes: [{ rotulo: 'Trocar senha' }, { rotulo: 'Salvar nome' }],
+  },
 ]
