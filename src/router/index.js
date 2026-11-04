@@ -13,6 +13,7 @@ import PerfisAcessoView from '../components/PerfisAcessoView.vue'
 import MatrizAcessoView from '../components/MatrizAcessoView.vue'
 import AuditoriaView from '../components/AuditoriaView.vue'
 import SemAcessoView from '../components/SemAcessoView.vue'
+import MinhaContaView from '../components/MinhaContaView.vue'
 import { temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 
@@ -28,6 +29,7 @@ import { PERMISSOES } from '../auth/permissoes'
 // - /admin/controle-acesso: painel do Controle de Acesso, com atalho pras 3 telas abaixo
 // - /admin/usuarios: cadastro de usuários e atribuição de perfis/permissões
 // - /admin/perfis e /admin/matriz-acesso: consulta (só leitura) de perfis e permissões
+// - /minha-conta: os dados do próprio usuário (troca nome e senha); qualquer usuário logado
 //
 // meta.permissao = role de permissão exigida pra abrir a tela (mesmo código do backend).
 // meta.titulo = nome da tela na Matriz de Acesso (que lista as telas de cada permissão).
@@ -107,6 +109,7 @@ const routes = [
     component: MatrizAcessoView,
     meta: { permissao: PERMISSOES.USUARIO_GERENCIAR, titulo: 'Matriz de Acesso' },
   },
+  { path: '/minha-conta', name: 'minha-conta', component: MinhaContaView },
   { path: '/sem-acesso', name: 'sem-acesso', component: SemAcessoView },
 ]
 
