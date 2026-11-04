@@ -4,9 +4,11 @@ import UsuariosView from './UsuariosView.vue'
 import {
   atualizarUsuario,
   buscarCatalogoAcesso,
+  buscarTokenAcesso,
   buscarUsuarios,
   criarUsuario,
   definirRoles,
+  definirTokenAcesso,
 } from '../services/usuarioService'
 import { gerarPdfUsuarios } from '../services/usuariosPdf'
 
@@ -17,6 +19,8 @@ vi.mock('../services/usuarioService', () => ({
   atualizarUsuario: vi.fn(),
   definirRoles: vi.fn(),
   redefinirSenha: vi.fn(),
+  buscarTokenAcesso: vi.fn(),
+  definirTokenAcesso: vi.fn(),
 }))
 
 vi.mock('../services/usuariosPdf', () => ({ gerarPdfUsuarios: vi.fn() }))
@@ -92,6 +96,8 @@ beforeEach(() => {
   criarUsuario.mockResolvedValue({})
   atualizarUsuario.mockResolvedValue({})
   definirRoles.mockResolvedValue({})
+  buscarTokenAcesso.mockResolvedValue(false)
+  definirTokenAcesso.mockResolvedValue(true)
 })
 
 afterEach(() => vi.clearAllMocks())
@@ -359,6 +365,7 @@ describe('UsuariosView', () => {
       email: 'joao@x.com',
       senhaTemporaria: 'Senha@123',
       roles: ['perfil-administrador', 'lote:gerenciar'],
+      tokenAcesso: false,
     })
   })
 
@@ -411,5 +418,84 @@ describe('UsuariosView', () => {
     expect(definirRoles).not.toHaveBeenCalled()
     expect(wrapper.find('.alerta--info').text()).toBe('Nenhuma alteração para salvar.')
     expect(wrapper.find('form.formulario-usuario').exists()).toBe(true)
+  })
+
+  it('a edição mostra a liberação do token de acesso vinda do backend', async () => {
+    buscarTokenAcesso.mockResolvedValue(true)
+    const wrapper = await montar()
+    await wrapper.findAll('tbody tr')[0].find('button').trigger('click')
+    await flushPromises()
+
+    expect(buscarTokenAcesso).toHaveBeenCalledWith('u-admin')
+    const interruptor = wrapper.find('[role="switch"]')
+    expect(interruptor.attributes('aria-checked')).toBe('true')
+    expect(wrapper.find('.texto-interruptor').text()).toBe('Ativado')
+  })
+
+  it('ativar o token de um administrador grava só o token', async () => {
+    const wrapper = await montar()
+    await wrapper.findAll('tbody tr')[0].find('button').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[role="switch"]').trigger('click')
+    await wrapper.find('form.formulario-usuario').trigger('submit')
+    await flushPromises()
+
+    expect(definirTokenAcesso).toHaveBeenCalledWith('u-admin', true)
+    expect(atualizarUsuario).not.toHaveBeenCalled()
+    expect(definirRoles).not.toHaveBeenCalled()
+  })
+
+  it('usuário sem o perfil Administrador não vê o token', async () => {
+    const wrapper = await montar()
+    await wrapper.findAll('tbody tr')[1].find('button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="switch"]').exists()).toBe(false)
+  })
+
+  async function preencherNovo(wrapper, senha) {
+    await botao(wrapper, '+ Novo').trigger('click')
+    const campos = wrapper.findAll('.formulario-usuario input.campo-texto')
+    await campos[0].setValue('api.gold')
+    await campos[1].setValue('API')
+    await campos[2].setValue('Gold')
+    await campos[3].setValue('api@x.com')
+    await campos[4].setValue(senha)
+  }
+
+  it('no cadastro, Ativar token só aparece depois de escolher o perfil Administrador', async () => {
+    const wrapper = await montar()
+    await preencherNovo(wrapper, 'Senha@123')
+    expect(wrapper.find('[role="switch"]').exists()).toBe(false)
+
+    await wrapper.find('input[value="perfil-administrador"]').setValue(true)
+    expect(wrapper.find('[role="switch"]').exists()).toBe(true)
+  })
+
+  it('cadastro com token manda tokenAcesso, sem regra de senha a mais', async () => {
+    const wrapper = await montar()
+    await preencherNovo(wrapper, 'Senha@123')
+    await wrapper.find('input[value="perfil-administrador"]').setValue(true)
+    await wrapper.find('[role="switch"]').trigger('click')
+    await wrapper.find('form.formulario-usuario').trigger('submit')
+    await flushPromises()
+
+    expect(criarUsuario).toHaveBeenCalledWith(
+      expect.objectContaining({ senhaTemporaria: 'Senha@123', tokenAcesso: true }),
+    )
+  })
+
+  it('tirar o perfil Administrador desliga o token', async () => {
+    const wrapper = await montar()
+    await preencherNovo(wrapper, 'Senha@123')
+    const admin = () => wrapper.find('input[value="perfil-administrador"]')
+    await admin().setValue(true)
+    await wrapper.find('[role="switch"]').trigger('click')
+    await admin().setValue(false)
+    expect(wrapper.find('[role="switch"]').exists()).toBe(false)
+
+    await admin().setValue(true)
+    expect(wrapper.find('[role="switch"]').attributes('aria-checked')).toBe('false')
   })
 })
