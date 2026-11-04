@@ -246,17 +246,16 @@ onMounted(async () => {
     <!-- Indicadores e resultados: números, sem mapa -->
     <section v-if="podeVerIndicadores" class="secao" data-secao="indicadores">
       <header class="secao-topo">
-        <h2 class="secao-titulo">Indicadores e resultados</h2>
-        <div class="secao-acoes">
-          <router-link v-if="!minimizada('indicadores')" to="/indicadores" class="btn-secao">Ver em tabela</router-link>
-          <button
-            type="button"
-            class="btn-secao btn-minimizar"
-            :aria-expanded="!minimizada('indicadores')"
-            @click="alternarSecao('indicadores')"
-          >
-            {{ minimizada('indicadores') ? 'Mostrar' : 'Minimizar' }}
+        <h2 class="secao-titulo">
+          <button type="button" class="secao-alternar" :aria-expanded="!minimizada('indicadores')" @click="alternarSecao('indicadores')">
+            <svg class="secao-seta" :class="{ 'secao-seta--aberta': !minimizada('indicadores') }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+            Indicadores e resultados
           </button>
+        </h2>
+        <div v-if="!minimizada('indicadores')" class="secao-acoes">
+          <router-link to="/indicadores" class="btn-secao">Ver em tabela</router-link>
         </div>
       </header>
 
@@ -322,12 +321,14 @@ onMounted(async () => {
 
     <section class="secao" data-secao="favoritos">
       <header class="secao-topo">
-        <h2 class="secao-titulo"><span class="estrela-titulo" aria-hidden="true">☆</span> Favoritos</h2>
-        <div class="secao-acoes">
-          <button type="button" class="btn-secao btn-minimizar" :aria-expanded="!minimizada('favoritos')" @click="alternarSecao('favoritos')">
-            {{ minimizada('favoritos') ? 'Mostrar' : 'Minimizar' }}
+        <h2 class="secao-titulo">
+          <button type="button" class="secao-alternar" :aria-expanded="!minimizada('favoritos')" @click="alternarSecao('favoritos')">
+            <svg class="secao-seta" :class="{ 'secao-seta--aberta': !minimizada('favoritos') }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+            <span class="estrela-titulo" aria-hidden="true">☆</span> Favoritos
           </button>
-        </div>
+        </h2>
       </header>
       <template v-if="!minimizada('favoritos')">
         <p v-if="carregandoFavoritos" class="estado-vazio">Carregando favoritos…</p>
@@ -353,12 +354,14 @@ onMounted(async () => {
 
     <section class="secao" data-secao="telas">
       <header class="secao-topo">
-        <h2 class="secao-titulo">Todas as telas</h2>
-        <div class="secao-acoes">
-          <button type="button" class="btn-secao btn-minimizar" :aria-expanded="!minimizada('telas')" @click="alternarSecao('telas')">
-            {{ minimizada('telas') ? 'Mostrar' : 'Minimizar' }}
+        <h2 class="secao-titulo">
+          <button type="button" class="secao-alternar" :aria-expanded="!minimizada('telas')" @click="alternarSecao('telas')">
+            <svg class="secao-seta" :class="{ 'secao-seta--aberta': !minimizada('telas') }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+            Todas as telas
           </button>
-        </div>
+        </h2>
       </header>
       <template v-if="!minimizada('telas')">
         <p v-if="!telas.length" class="estado-vazio">Seu usuário ainda não tem acesso a nenhuma tela. Fale com o administrador.</p>
@@ -510,13 +513,52 @@ onMounted(async () => {
   gap: 1rem;
   flex-wrap: wrap;
   margin-bottom: 0.75rem;
+  padding: 0.15rem 0.6rem 0.15rem 0.15rem;
+  border-radius: 10px;
+  background: var(--cor-branco);
+  border: 1px solid var(--cor-slate-200);
 }
 
 .secao-titulo {
+  flex: 1;
   margin: 0;
   font-size: 1.05rem;
   font-weight: 800;
   color: var(--cor-slate-900);
+}
+
+/* O título inteiro é o botão que abre e minimiza a seção */
+.secao-alternar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.secao-alternar:hover,
+.secao-alternar:focus-visible {
+  color: var(--cor-primaria);
+  outline: none;
+}
+
+.secao-seta {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  color: var(--cor-slate-400);
+  transition: transform 0.15s;
+}
+
+.secao-seta--aberta {
+  transform: rotate(90deg);
 }
 
 .secao-acoes {
@@ -836,7 +878,7 @@ onMounted(async () => {
 }
 
 /* "Ver em tabela" é link (<a>): sem isto, a cor de link do tema escuro passaria por cima
-   e ele ficaria diferente do Minimizar ao lado */
+   e ele ficaria diferente dos outros textos da barra da seção */
 :root[data-tema="escuro"] .btn-secao {
   color: var(--cor-slate-600);
 }
