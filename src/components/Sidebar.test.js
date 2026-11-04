@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, RouterLinkStub } from '@vue/test-utils'
 import Sidebar from './Sidebar.vue'
 import { alternarTema, estadoTema } from '../tema'
@@ -234,6 +234,66 @@ describe('Sidebar — Indicadores e Resultados: um item para o mapa e a tabela (
       await wrapper.find('.marca-icone--botao').trigger('click')
       expect(wrapper.find('.menu-flutuante').exists()).toBe(false)
       expect(wrapper.find('.grupo-cabeca').exists()).toBe(true)
+    })
+  })
+
+  describe('barra recolhida: passar o mouse mostra o nome da tela', () => {
+    function montarComTeleport() {
+      return mount(Sidebar, { global: { stubs: { 'router-link': RouterLinkStub, teleport: true } } })
+    }
+    afterEach(() => vi.useRealTimers())
+
+    it('num item comum, mostra o nome ao lado, que também leva à tela', async () => {
+      const wrapper = montarComTeleport()
+      await wrapper.find('.btn-toggle-desktop').trigger('click')
+
+      const home = wrapper.findAllComponents(RouterLinkStub).find((l) => l.props('to') === '/')
+      await home.trigger('mouseenter')
+
+      const menu = wrapper.find('.menu-flutuante')
+      expect(menu.exists()).toBe(true)
+      const titulo = menu.findComponent(RouterLinkStub)
+      expect(titulo.text()).toBe('Home')
+      expect(titulo.props('to')).toBe('/')
+      expect(menu.find('.grupo-lista').exists()).toBe(false)
+    })
+
+    it('num grupo, mostra o nome e as telas embaixo', async () => {
+      sessaoTeste.permissoes = ['usuario:gerenciar']
+      const wrapper = montarComTeleport()
+      await wrapper.find('.btn-toggle-desktop').trigger('click')
+      await wrapper.find('.grupo-icone-recolhido').trigger('mouseenter')
+
+      const menu = wrapper.find('.menu-flutuante')
+      expect(menu.find('.menu-flutuante-titulo').text()).toBe('Controle de Acesso')
+      expect(menu.findAll('.grupo-lista .subitem')).toHaveLength(4)
+    })
+
+    it('fecha um pouco depois de o mouse sair, mas não se ele entrar no menu', async () => {
+      vi.useFakeTimers()
+      const wrapper = montarComTeleport()
+      await wrapper.find('.btn-toggle-desktop').trigger('click')
+      const home = wrapper.findAllComponents(RouterLinkStub).find((l) => l.props('to') === '/')
+
+      await home.trigger('mouseenter')
+      await home.trigger('mouseleave')
+      await wrapper.find('.menu-flutuante').trigger('mouseenter')
+      vi.advanceTimersByTime(500)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.menu-flutuante').exists()).toBe(true)
+
+      await wrapper.find('.menu-flutuante').trigger('mouseleave')
+      vi.advanceTimersByTime(500)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.menu-flutuante').exists()).toBe(false)
+    })
+
+    it('com a barra aberta, passar o mouse não abre nada', async () => {
+      const wrapper = montarComTeleport()
+      const home = wrapper.findAllComponents(RouterLinkStub).find((l) => l.props('to') === '/')
+      await home.trigger('mouseenter')
+
+      expect(wrapper.find('.menu-flutuante').exists()).toBe(false)
     })
   })
 })
