@@ -203,20 +203,34 @@ describe('InicioView', () => {
     expect(listarTiposIndicador).not.toHaveBeenCalled()
   })
 
-  it('minimizar esconde a seção e é lembrado na próxima vez', async () => {
+  it('não tem mais botão Mostrar/Minimizar: o título da seção é que abre e minimiza', async () => {
     const wrapper = montar()
     await flushPromises()
 
-    const botao = wrapper.find('[data-secao="telas"] .btn-minimizar')
-    expect(botao.text()).toBe('Minimizar')
-    await botao.trigger('click')
+    expect(wrapper.text()).not.toMatch(/\bMinimizar\b|\bMostrar\b(?! de novo)/)
+    const titulo = wrapper.find('[data-secao="telas"] .secao-alternar')
+    expect(titulo.text()).toBe('Todas as telas')
+    expect(titulo.attributes('aria-expanded')).toBe('true')
+    expect(titulo.find('.secao-seta').classes()).toContain('secao-seta--aberta')
+
+    await titulo.trigger('click')
     expect(wrapper.find('[data-secao="telas"] .grade-telas').exists()).toBe(false)
-    expect(wrapper.find('[data-secao="telas"] .btn-minimizar').text()).toBe('Mostrar')
+    expect(titulo.attributes('aria-expanded')).toBe('false')
+    expect(titulo.find('.secao-seta').classes()).not.toContain('secao-seta--aberta')
+
+    await titulo.trigger('click')
+    expect(wrapper.find('[data-secao="telas"] .grade-telas').exists()).toBe(true)
+  })
+
+  it('a seção minimizada é lembrada na próxima vez', async () => {
+    const wrapper = montar()
+    await flushPromises()
+    await wrapper.find('[data-secao="telas"] .secao-alternar').trigger('click')
 
     const deNovo = montar()
     await flushPromises()
     expect(deNovo.find('[data-secao="telas"] .grade-telas').exists()).toBe(false)
-    expect(deNovo.find('[data-secao="favoritos"] .btn-minimizar').text()).toBe('Minimizar')
+    expect(deNovo.find('[data-secao="favoritos"] .secao-alternar').attributes('aria-expanded')).toBe('true')
   })
 
   it('ocultar tira a tela da lista e "Mostrar de novo" devolve', async () => {
@@ -255,7 +269,7 @@ describe('InicioView', () => {
     expect(faixas(curitiba)[0]).toBe('badge-tag--erro')
   })
 
-  it('a seção de indicadores só tem "Ver em tabela", no mesmo padrão do Minimizar, e some ao minimizar', async () => {
+  it('a seção de indicadores só tem "Ver em tabela", que some ao minimizar', async () => {
     const wrapper = montar()
     await flushPromises()
 
@@ -264,9 +278,8 @@ describe('InicioView', () => {
     const link = secao().findAllComponents(RouterLinkStub).find((l) => l.text() === 'Ver em tabela')
     expect(link.props('to')).toBe('/indicadores')
     expect(link.classes()).toContain('btn-secao')
-    expect(secao().find('.btn-minimizar').classes()).toContain('btn-secao')
 
-    await secao().find('.btn-minimizar').trigger('click')
+    await secao().find('.secao-alternar').trigger('click')
     expect(secao().text()).not.toContain('Ver em tabela')
   })
 
