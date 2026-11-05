@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import InicioView from '../components/InicioView.vue'
 import CadastroFontes from '../components/CadastroFontes.vue'
 import QuarentenaView from '../components/QuarentenaView.vue'
 import LotesView from '../components/LotesView.vue'
@@ -12,10 +13,12 @@ import PerfisAcessoView from '../components/PerfisAcessoView.vue'
 import MatrizAcessoView from '../components/MatrizAcessoView.vue'
 import AuditoriaView from '../components/AuditoriaView.vue'
 import SemAcessoView from '../components/SemAcessoView.vue'
+import MinhaContaView from '../components/MinhaContaView.vue'
 import { temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 
 // Rotas ativas do DataGIS:
+// - /: tela inicial (dashboard) com favoritos e atalhos; qualquer usuário logado abre
 // - /fontes: Cadastro e execução de fontes
 // - /lotes: Gestão de lotes, pipeline e liberação All-or-Nothing
 // - /quarentena: Triagem, auditoria e resolução de inconsistências (Fase 3)
@@ -26,12 +29,14 @@ import { PERMISSOES } from '../auth/permissoes'
 // - /admin/controle-acesso: painel do Controle de Acesso, com atalho pras 3 telas abaixo
 // - /admin/usuarios: cadastro de usuários e atribuição de perfis/permissões
 // - /admin/perfis e /admin/matriz-acesso: consulta (só leitura) de perfis e permissões
+// - /minha-conta: os dados do próprio usuário (troca nome e senha); qualquer usuário logado
 //
 // meta.permissao = role de permissão exigida pra abrir a tela (mesmo código do backend).
 // meta.titulo = nome da tela na Matriz de Acesso (que lista as telas de cada permissão).
-// A ordem da lista também define pra onde "/" leva: a primeira tela que o usuário pode abrir.
+// A ordem da lista também define pra onde vai quem abre uma tela sem permissão: a primeira
+// tela que o usuário pode abrir.
 const routes = [
-  { path: '/', redirect: () => primeiraRotaPermitida() },
+  { path: '/', name: 'inicio', component: InicioView },
   {
     path: '/fontes',
     name: 'fontes',
@@ -104,6 +109,7 @@ const routes = [
     component: MatrizAcessoView,
     meta: { permissao: PERMISSOES.USUARIO_GERENCIAR, titulo: 'Matriz de Acesso' },
   },
+  { path: '/minha-conta', name: 'minha-conta', component: MinhaContaView },
   { path: '/sem-acesso', name: 'sem-acesso', component: SemAcessoView },
 ]
 

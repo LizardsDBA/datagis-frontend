@@ -9,15 +9,18 @@
  * Duas telas no mesmo componente: a lista (busca, ordenação, paginação e detalhe expansível)
  * e o formulário de página inteira (novo/editar), com "Voltar à lista".
  */
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { nomeDoPerfil, sessao } from '../auth/autenticacao'
 import SeletorMultiplo from './SeletorMultiplo.vue'
+import Interruptor from './Interruptor.vue'
 import {
   atualizarUsuario,
   buscarCatalogoAcesso,
+  buscarTokenAcesso,
   buscarUsuarios,
   criarUsuario,
   definirRoles,
+  definirTokenAcesso,
   redefinirSenha,
 } from '../services/usuarioService'
 import {
@@ -274,6 +277,8 @@ function abrirNovo() {
     perfis: [],
     permissoesAvulsas: [],
   })
+  tokenAcesso.value = false
+  carregandoToken.value = false
   erroForm.value = ''
   tela.value = 'novo'
 }
@@ -293,10 +298,40 @@ function abrirEdicao(usuario) {
   original = {
     dados: dadosDoForm(),
     roles: rolesDe(usuario.perfis, usuario.permissoesAvulsas),
+    tokenAcesso: false,
   }
+  tokenAcesso.value = false
+  carregandoToken.value = true
   erroForm.value = ''
   avisoForm.value = ''
   tela.value = 'editar'
+  carregarTokenAcesso(usuario.id)
+}
+
+// Liberação da "Criação de token de acesso" (o token em si entra depois). Só o perfil
+// Administrador pode ter token: a opção só aparece com ele escolhido (mesma regra do backend).
+const PERFIL_COM_TOKEN = 'perfil-administrador'
+const tokenAcesso = ref(false)
+const carregandoToken = ref(false)
+const perfilPermiteToken = computed(() => form.perfis.includes(PERFIL_COM_TOKEN))
+
+// Tirou o perfil Administrador: o token desliga junto (o backend faz o mesmo ao salvar)
+watch(perfilPermiteToken, (permite) => {
+  if (!permite) tokenAcesso.value = false
+})
+
+async function carregarTokenAcesso(id) {
+  try {
+    const habilitado = await buscarTokenAcesso(id)
+    // O formulário pode ter mudado de usuário enquanto a resposta não chegava
+    if (form.id !== id) return
+    tokenAcesso.value = habilitado
+    original.tokenAcesso = habilitado
+  } catch (e) {
+    if (form.id === id) erroForm.value = e.message
+  } finally {
+    if (form.id === id) carregandoToken.value = false
+  }
 }
 
 function voltarALista() {
@@ -333,7 +368,8 @@ async function salvar() {
   const roles = rolesDoForm()
   const dadosMudaram = tela.value === 'editar' && JSON.stringify(dados) !== JSON.stringify(original.dados)
   const rolesMudaram = tela.value === 'editar' && !mesmoConjunto(roles, original.roles)
-  if (tela.value === 'editar' && !dadosMudaram && !rolesMudaram) {
+  const tokenMudou = tela.value === 'editar' && tokenAcesso.value !== original.tokenAcesso
+  if (tela.value === 'editar' && !dadosMudaram && !rolesMudaram && !tokenMudou) {
     avisoForm.value = 'Nenhuma alteração para salvar.'
     return
   }
@@ -347,11 +383,13 @@ async function salvar() {
         email: form.email,
         senhaTemporaria: form.senhaTemporaria,
         roles: rolesDoForm(),
+        tokenAcesso: tokenAcesso.value,
       })
       mostrarSucesso(`Usuário ${form.login} cadastrado. Ele vai trocar a senha no primeiro acesso.`)
     } else {
       if (dadosMudaram) await atualizarUsuario(form.id, dados)
       if (rolesMudaram) await definirRoles(form.id, roles)
+      if (tokenMudou) await definirTokenAcesso(form.id, tokenAcesso.value)
       mostrarSucesso(`Acessos de ${form.login} atualizados.`)
     }
     voltarALista()
@@ -876,6 +914,27 @@ onUnmounted(() => {
           >
             {{ codigo }}
           </span>
+        </div>
+      </div>
+
+      <div v-if="perfilPermiteToken" class="linha-form">
+        <span class="rotulo-form">Ativar token</span>
+        <div class="campo-form">
+          <div class="linha-interruptor">
+            <Interruptor
+              v-model="tokenAcesso"
+              rotulo="Ativar token de acesso"
+              :somente-leitura="carregandoToken"
+            />
+            <span class="texto-interruptor">
+              {{ carregandoToken ? 'Carregando…' : tokenAcesso ? 'Ativado' : 'Desativado' }}
+            </span>
+          </div>
+          <small>
+            Libera o usuário para buscar os dados da Gold pela API. Só para o perfil Administrador;
+            não precisa de senha própria, vale o login dele. A criação do token ainda vai ser
+            entregue; por enquanto fica só a liberação.
+          </small>
         </div>
       </div>
 
@@ -1635,6 +1694,20 @@ button:disabled {
   gap: 0.75rem;
   padding-top: 1.25rem;
   padding-left: 14.25rem;
+}
+
+/* Interruptor do token de acesso */
+.linha-interruptor {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 0.45rem;
+}
+
+.texto-interruptor {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--cor-slate-700);
 }
 
 /* Menu de exportação */

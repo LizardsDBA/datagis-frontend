@@ -48,3 +48,17 @@ export async function redefinirSenha(id, senhaTemporaria) {
     'Falha ao redefinir senha',
   )
 }
+
+/** Se o usuário pode criar token de acesso (a criação do token entra depois). */
+export async function buscarTokenAcesso(id) {
+  const data = await lerJson(await apiFetch(`/api/admin/usuarios/${id}/token-acesso`), 'Falha ao carregar o token de acesso')
+  return Boolean(data?.habilitado)
+}
+
+export async function definirTokenAcesso(id, habilitado) {
+  const data = await lerJson(
+    await apiFetch(`/api/admin/usuarios/${id}/token-acesso`, enviar('PUT', { habilitado })),
+    'Falha ao salvar o token de acesso',
+  )
+  return Boolean(data?.habilitado)
+}

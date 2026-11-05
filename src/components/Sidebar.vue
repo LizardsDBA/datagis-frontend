@@ -1,9 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { nomeDoPerfil, sair, sessao, temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 import { alternarTema, estadoTema } from '../tema'
+import PesquisaTelas from './PesquisaTelas.vue'
+import IconeTela from './IconeTela.vue'
 
 defineProps({
   abertoNoMobile: {
@@ -19,6 +21,7 @@ const recolhido = ref(false)
 
 function alternarRecuo() {
   recolhido.value = !recolhido.value
+  fecharFlutuante()
 }
 
 // Botão de tema (LIZARDS-38): o rótulo descreve a ação, não o estado atual
@@ -34,6 +37,19 @@ function lidarDuploClique() {
 
 // Estrutura completa agrupada pelas categorias Medalhão (LIZARDS-36) com permissões da sprint-2
 const categorias = [
+  {
+    titulo: 'Tela inicial',
+    itens: [
+      {
+        rota: '/',
+        rotulo: 'Home',
+        icone: 'inicio',
+        descricao: 'Favoritos e atalhos',
+        // Sem permissão: a tela inicial abre pra qualquer usuário logado
+        permissao: null,
+      },
+    ],
+  },
   {
     titulo: 'Ingestão & Qualidade (Bronze)',
     itens: [
@@ -93,6 +109,14 @@ const categorias = [
         permissao: PERMISSOES.USUARIO_GERENCIAR,
         // As telas do Controle de Acesso abrem pelo painel; o item continua marcado nelas
         rotasRelacionadas: ['/admin/'],
+        // Vira um grupo que abre no próprio menu: a pessoa escolhe a tela direto daqui,
+        // sem passar pelo painel. Com a barra recolhida, o ícone leva ao painel (rota).
+        filhos: [
+          { rota: '/admin/controle-acesso', rotulo: 'Visão geral', icone: 'painel', permissao: PERMISSOES.USUARIO_GERENCIAR },
+          { rota: '/admin/usuarios', rotulo: 'Usuários', icone: 'usuarios', permissao: PERMISSOES.USUARIO_GERENCIAR },
+          { rota: '/admin/perfis', rotulo: 'Perfis', icone: 'perfis', permissao: PERMISSOES.USUARIO_GERENCIAR },
+          { rota: '/admin/matriz-acesso', rotulo: 'Matriz de Acesso', icone: 'matriz', permissao: PERMISSOES.USUARIO_GERENCIAR },
+        ],
       },
     ],
   },
@@ -104,6 +128,35 @@ const route = useRoute()
 function ativoPorRelacao(item) {
   return (item.rotasRelacionadas || []).some((r) => route?.path?.startsWith(r))
 }
+
+// Grupos do menu (item com `filhos`): abrem e fecham pelo cabeçalho. Abrem sozinhos
+// quando a tela aberta é de dentro do grupo.
+const gruposAbertos = reactive(new Set())
+
+function grupoAberto(item) {
+  return gruposAbertos.has(item.rota)
+}
+
+function alternarGrupo(item) {
+  if (gruposAbertos.has(item.rota)) gruposAbertos.delete(item.rota)
+  else gruposAbertos.add(item.rota)
+}
+
+function filhosVisiveis(item) {
+  return (item.filhos || []).filter((filho) => temPermissao(filho.permissao))
+}
+
+watch(
+  () => route?.path,
+  () => {
+    categorias.forEach((categoria) =>
+      categoria.itens.forEach((item) => {
+        if (item.filhos && ativoPorRelacao(item)) gruposAbertos.add(item.rota)
+      }),
+    )
+  },
+  { immediate: true },
+)
 
 // Mantém o filtro estrito de permissões da sprint-2 por perfil de usuário
 const categoriasVisiveis = computed(() => {
@@ -129,8 +182,75 @@ const descricaoPerfis = computed(() =>
 )
 
 function navegar() {
+  fecharFlutuante()
   emit('fechar')
 }
+
+// Barra recolhida: passar o mouse num ícone mostra, ao lado, o nome da tela; num grupo,
+// também a lista das telas dele. O menu fica aberto enquanto o mouse está no ícone ou no
+// próprio menu. O clique no ícone do grupo abre e fecha (teclado e tela de toque).
+// Vai pro <body> (Teleport) pra não ser cortado pela rolagem da barra, na altura do ícone.
+const flutuante = ref(null) // { item, top, left } | null
+const ATRASO_FECHAR_MS = 200
+let timerFechar = null
+
+function posicionar(item, evento) {
+  const caixa = evento.currentTarget.getBoundingClientRect()
+  flutuante.value = { item, top: caixa.top, left: caixa.right + 4 }
+}
+
+function abrirFlutuante(item, evento) {
+  cancelarFechamento()
+  if (flutuante.value?.item.rota === item.rota) {
+    fecharFlutuante()
+    return
+  }
+  posicionar(item, evento)
+}
+
+function mostrarAoPassar(item, evento) {
+  if (!recolhido.value) return
+  cancelarFechamento()
+  posicionar(item, evento)
+}
+
+function cancelarFechamento() {
+  clearTimeout(timerFechar)
+  timerFechar = null
+}
+
+// Atraso curto: dá tempo de levar o mouse do ícone até o menu sem ele sumir
+function agendarFechar() {
+  cancelarFechamento()
+  timerFechar = setTimeout(fecharFlutuante, ATRASO_FECHAR_MS)
+}
+
+function fecharFlutuante() {
+  cancelarFechamento()
+  flutuante.value = null
+}
+
+function aoClicarFora(evento) {
+  if (!flutuante.value) return
+  if (evento.target.closest?.('.menu-flutuante, .grupo-icone-recolhido')) return
+  fecharFlutuante()
+}
+
+function aoTeclar(evento) {
+  if (evento.key === 'Escape') fecharFlutuante()
+}
+
+watch(() => route?.path, fecharFlutuante)
+
+onMounted(() => {
+  document.addEventListener('mousedown', aoClicarFora)
+  document.addEventListener('keydown', aoTeclar)
+})
+onUnmounted(() => {
+  cancelarFechamento()
+  document.removeEventListener('mousedown', aoClicarFora)
+  document.removeEventListener('keydown', aoTeclar)
+})
 </script>
 
 <template>
@@ -201,6 +321,9 @@ function navegar() {
         </button>
       </div>
 
+      <!-- Pesquisa de telas e botões, logo abaixo do nome do projeto -->
+      <PesquisaTelas v-if="!recolhido" @navegou="navegar" />
+
       <nav class="menu">
         <!-- Renderização agrupada por categorias Medalhão -->
         <div 
@@ -211,20 +334,46 @@ function navegar() {
           <div v-if="!recolhido" class="menu-secao-rotulo">{{ categoria.titulo }}</div>
           <div v-else class="menu-secao-divisor"></div>
 
+          <template v-for="item in categoria.itens" :key="item.rota">
+          <!-- Grupo com a barra recolhida: o ícone abre o menu flutuante com as telas -->
+          <button
+            v-if="item.filhos && recolhido"
+            type="button"
+            class="item-menu grupo-icone-recolhido"
+            :class="{ 'item-menu--ativo': ativoPorRelacao(item) }"
+            :aria-label="item.rotulo"
+            aria-haspopup="menu"
+            :aria-expanded="flutuante?.item.rota === item.rota"
+            @click="abrirFlutuante(item, $event)"
+            @mouseenter="mostrarAoPassar(item, $event)"
+            @mouseleave="agendarFechar"
+          >
+            <div class="icone-wrapper">
+              <span class="icone"><IconeTela :nome="item.icone" /></span>
+            </div>
+          </button>
+
           <router-link
-            v-for="item in categoria.itens"
-            :key="item.rota"
+            v-else-if="!item.filhos"
             :to="item.rota"
             class="item-menu"
             active-class="item-menu--ativo"
             :class="{ 'item-menu--ativo': ativoPorRelacao(item) }"
-            :title="recolhido ? item.rotulo : ''"
+            :aria-label="recolhido ? item.rotulo : undefined"
             @click="navegar"
             @dblclick="lidarDuploClique"
+            @mouseenter="mostrarAoPassar(item, $event)"
+            @mouseleave="agendarFechar"
           >
             <div class="icone-wrapper">
+              <!-- Ícone para Home -->
+              <svg v-if="item.icone === 'inicio'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 10.5 12 3l9 7.5" />
+                <path d="M5 9.5V21h14V9.5" />
+                <path d="M10 21v-6h4v6" />
+              </svg>
               <!-- Ícone para Fontes -->
-              <svg v-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg v-else-if="item.icone === 'fontes'" class="icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <ellipse cx="12" cy="5" rx="8" ry="3" />
                 <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
                 <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
@@ -267,24 +416,122 @@ function navegar() {
               <span class="item-desc">{{ item.descricao }}</span>
             </div>
           </router-link>
+
+          <!-- Grupo: cabeçalho abre a lista de telas, que a pessoa escolhe direto no menu -->
+          <div v-else class="grupo-menu">
+            <button
+              type="button"
+              class="item-menu grupo-cabeca"
+              :class="{ 'item-menu--ativo': ativoPorRelacao(item) }"
+              :aria-expanded="grupoAberto(item)"
+              @click="alternarGrupo(item)"
+            >
+              <div class="icone-wrapper">
+                <span class="icone"><IconeTela :nome="item.icone" /></span>
+              </div>
+              <div class="item-texto">
+                <span class="item-rotulo">{{ item.rotulo }}</span>
+                <span class="item-desc">{{ item.descricao }}</span>
+              </div>
+              <svg class="grupo-seta" :class="{ 'grupo-seta--aberta': grupoAberto(item) }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <ul v-if="grupoAberto(item)" class="grupo-lista">
+              <li v-for="filho in filhosVisiveis(item)" :key="filho.rota" class="grupo-item">
+                <router-link
+                  :to="filho.rota"
+                  class="subitem"
+                  active-class="subitem--ativo"
+                  @click="navegar"
+                >
+                  <span class="subitem-icone"><IconeTela :nome="filho.icone" /></span>
+                  <span class="subitem-rotulo">{{ filho.rotulo }}</span>
+                </router-link>
+                <a
+                  :href="filho.rota"
+                  target="_blank"
+                  rel="noopener"
+                  class="subitem-nova-aba"
+                  :title="`Abrir ${filho.rotulo} em nova aba`"
+                  :aria-label="`Abrir ${filho.rotulo} em nova aba`"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </a>
+              </li>
+            </ul>
+          </div>
+          </template>
         </div>
       </nav>
 
-      <div class="rodape">
-        <!-- Apenas o avatar centralizado quando recolhido -->
-        <div 
-          class="avatar" 
-          aria-hidden="true" 
-          :title="recolhido ? `${sessao.nome || sessao.login} (${descricaoPerfis})` : ''"
+      <Teleport to="body">
+        <div
+          v-if="flutuante"
+          class="menu-flutuante"
+          :class="{ 'menu-flutuante--grupo': flutuante.item.filhos }"
+          role="menu"
+          :aria-label="flutuante.item.rotulo"
+          :style="{ top: `${flutuante.top}px`, left: `${flutuante.left}px` }"
+          @mouseenter="cancelarFechamento"
+          @mouseleave="agendarFechar"
         >
-          {{ iniciais }}
+          <router-link
+            v-if="!flutuante.item.filhos"
+            :to="flutuante.item.rota"
+            class="menu-flutuante-titulo menu-flutuante-titulo--link"
+            role="menuitem"
+            @click="navegar"
+          >{{ flutuante.item.rotulo }}</router-link>
+          <p v-else class="menu-flutuante-titulo">{{ flutuante.item.rotulo }}</p>
+          <ul v-if="flutuante.item.filhos" class="grupo-lista grupo-lista--flutuante">
+            <li v-for="filho in filhosVisiveis(flutuante.item)" :key="filho.rota" class="grupo-item">
+              <router-link :to="filho.rota" class="subitem" active-class="subitem--ativo" role="menuitem" @click="navegar">
+                <span class="subitem-icone"><IconeTela :nome="filho.icone" /></span>
+                <span class="subitem-rotulo">{{ filho.rotulo }}</span>
+              </router-link>
+              <a
+                :href="filho.rota"
+                target="_blank"
+                rel="noopener"
+                class="subitem-nova-aba"
+                :title="`Abrir ${filho.rotulo} em nova aba`"
+                :aria-label="`Abrir ${filho.rotulo} em nova aba`"
+                @click="fecharFlutuante"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </a>
+            </li>
+          </ul>
         </div>
-        
+      </Teleport>
+
+      <div class="rodape">
+        <!-- Nome e avatar abrem a Minha conta; recolhida, só o avatar centralizado -->
+        <router-link
+          to="/minha-conta"
+          class="link-conta"
+          :class="{ 'link-conta--ativo': route.path === '/minha-conta' }"
+          :title="recolhido ? `${sessao.nome || sessao.login} (${descricaoPerfis}) - Minha conta` : 'Minha conta'"
+          aria-label="Minha conta"
+          @click="emit('fechar')"
+        >
+          <span class="avatar" aria-hidden="true">{{ iniciais }}</span>
+          <span v-if="!recolhido" class="rodape-info">
+            <span class="rodape-nome">{{ sessao.nome || sessao.login }}</span>
+            <span class="rodape-perfil">{{ descricaoPerfis }}</span>
+          </span>
+        </router-link>
+
         <template v-if="!recolhido">
-          <div class="rodape-info">
-            <p class="rodape-nome">{{ sessao.nome || sessao.login }}</p>
-            <p class="rodape-perfil">{{ descricaoPerfis }}</p>
-          </div>
           <button class="btn-tema" :title="rotuloTema" :aria-label="rotuloTema" @click="alternarTema">
             <!-- Sol no escuro (volta pro claro), lua no claro (vai pro escuro) -->
             <svg v-if="temaEscuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -644,6 +891,30 @@ function navegar() {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Nome + avatar: link para a Minha conta */
+.link-conta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem;
+  margin: -0.25rem;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.link-conta:hover,
+.link-conta--ativo {
+  background: #f1f5f9;
+}
+
+.barra-lateral--recolhida .link-conta {
+  flex: 0 0 auto;
+}
+
 .rodape-info {
   display: flex;
   flex-direction: column;
@@ -884,6 +1155,11 @@ function navegar() {
   box-shadow: none;
 }
 
+:root[data-tema="escuro"] .link-conta:hover,
+:root[data-tema="escuro"] .link-conta--ativo {
+  background: var(--cor-superficie-elevada);
+}
+
 :root[data-tema="escuro"] .rodape-nome {
   color: var(--cor-texto-titulo);
 }
@@ -908,5 +1184,184 @@ function navegar() {
   background: var(--tenue-erro);
   border-color: rgb(248 113 113 / 30%);
   color: var(--cor-erro);
+}
+
+/* Grupo do menu (Controle de Acesso): cabeçalho que abre a lista de telas */
+.grupo-cabeca {
+  width: 100%;
+  border: 1px solid transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Botão sem o fundo cinza do navegador; o ativo mantém o fundo do .item-menu--ativo */
+.grupo-cabeca:not(.item-menu--ativo) {
+  background: transparent;
+}
+
+/* O ícone vem do IconeTela (componente): o span segura o tamanho que o .icone define */
+.grupo-cabeca .icone {
+  display: inline-flex;
+}
+
+.grupo-seta {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin-left: auto;
+  color: var(--cor-slate-400);
+  transition: transform 0.15s;
+}
+
+.grupo-seta--aberta {
+  transform: rotate(180deg);
+}
+
+.grupo-lista {
+  margin: 0.15rem 0 0.35rem;
+  padding: 0 0 0 1.4rem;
+  list-style: none;
+}
+
+.grupo-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.subitem {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 2.2rem 0.45rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  color: var(--cor-slate-700);
+  text-decoration: none;
+}
+
+.subitem:hover {
+  background: var(--cor-slate-100);
+}
+
+.subitem--ativo {
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria);
+  font-weight: 700;
+}
+
+.subitem-icone {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  color: var(--cor-slate-400);
+}
+
+.subitem--ativo .subitem-icone {
+  color: var(--cor-primaria);
+}
+
+/* Abrir em nova aba: aparece ao passar o mouse (ou focar) no sub-item */
+.subitem-nova-aba {
+  position: absolute;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 6px;
+  color: var(--cor-slate-500);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.subitem-nova-aba svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.grupo-item:hover .subitem-nova-aba,
+.subitem-nova-aba:focus-visible {
+  opacity: 1;
+}
+
+.subitem-nova-aba:hover {
+  background: var(--cor-slate-200);
+  color: var(--cor-slate-900);
+}
+
+:root[data-tema="escuro"] .subitem {
+  color: var(--cor-slate-700);
+}
+
+:root[data-tema="escuro"] .subitem--ativo {
+  color: var(--cor-primaria);
+}
+
+/* Barra recolhida: botão do grupo e o menu flutuante que ele abre */
+.grupo-icone-recolhido {
+  width: 100%;
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.grupo-icone-recolhido:not(.item-menu--ativo) {
+  background: transparent;
+}
+
+.grupo-icone-recolhido .icone {
+  display: inline-flex;
+}
+
+.menu-flutuante {
+  position: fixed;
+  z-index: 1000;
+  padding: 0.35rem;
+  border-radius: 10px;
+  background: var(--cor-branco);
+  border: 1px solid var(--cor-slate-200);
+  box-shadow: var(--sombra-md);
+}
+
+.menu-flutuante--grupo {
+  min-width: 14rem;
+}
+
+/* Nome da tela (ou do grupo) ao lado do ícone */
+.menu-flutuante-titulo {
+  display: block;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--cor-slate-900);
+  background: var(--cor-slate-100);
+  text-decoration: none;
+}
+
+.menu-flutuante-titulo--link:hover {
+  color: var(--cor-primaria);
+}
+
+/* Telas do grupo embaixo do nome, com a barra de destaque à esquerda */
+.grupo-lista--flutuante {
+  margin: 0.35rem 0 0;
+  padding: 0 0 0 0.35rem;
+  border-left: 3px solid var(--cor-primaria);
+}
+
+/* O nome no menu flutuante é link: sem isto a cor de link do tema escuro passaria por cima */
+:root[data-tema="escuro"] .menu-flutuante-titulo {
+  color: var(--cor-slate-900);
+}
+
+:root[data-tema="escuro"] .menu-flutuante-titulo--link:hover {
+  color: var(--cor-primaria);
 }
 </style>

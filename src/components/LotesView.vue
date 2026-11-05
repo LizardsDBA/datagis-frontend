@@ -306,6 +306,13 @@ function fecharModalGold() {
   modalGoldAberto.value = false
 }
 
+// X da fase de processamento: só esconde a janela. A publicação segue no backend e o
+// acompanhamento (polling) continua, então a lista de lotes atualiza sozinha ao terminar;
+// o painel de Processamentos mostra o andamento e o botão "Migrar para Gold" reabre esta tela.
+function ocultarModalGold() {
+  modalGoldAberto.value = false
+}
+
 function iniciarPollingGold() {
   if (timerPollingGold) {
     clearInterval(timerPollingGold)
@@ -438,7 +445,7 @@ onUnmounted(() => {
         <button
           v-if="podePublicarGold"
           class="btn-migrar-gold"
-          :disabled="carregando || lotesNaSilver.length === 0 || faseGold === 'PROCESSANDO'"
+          :disabled="carregando || lotesNaSilver.length === 0 || (faseGold === 'PROCESSANDO' && modalGoldAberto)"
           @click="abrirModalGold"
           title="Migrar dados consolidados da Silver para a Gold"
         >
@@ -1087,6 +1094,12 @@ onUnmounted(() => {
                 Executando cruzamentos geoespaciais em PL/SQL e simplificação de geometrias.
               </p>
             </div>
+            <button
+              class="btn-fechar"
+              title="Fechar (a publicação continua em segundo plano)"
+              aria-label="Fechar (a publicação continua em segundo plano)"
+              @click="ocultarModalGold"
+            >✕</button>
           </header>
 
           <div class="modal-body modal-body--centro">
@@ -1096,6 +1109,9 @@ onUnmounted(() => {
             </h3>
             <p class="progresso-sub">
               Por favor, aguarde. Este processo recalcula os índices analíticos e consolida os dados na camada Gold.
+            </p>
+            <p class="progresso-sub progresso-sub--dica">
+              Pode fechar esta janela: a publicação continua e aparece no painel Processamentos.
             </p>
 
             <div v-if="statusGold?.indicadores" class="progresso-detalhe-card">
@@ -2963,5 +2979,12 @@ onUnmounted(() => {
 
 :root[data-tema="escuro"] .btn-confirmar-descarte:hover:not(:disabled) {
   background: var(--cor-erro);
+}
+
+/* Aviso de que o X do processamento da Gold só fecha a janela */
+.progresso-sub--dica {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--cor-slate-500);
 }
 </style>

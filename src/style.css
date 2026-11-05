@@ -393,3 +393,17 @@ code, pre {
     color: var(--cor-link);
   }
 }
+
+/* Botão encontrado pela pesquisa da barra lateral (navegacao/pesquisa.js): pisca até a
+   pessoa ver onde ele está. Só contorno, sem mudar o tamanho nem o layout da tela. */
+.destaque-pesquisa {
+  outline: 3px solid var(--cor-primaria) !important;
+  outline-offset: 3px;
+  border-radius: 6px;
+  animation: destaque-pesquisa-pulso 0.8s ease-in-out 3;
+}
+
+@keyframes destaque-pesquisa-pulso {
+  0%, 100% { outline-color: var(--cor-primaria); }
+  50% { outline-color: transparent; }
+}
