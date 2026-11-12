@@ -1,18 +1,5 @@
 <script setup>
-/**
- * Indicadores e Resultados — mapa (LIZARDS-35). Rota /conjuntos; a mesma área em tabela é
- * a /indicadores (LIZARDS-34), e as duas telas se alternam por "Ver em tabela" / "Ver no mapa".
- *
- * - Visão por município ou por imóvel, com seleção de um item específico.
- * - KPIs (quantidades, imóveis com interseção e os 7 indicadores) vêm do backend, os
- *   mesmos da tela de tabela (LIZARDS-34): geral sem seleção, do item com seleção.
- * - Aviso de interseção vem dos VALORES dos indicadores, calculados no Oracle sobre a
- *   geometria completa da Silver. O GeoServer só desenha o mapa e destaca quais feições
- *   cruzam a seleção — a geometria do mapa é simplificada (~5 m) e erraria nas
- *   sobreposições pequenas, e qualquer sobreposição conta.
- * - O mapa mostra só o Paraná (recorte do desafio): contorno publicado na Gold, máscara
- *   sobre o resto, sem arrastar nem afastar pra fora do estado.
- */
+
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -37,14 +24,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { temPermissao } from '../auth/autenticacao'
 import { PERMISSOES } from '../auth/permissoes'
 
-/**
- * Camada de cada indicador e como ler o aviso:
- * - RESTRICAO: sobrepor é o problema (área protegida, embargo, desmatamento, fogo)
- * - CONFORMIDADE: NÃO ter é o problema (imóvel sem Reserva Legal declarada)
- * - INFORMATIVO: só diz se o imóvel possui ou não aquela área
- * `camada` nulo = ainda não publicada no mapa (IRL/IAPP/ICV dependem de outra entrega);
- * o aviso funciona mesmo assim, porque vem do indicador.
- */
 const CAMADAS_INDICADOR = [
   { indicador: 'ISAP', campo: 'valorIsap', camada: 'datagis:vw_mapa_area_protegida', rotulo: 'Área protegida (UC / TI)', cor: '#16a34a', leitura: 'RESTRICAO' },
   { indicador: 'IAE', campo: 'valorIae', camada: 'datagis:vw_mapa_embargo', rotulo: 'Embargo ambiental', cor: '#dc2626', leitura: 'RESTRICAO' },
@@ -57,13 +36,14 @@ const CAMADAS_INDICADOR = [
 const CAMADAS_NO_MAPA = CAMADAS_INDICADOR.filter((c) => c.camada)
 const RESTRICOES = CAMADAS_INDICADOR.filter((c) => c.leitura === 'RESTRICAO')
 
-/** Quantos imóveis com alerta a lista do painel mostra antes do "Mostrar todos". */
+const GRUPOS_INDICADOR = [
+  { titulo: 'Camadas de alerta', camadas: CAMADAS_NO_MAPA },
+  { titulo: 'Indicadores sem camada no mapa', camadas: CAMADAS_INDICADOR.filter((c) => !c.camada) },
+]
+
 const LIMITE_LISTA_ALERTA = 8
 
-/** Usado só se o contorno da Gold não carregar: caixa do Paraná. */
 const CAIXA_PARANA = [[-27.2, -55], [-22, -47.5]]
-
-// ------------------------------------------------------------------- estado
 
 const visao = ref('municipio')
 const tipos = ref([])
@@ -78,17 +58,10 @@ const filtroMunicipioImovel = ref('')
 const buscaImovel = ref('')
 const imovelSelecionado = ref('')
 
-/** Feições publicadas por camada do mapa: { [camada]: { estado, total } } */
 const situacaoCamadas = ref({})
-/** Feições que cruzam a seleção, por camada (só destaque). */
 const destacadas = ref({})
-const camadasVisiveis = ref({ base: true, comDados: true, imoveis: true })
+const camadasVisiveis = ref({ base: true, comDados: false, imoveis: false })
 
-/**
- * Carregamento visível: camadas WMS com imagem chegando (eventos loading/load do
- * Leaflet) + consultas ao GeoServer em andamento (contorno, destaque da seleção,
- * feições que cruzam). Qualquer um pendente mostra o aviso sobre o mapa.
- */
 const camadasCarregando = ref(new Set())
 const buscasNoMapa = ref(0)
 const mapaCarregando = computed(() => camadasCarregando.value.size > 0 || buscasNoMapa.value > 0)
@@ -105,9 +78,7 @@ async function comCarregamento(tarefa) {
 const route = useRoute()
 const router = useRouter()
 const listaAlertaCompleta = ref(false)
-/** Aba da lista de imóveis do município: 'sobreposicao' (ISAP/IAE/IDESMAT/IFC) ou 'reservaLegal' (IRL = 0). */
 const tipoListaAlerta = ref('sobreposicao')
-/** Item do painel destacado depois de clicar no código do aviso. */
 const camadaEmFoco = ref('')
 const painelAvisoEl = ref(null)
 let temporizadorFoco = null
@@ -121,11 +92,6 @@ let camadaImoveis = null
 let camadaComDados = null
 let camadaComDadosContorno = null
 
-/**
- * Estilos extras do GeoServer (infra/geoserver/estilos) para os municípios com imóveis
- * publicados: o preenchimento vai abaixo dos imóveis e o contorno acima deles, senão onde
- * os imóveis cobrem o município quase inteiro (Maringá, Ponta Grossa) o destaque sumia.
- */
 const ESTILO_MUNICIPIO_COM_DADOS = 'vw_mapa_municipio_com_dados'
 const ESTILO_MUNICIPIO_COM_DADOS_CONTORNO = 'vw_mapa_municipio_com_dados_contorno'
 const camadasWms = {}
@@ -134,8 +100,10 @@ let destaqueCruzamentos = null
 let mascara = null
 let contornoParana = null
 let ultimaConsulta = 0
+let ultimaBuscaCruzamentos = 0
 
-// ------------------------------------------------------------------ seleção
+const PAINEL_SELECAO = 'selecao'
+
 
 const selecao = computed(() => {
   if (visao.value === 'municipio' && municipioSelecionado.value) {
@@ -162,7 +130,6 @@ const municipioDaSelecao = computed(() => {
   return cod == null ? null : municipios.value.find((m) => m.codIbge === cod) || null
 })
 
-/** Imóveis que entram no aviso: todos, os do município, ou o selecionado. */
 const imoveisDoRecorte = computed(() => {
   if (selecao.value?.tipo === 'imovel') return imovelDaSelecao.value ? [imovelDaSelecao.value] : []
   if (selecao.value?.tipo === 'municipio') {
@@ -201,7 +168,6 @@ function limparSelecao() {
   aviso.value = ''
 }
 
-/** Da lista de imóveis com alerta do município: passa para a visão de imóvel nele. */
 function selecionarImovelDaLista(imovel) {
   visao.value = 'imovel'
   filtroMunicipioImovel.value = String(imovel.municipioCodIbge ?? '')
@@ -209,13 +175,6 @@ function selecionarImovelDaLista(imovel) {
   buscaImovel.value = imovel.codImovel
 }
 
-// ---------------------------------------------------- seleção na URL
-
-/**
- * A seleção vai para a URL (?municipio=4119905 ou ?imovel=PR-...): F5 volta no mesmo
- * item e dá para mandar o link. Só é aplicada depois que os indicadores chegam, para
- * conferir que o código existe — código desconhecido é ignorado.
- */
 function aplicarSelecaoDaUrl() {
   const { municipio, imovel } = route?.query || {}
   if (imovel) {
@@ -237,14 +196,12 @@ function gravarSelecaoNaUrl(sel) {
   router.replace({ query })
 }
 
-/** Atalho para a tela de Indicadores e Resultados já aberta no item selecionado. */
 function verNaTabela() {
   const sel = selecao.value
   const query = sel?.tipo === 'imovel' ? { visao: 'imovel', imovel: sel.codigo } : sel ? { municipio: sel.codigo } : {}
   router?.push({ path: '/indicadores', query })
 }
 
-// --------------------------------------------------------------------- KPIs
 
 function campoDoIndicador(codigo) {
   return `valor${codigo.charAt(0).toUpperCase()}${codigo.slice(1).toLowerCase()}`
@@ -257,11 +214,6 @@ const indicadoresOrdenados = computed(() =>
     .sort((a, b) => (a.ordemExibicao ?? 99) - (b.ordemExibicao ?? 99)),
 )
 
-/**
- * KPI geral: média ponderada pela área dos imóveis que têm o indicador calculado —
- * a mesma conta que o backend faz por município. Imóvel sem valor fica fora do
- * numerador e do denominador, pra ausência de cálculo não virar zero.
- */
 function mediaPonderada(lista, campo) {
   let soma = 0
   let area = 0
@@ -274,11 +226,6 @@ function mediaPonderada(lista, campo) {
   return area > 0 ? soma / area : null
 }
 
-/**
- * Soma de um valor absoluto em hectares (déficit/excedente de RL, passivo de APP) —
- * mesma semântica SUM() do backend por município: não é percentual, não entra na
- * média ponderada por área.
- */
 function somaIndicador(lista, campo) {
   let soma = null
   lista.forEach((i) => {
@@ -310,10 +257,6 @@ function cruza(imovel, camada) {
   return (imovel?.[camada.campo] ?? 0) > 0
 }
 
-/**
- * Imóvel: quantas camadas de alerta ele cruza. Município / geral: quantos imóveis
- * cruzam alguma (vem pronto do backend, qtdImoveisComIntersecao).
- */
 const kpisQuantidade = computed(() => {
   if (selecao.value?.tipo === 'imovel') {
     const n = RESTRICOES.filter((c) => cruza(imovelDaSelecao.value, c)).length
@@ -342,7 +285,6 @@ const kpisQuantidade = computed(() => {
   }
 })
 
-/** Data da publicação mais recente dos indicadores no recorte. */
 const dataPublicacao = computed(() => {
   const datas = imoveisDoRecorte.value.map((i) => i.dataPublicacao).filter(Boolean).sort()
   return datas.length ? datas[datas.length - 1] : null
@@ -375,15 +317,12 @@ const tituloSelecao = computed(() => {
   return codigoCurto(sel.codigo)
 })
 
-// -------------------------------------------------------------- aviso
 
 function plural(n, singular, varios) {
   return `${formatarInteiro(n)} ${n === 1 ? singular : varios}`
 }
 
-/** Tom e texto do aviso de uma camada, a partir dos valores do indicador. */
 function avisoDaCamada(c) {
-  // Enquanto os indicadores não chegam, "não calculado" daria a impressão de falta de dado
   if (carregando.value) return { tom: 'neutro', texto: 'Carregando…' }
   const lista = imoveisDoRecorte.value
   const comValor = lista.filter((i) => i[c.campo] !== null && i[c.campo] !== undefined)
@@ -425,7 +364,6 @@ const resumoAviso = computed(() => {
   }
   const alertas = CAMADAS_INDICADOR.filter((c) => ['erro', 'alerta'].includes(avisoDaCamada(c).tom))
   if (alertas.length === 0) return { tom: 'sucesso', texto: 'Sem interseção com camadas de alerta.' }
-  // Os códigos viram botões no template (irParaCamada): o aviso leva até a explicação.
   return {
     tom: 'erro',
     texto: `Atenção: ${alertas.length} ${alertas.length === 1 ? 'camada' : 'camadas'} com alerta —`,
@@ -433,11 +371,6 @@ const resumoAviso = computed(() => {
   }
 })
 
-/**
- * Clique num código do aviso. Com município selecionado e imóveis naquela situação, abre
- * a aba certa da lista; senão leva até o item da camada no painel, que fica destacado
- * (é onde está a explicação — IRL, IAPP e ICV nem têm camada no mapa).
- */
 async function irParaCamada(c) {
   const tipoLista = c.leitura === 'CONFORMIDADE' ? 'reservaLegal' : c.leitura === 'RESTRICAO' ? 'sobreposicao' : null
   const lista = tipoLista === 'reservaLegal' ? imoveisSemReservaLegal.value : imoveisComAlerta.value
@@ -458,11 +391,6 @@ async function irParaCamada(c) {
   }
 }
 
-/**
- * Imóveis do município selecionado que cruzam alguma camada de alerta (mesma regra do
- * KPI "Interseções": ISAP, IAE, IDESMAT ou IFC > 0). Primeiro os que cruzam mais
- * camadas; empate, o de maior sobreposição percentual.
- */
 const imoveisComAlerta = computed(() => {
   if (selecao.value?.tipo !== 'municipio') return []
   const percentuais = RESTRICOES.filter((c) => !c.ponto)
@@ -476,7 +404,6 @@ const imoveisComAlerta = computed(() => {
     .sort((a, b) => b.alertas.length - a.alertas.length || b.pior - a.pior)
 })
 
-/** Imóveis do município com IRL = 0 (sem Reserva Legal declarada). Fora do KPI de interseções. */
 const imoveisSemReservaLegal = computed(() => {
   if (selecao.value?.tipo !== 'municipio') return []
   const irl = CAMADAS_INDICADOR.find((c) => c.leitura === 'CONFORMIDADE')
@@ -486,7 +413,6 @@ const imoveisSemReservaLegal = computed(() => {
     .map((imovel) => ({ imovel, alertas: [irl] }))
 })
 
-/** Aba escolhida; se ela estiver vazia e a outra não, mostra a outra. */
 const tipoListaEfetivo = computed(() => {
   if (tipoListaAlerta.value === 'reservaLegal' && !imoveisSemReservaLegal.value.length) return 'sobreposicao'
   if (tipoListaAlerta.value === 'sobreposicao' && !imoveisComAlerta.value.length && imoveisSemReservaLegal.value.length) {
@@ -518,13 +444,13 @@ function tipoDoIndicador(codigo) {
   return tipos.value.find((t) => t.codigo === codigo)
 }
 
-/** Situação da camada no mapa (independe do aviso). */
 function textoDoMapa(c) {
   if (!c.camada) return 'Camada ainda não publicada no mapa'
   const situacao = situacaoCamadas.value[c.camada]
   if (!situacao || situacao.estado === 'carregando') return 'Verificando camada…'
   if (situacao.estado === 'erro') return 'Não foi possível consultar a camada'
   if (situacao.total === 0) return 'Sem feições publicadas na Gold'
+  if (selecao.value && !camadasVisiveis.value[c.camada]) return 'Ligue a camada para destacar o que cruza a seleção'
   const n = destacadas.value[c.camada]
   if (selecao.value && n === 0) return 'Nenhuma feição cruzando no mapa'
   if (selecao.value && n != null) return `${plural(n, 'feição destacada', 'feições destacadas')} no mapa`
@@ -552,12 +478,11 @@ async function verificarCamadas() {
 function wms(camada, extras = {}) {
   const layer = camadaWmsAutenticada(URL_WMS, {
     layers: camada,
-    format: 'image/png',
+    format: 'image/png8',
     transparent: true,
     version: '1.1.1',
     ...extras,
   })
-  // 'remove' também tira da lista: camada desligada no meio do carregamento não dispara 'load'
   const parou = () => camadasCarregando.value.delete(layer)
   return layer
     .on('loading', () => camadasCarregando.value.add(layer))
@@ -565,19 +490,15 @@ function wms(camada, extras = {}) {
     .on('remove', parou)
 }
 
-/**
- * Cores do tema atual lidas das variáveis do style.css: a máscara usa o mesmo fundo do
- * container do mapa e o contorno a cor de título. No escuro (LIZARDS-38) as duas
- * variáveis já apontam pra paleta escura; o Leaflet pinta com cor fixa, então é preciso
- * reler e aplicar de novo a cada troca de tema (ver o watch de estadoTema).
- */
 function corDoTema(variavel, padrao) {
   const cor = getComputedStyle(document.documentElement).getPropertyValue(variavel).trim()
   return cor || padrao
 }
 
+const OPACIDADE_MASCARA = 0.6
+
 function corDaMascara() {
-  return corDoTema('--cor-slate-100', '#f1f5f9')
+  return corDoTema('--cor-branco', '#ffffff')
 }
 
 function corDoContorno() {
@@ -589,7 +510,6 @@ function aplicarCoresDoTema() {
   contornoParana?.setStyle({ color: corDoContorno() })
 }
 
-/** Anéis externos do contorno em [lat, lng] — viram os "furos" da máscara. */
 function aneisExternos(geojson) {
   const aneis = []
   geojson.features.forEach((f) => {
@@ -601,12 +521,13 @@ function aneisExternos(geojson) {
 }
 
 function iniciarMapa() {
-  // Zoom fracionado: o enquadramento do Paraná não precisa cair num nível inteiro e
-  // sobrar faixa vazia em volta do estado.
-  mapa.value = L.map(mapaEl.value, { zoomControl: true, attributionControl: true, zoomSnap: 0.25, zoomDelta: 0.5 })
-  // OpenStreetMap num painel só dele, abaixo do painel de tiles: no tema escuro o filtro
-  // que escurece o fundo (LIZARDS-38) vale só aqui. As camadas do GeoServer também são
-  // tiles e, no painel padrão, teriam as cores invertidas (azul virando laranja).
+  mapa.value = L.map(mapaEl.value, {
+    zoomControl: true,
+    attributionControl: true,
+    zoomSnap: 0.25,
+    zoomDelta: 0.5,
+    preferCanvas: true,
+  })
   mapa.value.createPane('fundo')
   mapa.value.getPane('fundo').style.zIndex = 150
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -617,52 +538,51 @@ function iniciarMapa() {
 
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(mapa.value)
 
-  camadaMunicipios = wms(CAMADA_MUNICIPIO, { zIndex: 5 }).addTo(mapa.value)
-  camadaImoveis = wms(CAMADA_IMOVEL, { zIndex: 10 }).addTo(mapa.value)
+  mapa.value.createPane(PAINEL_SELECAO)
+  mapa.value.getPane(PAINEL_SELECAO).style.zIndex = 450
+  mapa.value.getPane(PAINEL_SELECAO).style.pointerEvents = 'none'
+
+  camadaMunicipios = wms(CAMADA_MUNICIPIO, { zIndex: 5 })
+  camadaImoveis = wms(CAMADA_IMOVEL, { zIndex: 10 })
   CAMADAS_NO_MAPA.forEach((c, i) => {
     camadasWms[c.camada] = wms(c.camada, { zIndex: 20 + i })
   })
 
   prenderNoParana()
+  sincronizarCamadas()
   mapa.value.on('click', aoClicarNoMapa)
   mapa.value.on('mousemove', aoMoverMouse)
-  // saiu do mapa ou começou a arrastar: nada de etiqueta aparecendo depois
   mapa.value.on('mouseout', esconderEtiqueta)
   mapa.value.on('movestart', esconderEtiqueta)
 }
 
-/** Enquadra o estado inteiro e não deixa sair dele (arrastar nem afastar). */
 function prenderNoParana() {
-  mapa.value.setMaxBounds(limitesParana.pad(0.05))
-  mapa.value.options.maxBoundsViscosity = 1.0
-  // Sem animação: animado, o getZoom() abaixo ainda devolve o zoom de antes e o mínimo
-  // ficava um pouco menor que o do estado inteiro (dava pra afastar meio nível).
+  mapa.value.setMaxBounds(null)
+  mapa.value.setMinZoom(0)
   mapa.value.fitBounds(limitesParana, { animate: false })
   mapa.value.setMinZoom(mapa.value.getZoom())
+  mapa.value.options.maxBoundsViscosity = 1.0
+  mapa.value.setMaxBounds(mapa.value.getBounds())
 }
 
-/** Botão "ver o Paraná inteiro": volta o enquadramento sem mexer na seleção. */
 function verParanaInteiro() {
   mapa.value?.closePopup?.()
   mapa.value?.fitBounds(limitesParana)
 }
 
-/**
- * Máscara por cima dos tiles (OpenStreetMap e WMS) e abaixo dos destaques: um
- * retângulo do mundo com o Paraná recortado. É o que faz o mapa mostrar só o estado.
- */
 async function desenharContornoParana() {
   try {
     const contorno = await buscarContornoParana()
     if (!contorno.features?.length) throw new Error('camada LIMITE_PR sem feição publicada')
     mapa.value.createPane('mascara')
     mapa.value.getPane('mascara').style.zIndex = 350
+    mapa.value.getPane('mascara').style.pointerEvents = 'none'
     const mundo = [[-90, -360], [-90, 360], [90, 360], [90, -360]]
     mascara = L.polygon([mundo, ...aneisExternos(contorno)], {
       pane: 'mascara',
       stroke: false,
       fillColor: corDaMascara(),
-      fillOpacity: 1,
+      fillOpacity: OPACIDADE_MASCARA,
       interactive: false,
     }).addTo(mapa.value)
     contornoParana = L.geoJSON(contorno, {
@@ -677,7 +597,6 @@ async function desenharContornoParana() {
   }
 }
 
-/** Liga no mapa as camadas que têm dado e estão marcadas na legenda. */
 function sincronizarCamadas() {
   if (!mapa.value) return
   const alternar = (layer, ligada) => {
@@ -743,6 +662,7 @@ async function destacarSelecao(sel, consulta) {
     const geo = await buscarGeometriaDaSelecao(sel)
     if (consulta !== ultimaConsulta || !geo.features.length) return
     destaque = L.geoJSON(geo, {
+      pane: PAINEL_SELECAO,
       style: { color: '#facc15', weight: 3, fillColor: '#facc15', fillOpacity: sel.tipo === 'imovel' ? 0.25 : 0.05 },
       interactive: false,
     }).addTo(mapa.value)
@@ -752,11 +672,21 @@ async function destacarSelecao(sel, consulta) {
   }
 }
 
-/** Busca no GeoServer as feições que cruzam a seleção e pinta por cima — só visual. */
+/** Camadas de alerta com dado publicado e ligadas na legenda. */
+function camadasDeAlertaLigadas() {
+  return CAMADAS_NO_MAPA.filter((c) => situacaoCamadas.value[c.camada]?.total > 0 && camadasVisiveis.value[c.camada])
+}
+
+/**
+ * Busca no GeoServer as feições que cruzam a seleção e pinta por cima — só visual. Só das
+ * camadas ligadas: a resposta pode ser grande (desmatamento em Ponta Grossa passa de
+ * 1 MB) e camada desligada não tem o que destacar. Ligou outra camada com a seleção
+ * feita, busca de novo (watch de camadasDeAlertaLigadas).
+ */
 async function destacarCruzamentos(sel, consulta) {
-  const comDado = CAMADAS_NO_MAPA.filter((c) => situacaoCamadas.value[c.camada]?.total > 0)
+  const busca = ++ultimaBuscaCruzamentos
   const resultados = await Promise.all(
-    comDado.map(async (c) => {
+    camadasDeAlertaLigadas().map(async (c) => {
       try {
         return { c, geo: await buscarFeicoesQueCruzam(c.camada, sel) }
       } catch {
@@ -764,7 +694,9 @@ async function destacarCruzamentos(sel, consulta) {
       }
     }),
   )
-  if (consulta !== ultimaConsulta || !mapa.value) return
+  if (consulta !== ultimaConsulta || busca !== ultimaBuscaCruzamentos || !mapa.value) return
+  if (destaqueCruzamentos) mapa.value.removeLayer(destaqueCruzamentos)
+  destaqueCruzamentos = null
   const contagem = {}
   resultados.forEach(({ c, geo }) => {
     if (geo) contagem[c.camada] = geo.features.length
@@ -968,11 +900,24 @@ watch(municipios, atualizarMunicipiosComDados)
 
 watch([situacaoCamadas, camadasVisiveis], sincronizarCamadas, { deep: true })
 
+// Ligou ou desligou camada de alerta com algo selecionado: refaz o destaque do que cruza.
+watch(
+  () => camadasDeAlertaLigadas().map((c) => c.camada).join(','),
+  () => {
+    if (selecao.value) comCarregamento(() => destacarCruzamentos(selecao.value, ultimaConsulta))
+  },
+)
+
+// Na visão de imóveis, os imóveis precisam aparecer pra serem clicados.
+watch(visao, (nova) => {
+  if (nova === 'imovel') camadasVisiveis.value.imoveis = true
+})
+
 // Trocou o tema com a tela aberta: máscara e contorno acompanham sem recarregar.
 watch(() => estadoTema.atual, aplicarCoresDoTema)
 
 onMounted(async () => {
-  CAMADAS_NO_MAPA.forEach((c) => (camadasVisiveis.value[c.camada] = true))
+  CAMADAS_NO_MAPA.forEach((c) => (camadasVisiveis.value[c.camada] = false))
   await nextTick()
   iniciarMapa()
   await Promise.all([
@@ -1075,12 +1020,14 @@ onUnmounted(() => {
     </section>
 
     <section class="kpis" aria-label="Indicadores da seleção">
-      <p class="kpis-titulo">
-        KPIs de <strong>{{ tituloSelecao }}</strong>
-        <span v-if="carregando" class="kpis-nota">· carregando indicadores…</span>
-        <span v-if="!selecao" class="kpis-nota">· média ponderada pela área</span>
-        <span v-if="dataPublicacao" class="kpis-nota">· indicadores publicados em {{ formatarData(dataPublicacao) }}</span>
-      </p>
+      <div class="kpis-cabecalho">
+        <p class="kpis-titulo">KPIs de <strong>{{ tituloSelecao }}</strong></p>
+        <p class="kpis-notas">
+          <span v-if="carregando" class="kpis-nota">carregando indicadores…</span>
+          <span v-if="!selecao" class="kpis-nota">média ponderada pela área</span>
+          <span v-if="dataPublicacao" class="kpis-nota">indicadores publicados em {{ formatarData(dataPublicacao) }}</span>
+        </p>
+      </div>
       <div class="kpis-quantidades">
         <div class="kpi" data-kpi="imoveis">
           <span class="kpi-rotulo">Imóveis</span>
@@ -1147,131 +1094,146 @@ onUnmounted(() => {
             <span class="mapa-carregando-giro" aria-hidden="true"></span>
             Carregando mapa…
           </div>
+          <p :class="['mapa-dica', { 'mapa-dica--aviso': aviso }]">
+            <template v-if="aviso">{{ aviso }}</template>
+            <template v-else>Clique no mapa para selecionar {{ visao === 'imovel' ? 'um imóvel' : 'um município' }}.</template>
+          </p>
         </div>
-        <p class="mapa-dica">
-          Clique no mapa para selecionar {{ visao === 'imovel' ? 'um imóvel' : 'um município' }}.
-          <span v-if="aviso" class="mapa-aviso">{{ aviso }}</span>
-        </p>
       </div>
 
-      <aside ref="painelAvisoEl" class="painel-aviso" aria-live="polite">
-        <h2 class="painel-titulo">Aviso de interseção</h2>
-        <p v-if="!selecao" class="painel-vazio">
-          Selecione um município ou imóvel para ver o aviso dele. Abaixo, a situação de todo o recorte.
-        </p>
-        <div v-else-if="resumoAviso" :class="['resumo-aviso', `resumo-aviso--${resumoAviso.tom}`]">
-          {{ resumoAviso.texto }}
-          <template v-if="resumoAviso.alertas">
-            <button
-              v-for="c in resumoAviso.alertas"
-              :key="c.indicador"
-              type="button"
-              class="resumo-codigo"
-              :data-ir-para="c.indicador"
-              :title="`Ver o motivo do alerta de ${c.indicador}`"
-              @click="irParaCamada(c)"
-            >
-              {{ c.indicador }}
-            </button>
-          </template>
-        </div>
-
-        <div v-if="imoveisComAlerta.length || imoveisSemReservaLegal.length" class="lista-alerta">
-          <h3 class="lista-alerta-titulo">Imóveis com alerta</h3>
-          <div class="lista-alerta-abas" role="tablist" aria-label="Tipo de alerta">
-            <button
-              type="button"
-              role="tab"
-              data-lista="sobreposicao"
-              :aria-selected="tipoListaEfetivo === 'sobreposicao'"
-              :class="['lista-alerta-aba', { 'lista-alerta-aba--ativa': tipoListaEfetivo === 'sobreposicao' }]"
-              :disabled="!imoveisComAlerta.length"
-              @click="trocarListaAlerta('sobreposicao')"
-            >
-              Sobreposição ({{ formatarInteiro(imoveisComAlerta.length) }})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              data-lista="reservaLegal"
-              :aria-selected="tipoListaEfetivo === 'reservaLegal'"
-              :class="['lista-alerta-aba', { 'lista-alerta-aba--ativa': tipoListaEfetivo === 'reservaLegal' }]"
-              :disabled="!imoveisSemReservaLegal.length"
-              @click="trocarListaAlerta('reservaLegal')"
-            >
-              Sem Reserva Legal ({{ formatarInteiro(imoveisSemReservaLegal.length) }})
-            </button>
+      <aside ref="painelAvisoEl" class="painel-lateral">
+        <section class="painel painel-aviso" aria-live="polite">
+          <h2 class="painel-titulo">Aviso de interseção</h2>
+          <p v-if="!selecao" class="painel-vazio">
+            Selecione um município ou imóvel para ver o aviso dele. Em "Camadas do mapa", a situação de todo o recorte.
+          </p>
+          <div v-else-if="resumoAviso" :class="['resumo-aviso', `resumo-aviso--${resumoAviso.tom}`]">
+            {{ resumoAviso.texto }}
+            <template v-if="resumoAviso.alertas">
+              <button
+                v-for="c in resumoAviso.alertas"
+                :key="c.indicador"
+                type="button"
+                class="resumo-codigo"
+                :data-ir-para="c.indicador"
+                :title="`Ver o motivo do alerta de ${c.indicador}`"
+                @click="irParaCamada(c)"
+              >
+                {{ c.indicador }}
+              </button>
+            </template>
           </div>
-          <ul>
-            <li v-for="item in imoveisComAlertaVisiveis" :key="item.imovel.codImovel">
+
+          <div v-if="imoveisComAlerta.length || imoveisSemReservaLegal.length" class="lista-alerta">
+            <h3 class="lista-alerta-titulo">Imóveis com alerta</h3>
+            <div class="lista-alerta-abas" role="tablist" aria-label="Tipo de alerta">
               <button
                 type="button"
-                class="lista-alerta-item"
-                :title="`${item.imovel.codImovel} — clique para ver no mapa`"
-                @click="selecionarImovelDaLista(item.imovel)"
+                role="tab"
+                data-lista="sobreposicao"
+                :aria-selected="tipoListaEfetivo === 'sobreposicao'"
+                :class="['lista-alerta-aba', { 'lista-alerta-aba--ativa': tipoListaEfetivo === 'sobreposicao' }]"
+                :disabled="!imoveisComAlerta.length"
+                @click="trocarListaAlerta('sobreposicao')"
               >
-                <span class="lista-alerta-codigo">{{ codigoCurto(item.imovel.codImovel) }}</span>
-                <span class="lista-alerta-chips">
-                  <span v-for="c in item.alertas" :key="c.indicador" class="lista-alerta-chip" :style="{ '--cor': c.cor }">
-                    {{ c.indicador }} {{ valorComUnidade(tipoDoIndicador(c.indicador), item.imovel[c.campo]) }}
-                  </span>
-                </span>
+                Sobreposição ({{ formatarInteiro(imoveisComAlerta.length) }})
               </button>
+              <button
+                type="button"
+                role="tab"
+                data-lista="reservaLegal"
+                :aria-selected="tipoListaEfetivo === 'reservaLegal'"
+                :class="['lista-alerta-aba', { 'lista-alerta-aba--ativa': tipoListaEfetivo === 'reservaLegal' }]"
+                :disabled="!imoveisSemReservaLegal.length"
+                @click="trocarListaAlerta('reservaLegal')"
+              >
+                Sem Reserva Legal ({{ formatarInteiro(imoveisSemReservaLegal.length) }})
+              </button>
+            </div>
+            <ul>
+              <li v-for="item in imoveisComAlertaVisiveis" :key="item.imovel.codImovel">
+                <button
+                  type="button"
+                  class="lista-alerta-item"
+                  :title="`${item.imovel.codImovel} — clique para ver no mapa`"
+                  @click="selecionarImovelDaLista(item.imovel)"
+                >
+                  <span class="lista-alerta-codigo">{{ codigoCurto(item.imovel.codImovel) }}</span>
+                  <span class="lista-alerta-chips">
+                    <span v-for="c in item.alertas" :key="c.indicador" class="lista-alerta-chip" :style="{ '--cor': c.cor }">
+                      {{ c.indicador }} {{ valorComUnidade(tipoDoIndicador(c.indicador), item.imovel[c.campo]) }}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+            <button
+              v-if="listaAlertaAtual.length > LIMITE_LISTA_ALERTA"
+              type="button"
+              class="lista-alerta-mais"
+              @click="listaAlertaCompleta = !listaAlertaCompleta"
+            >
+              {{ listaAlertaCompleta ? 'Mostrar menos' : `Mostrar todos (${formatarInteiro(listaAlertaAtual.length)})` }}
+            </button>
+          </div>
+        </section>
+
+        <section class="painel painel-camadas" aria-label="Camadas do mapa">
+          <h2 class="painel-titulo">Camadas do mapa</h2>
+
+          <h3 class="grupo-titulo">Base</h3>
+          <ul class="lista-camadas">
+            <li class="item-camada">
+              <label class="camada-toggle">
+                <input v-model="camadasVisiveis.base" type="checkbox" />
+                <span class="amostra amostra--contorno" style="--cor: #64748b"></span>
+                Limites municipais
+              </label>
+            </li>
+            <li class="item-camada">
+              <label class="camada-toggle">
+                <input v-model="camadasVisiveis.comDados" type="checkbox" />
+                <span class="amostra" style="--cor: #7c3aed"></span>
+                Municípios com imóveis publicados
+              </label>
+            </li>
+            <li class="item-camada">
+              <label class="camada-toggle">
+                <input v-model="camadasVisiveis.imoveis" type="checkbox" />
+                <span class="amostra" style="--cor: #2563eb"></span>
+                Imóveis rurais (CAR)
+              </label>
             </li>
           </ul>
-          <button
-            v-if="listaAlertaAtual.length > LIMITE_LISTA_ALERTA"
-            type="button"
-            class="lista-alerta-mais"
-            @click="listaAlertaCompleta = !listaAlertaCompleta"
-          >
-            {{ listaAlertaCompleta ? 'Mostrar menos' : `Mostrar todos (${formatarInteiro(listaAlertaAtual.length)})` }}
-          </button>
-        </div>
 
-        <ul class="lista-camadas">
-          <li class="item-camada">
-            <label class="camada-toggle">
-              <input v-model="camadasVisiveis.base" type="checkbox" />
-              <span class="amostra amostra--contorno" style="--cor: #64748b"></span>
-              Limites municipais
-            </label>
-          </li>
-          <li class="item-camada">
-            <label class="camada-toggle">
-              <input v-model="camadasVisiveis.comDados" type="checkbox" />
-              <span class="amostra" style="--cor: #7c3aed"></span>
-              Municípios com imóveis publicados
-            </label>
-          </li>
-          <li class="item-camada">
-            <label class="camada-toggle">
-              <input v-model="camadasVisiveis.imoveis" type="checkbox" />
-              <span class="amostra" style="--cor: #2563eb"></span>
-              Imóveis rurais (CAR)
-            </label>
-          </li>
-          <li
-            v-for="c in CAMADAS_INDICADOR"
-            :key="c.indicador"
-            :class="['item-camada', { 'item-camada--foco': camadaEmFoco === c.indicador }]"
-            :data-camada="c.indicador"
-          >
-            <label class="camada-toggle">
-              <input
-                v-if="c.camada"
-                v-model="camadasVisiveis[c.camada]"
-                type="checkbox"
-                :disabled="!(situacaoCamadas[c.camada]?.total > 0)"
-              />
-              <span v-else class="sem-checkbox"></span>
-              <span :class="['amostra', { 'amostra--ponto': c.ponto }]" :style="{ '--cor': c.cor }"></span>
-              <span class="camada-nome">{{ c.rotulo }} <em>({{ c.indicador }})</em></span>
-            </label>
-            <span :class="['badge-tag', `badge-tag--${avisoDaCamada(c).tom}`]">{{ avisoDaCamada(c).texto }}</span>
-            <span class="camada-mapa">{{ textoDoMapa(c) }}</span>
-          </li>
-        </ul>
+          <template v-for="grupo in GRUPOS_INDICADOR" :key="grupo.titulo">
+            <h3 class="grupo-titulo">{{ grupo.titulo }}</h3>
+            <ul class="lista-camadas">
+              <li
+                v-for="c in grupo.camadas"
+                :key="c.indicador"
+                :class="['item-camada', { 'item-camada--foco': camadaEmFoco === c.indicador }]"
+                :data-camada="c.indicador"
+              >
+                <label class="camada-toggle">
+                  <input
+                    v-if="c.camada"
+                    v-model="camadasVisiveis[c.camada]"
+                    type="checkbox"
+                    :disabled="!(situacaoCamadas[c.camada]?.total > 0)"
+                  />
+                  <span v-else class="sem-checkbox"></span>
+                  <span :class="['amostra', { 'amostra--ponto': c.ponto }]" :style="{ '--cor': c.cor }"></span>
+                  <span class="camada-nome">{{ c.rotulo }} <em>({{ c.indicador }})</em></span>
+                </label>
+                <div class="camada-situacao">
+                  <span :class="['badge-tag', `badge-tag--${avisoDaCamada(c).tom}`]">{{ avisoDaCamada(c).texto }}</span>
+                  <span class="camada-mapa">{{ textoDoMapa(c) }}</span>
+                </div>
+              </li>
+            </ul>
+          </template>
+        </section>
       </aside>
     </section>
   </div>
@@ -1427,13 +1389,33 @@ onUnmounted(() => {
   box-shadow: var(--sombra-sm);
 }
 
+.kpis-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+
 .kpis-titulo {
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   color: var(--cor-slate-600);
 }
 
-.kpis-nota {
+.kpis-titulo strong {
+  color: var(--cor-slate-900);
+}
+
+.kpis-notas {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
   color: var(--cor-slate-400);
+}
+
+.kpis-nota + .kpis-nota::before {
+  content: '·';
+  margin: 0 0.4rem;
 }
 
 .kpis-quantidades,
@@ -1455,6 +1437,15 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+}
+
+/* Quantidades em cartão, como os indicadores: antes ficavam soltas na largura toda. */
+.kpi {
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--raio-md);
+  border: 1px solid var(--cor-slate-200);
+  border-left: 3px solid var(--cor-primaria);
+  background: var(--cor-slate-50);
 }
 
 .kpi-indicador {
@@ -1559,9 +1550,14 @@ onUnmounted(() => {
 
 /* --------------------------------------------------------------- mapa */
 
+/* Acompanha a altura da janela (60% dela, entre 560px e 720px), para caber na tela sem
+   rolar numa janela de 1000px. O ganho maior de tamanho vem do zoom fracionado
+   (zoomSnap), que deixa o Paraná ocupar o mapa sem faixa vazia. O painel ao lado tem a
+   mesma altura: mapa e painel terminam na mesma linha. */
 .area-mapa {
+  --altura-mapa: clamp(560px, 60vh, 720px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 21rem;
+  grid-template-columns: minmax(0, 1fr) 22rem;
   gap: 1rem;
   align-items: start;
 }
@@ -1576,17 +1572,25 @@ onUnmounted(() => {
   position: relative;
 }
 
-/* Acompanha a altura da janela (60% dela, entre 560px e 720px), para caber na tela sem
-   rolar numa janela de 1000px. O ganho maior de tamanho vem do zoom fracionado
-   (zoomSnap), que deixa o Paraná ocupar o mapa sem faixa vazia. */
+/* Fundo da cor do cartão (não cinza) enquanto o mapa de fundo carrega. */
 .mapa {
-  height: clamp(560px, 60vh, 720px);
+  height: var(--altura-mapa);
   border-radius: var(--raio-lg);
   border: 1px solid var(--cor-slate-200);
   box-shadow: var(--sombra-sm);
   overflow: hidden;
   z-index: 0;
-  background: var(--cor-slate-100);
+  background: var(--cor-branco);
+}
+
+/* Emendas do mapa de fundo: com o zoom fracionado (zoomSnap 0.25) os tiles do
+   OpenStreetMap são escalados e o Chrome deixa uma fresta de subpixel entre eles — linhas
+   claras retas atravessando o mapa. Meio pixel a mais em cada tile cobre a fresta (o fundo
+   é opaco, a sobra não aparece); sem o plus-lighter do Leaflet, que somaria a sobra. */
+.mapa :deep(.leaflet-fundo-pane img.leaflet-tile) {
+  mix-blend-mode: normal;
+  width: 256.5px !important;
+  height: 256.5px !important;
 }
 
 /* Balão do clique e etiqueta do mouse: o Leaflet cria fora do escopo do Vue, dentro
@@ -1736,13 +1740,29 @@ onUnmounted(() => {
   }
 }
 
+/* Dica dentro do mapa, embaixo e no centro (a escala fica à esquerda e a atribuição à
+   direita). O mouse passa por ela: não atrapalha o clique no mapa. */
 .mapa-dica {
-  font-size: 0.78rem;
-  color: var(--cor-slate-500);
+  position: absolute;
+  bottom: 0.6rem;
+  left: 50%;
+  z-index: 1000;
+  max-width: calc(100% - 16rem);
+  transform: translateX(-50%);
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--cor-slate-200);
+  background: var(--cor-branco);
+  box-shadow: var(--sombra-sm);
+  font-size: 0.76rem;
+  color: var(--cor-slate-600);
+  text-align: center;
+  pointer-events: none;
 }
 
-.mapa-aviso {
-  margin-left: 0.4rem;
+.mapa-dica--aviso {
+  border-color: var(--status-alerta-borda);
+  background: var(--status-alerta-bg);
   color: var(--status-alerta-texto);
   font-weight: 600;
 }
@@ -1883,20 +1903,50 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.painel-aviso {
+/* Dois cartões (aviso e camadas) com a altura do mapa; quem rola, se não couber, é a
+   lista de camadas. */
+.painel-lateral {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
-  padding: 1rem;
+  gap: 0.75rem;
+  max-height: var(--altura-mapa);
+  min-height: 0;
+}
+
+.painel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem;
   background: var(--cor-branco);
   border: 1px solid var(--cor-slate-200);
   border-radius: var(--raio-lg);
   box-shadow: var(--sombra-sm);
 }
 
+.painel-aviso {
+  flex-shrink: 0;
+}
+
+.painel-camadas {
+  flex: 1 1 auto;
+  min-height: 11rem;
+  overflow-y: auto;
+  gap: 0.45rem;
+}
+
 .painel-titulo {
   font-size: 1rem;
   font-weight: 700;
+}
+
+.grupo-titulo {
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cor-slate-400);
 }
 
 .painel-vazio {
@@ -1930,29 +1980,33 @@ onUnmounted(() => {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.4rem;
 }
 
 .item-camada {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding-bottom: 0.55rem;
+  gap: 0.25rem;
+  padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--cor-slate-100);
 }
 
 .item-camada:last-child {
   border-bottom: none;
+  padding-bottom: 0;
 }
 
-.item-camada .badge-tag,
-.camada-mapa {
-  align-self: flex-start;
+/* Aviso e situação no mapa na mesma linha, alinhados sob o nome da camada. */
+.camada-situacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.5rem;
   margin-left: 1.9rem;
 }
 
 .camada-mapa {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: var(--cor-slate-400);
 }
 
@@ -1998,11 +2052,17 @@ onUnmounted(() => {
 
 @media (max-width: 1100px) {
   .area-mapa {
+    --altura-mapa: 460px;
     grid-template-columns: 1fr;
   }
 
-  .mapa {
-    height: 460px;
+  /* Empilhado embaixo do mapa, o painel volta à altura natural. */
+  .painel-lateral {
+    max-height: none;
+  }
+
+  .painel-camadas {
+    overflow-y: visible;
   }
 }
 
