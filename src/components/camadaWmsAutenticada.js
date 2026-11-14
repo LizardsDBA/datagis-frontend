@@ -70,6 +70,31 @@ async function baixarImagem(url, signal) {
   return objeto
 }
 
+/** Pedidos de imagem ainda sem resposta, por URL - ver baixarImagemCompartilhada. */
+const emAndamento = new Map()
+
+/**
+ * Mesma imagem, pedido só 1x mesmo se chamada 2x em seguida pra mesma URL (achado
+ * em volume real, LIZARDS-60: a camada de imóveis religando sozinha ao entrar na
+ * visão Imóveis - watch(visao) - podia coincidir com outro watcher ainda reagindo
+ * às contagens de camadasVisiveis/situacaoCamadas chegando aos poucos, as duas
+ * chamadas de _atualizar() caindo com o mesmo bbox antes da primeira terminar e
+ * entrar no cache. Sem isso, cada uma virava um GetMap real pro GeoServer - pro
+ * imóvel sem filtro (Paraná inteiro) isso são ~15s, em dobro.
+ */
+function baixarImagemCompartilhada(url, signal) {
+  const emCurso = emAndamento.get(url)
+  if (emCurso) return emCurso
+  const promessa = baixarImagem(url, signal).finally(() => emAndamento.delete(url))
+  emAndamento.set(url, promessa)
+  return promessa
+}
+
+/** Só para os testes. */
+export function limparPedidosEmAndamentoWms() {
+  emAndamento.clear()
+}
+
 export const CamadaWmsAutenticada = L.Layer.extend({
   options: {
     pane: PAINEL_WMS,
@@ -189,7 +214,7 @@ export const CamadaWmsAutenticada = L.Layer.extend({
     let origem = Promise.resolve(emCache)
     if (!emCache) {
       this._controle = new AbortController()
-      origem = baixarImagem(pedido.url, this._controle.signal)
+      origem = baixarImagemCompartilhada(pedido.url, this._controle.signal)
     }
 
     origem

@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import L from 'leaflet'
 import { apiFetch } from '../services/http'
-import { PAINEL_WMS, camadaWmsAutenticada, limparCacheWms } from './camadaWmsAutenticada'
+import {
+  PAINEL_WMS,
+  camadaWmsAutenticada,
+  limparCacheWms,
+  limparPedidosEmAndamentoWms,
+} from './camadaWmsAutenticada'
 
 vi.mock('../services/http', () => ({ apiFetch: vi.fn() }))
 
@@ -32,6 +37,7 @@ let contador
 beforeEach(() => {
   apiFetch.mockReset()
   limparCacheWms()
+  limparPedidosEmAndamentoWms()
   contador = 0
   URL.createObjectURL = vi.fn(() => `blob:imagem-${++contador}`)
   URL.revokeObjectURL = vi.fn()
@@ -102,6 +108,26 @@ describe('camadaWmsAutenticada', () => {
 
     expect(apiFetch).toHaveBeenCalledTimes(1)
     expect(mapa.getPane(PAINEL_WMS).querySelectorAll('img')).toHaveLength(1)
+  })
+
+  it('duas camadas pedindo a mesma vista ao mesmo tempo só pedem a imagem 1 vez (LIZARDS-60)', async () => {
+    // Achado em volume real: a camada de imóveis religando sozinha (watch(visao))
+    // coincidindo com outro watcher ainda reagindo às contagens chegando aos poucos -
+    // duas chamadas de _atualizar() caindo com o mesmo bbox antes da primeira
+    // terminar e entrar no cache, virando 2 GetMap reais pro GeoServer (~15s cada,
+    // em dobro, pro imóvel sem filtro).
+    let responder
+    apiFetch.mockReturnValue(new Promise((r) => { responder = r }))
+    camadaWmsAutenticada(URL_WMS, { layers: 'datagis:vw_mapa_imovel' }).addTo(mapa)
+    camadaWmsAutenticada(URL_WMS, { layers: 'datagis:vw_mapa_imovel' }).addTo(mapa)
+
+    expect(apiFetch).toHaveBeenCalledTimes(1)
+
+    responder(respostaImagem())
+    await flushPromises()
+    carregarImagens()
+
+    expect(mapa.getPane(PAINEL_WMS).querySelectorAll('img')).toHaveLength(2)
   })
 
   it('mexer no mapa pede a imagem da vista nova e tira a antiga só quando a nova carrega', async () => {
