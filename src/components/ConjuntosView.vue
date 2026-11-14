@@ -29,17 +29,19 @@ const CAMADAS_INDICADOR = [
   { indicador: 'IAE', campo: 'valorIae', camada: 'datagis:vw_mapa_embargo', rotulo: 'Embargo ambiental', cor: '#dc2626', leitura: 'RESTRICAO' },
   { indicador: 'IDESMAT', campo: 'valorIdesmat', camada: 'datagis:vw_mapa_desmatamento', rotulo: 'Desmatamento (PRODES)', cor: '#b45309', leitura: 'RESTRICAO' },
   { indicador: 'IFC', campo: 'valorIfc', camada: 'datagis:vw_mapa_foco_calor', rotulo: 'Foco de calor', cor: '#ea580c', leitura: 'RESTRICAO', ponto: true },
-  { indicador: 'IRL', campo: 'valorIrl', camada: null, rotulo: 'Reserva Legal', cor: '#0d9488', leitura: 'CONFORMIDADE' },
-  { indicador: 'IAPP', campo: 'valorIapp', camada: null, rotulo: 'APP declarada', cor: '#0891b2', leitura: 'INFORMATIVO' },
-  { indicador: 'ICV', campo: 'valorIcv', camada: null, rotulo: 'Vegetação nativa', cor: '#65a30d', leitura: 'INFORMATIVO' },
+  { indicador: 'IRL', campo: 'valorIrl', camada: 'datagis:vw_mapa_reserva_legal', rotulo: 'Reserva Legal', cor: '#0d9488', leitura: 'CONFORMIDADE' },
+  { indicador: 'IAPP', campo: 'valorIapp', camada: 'datagis:vw_mapa_app_declarada', rotulo: 'APP declarada', cor: '#0891b2', leitura: 'INFORMATIVO' },
+  { indicador: 'ICV', campo: 'valorIcv', camada: 'datagis:vw_mapa_vegetacao_nativa', rotulo: 'Vegetação nativa', cor: '#65a30d', leitura: 'INFORMATIVO' },
 ]
 const CAMADAS_NO_MAPA = CAMADAS_INDICADOR.filter((c) => c.camada)
 const RESTRICOES = CAMADAS_INDICADOR.filter((c) => c.leitura === 'RESTRICAO')
 
+// .filter: hoje os 7 indicadores têm camada (LIZARDS-35) e o 2º grupo fica vazio - sem
+// isso sobraria um título "Indicadores sem camada no mapa" com a lista em branco embaixo.
 const GRUPOS_INDICADOR = [
   { titulo: 'Camadas de alerta', camadas: CAMADAS_NO_MAPA },
   { titulo: 'Indicadores sem camada no mapa', camadas: CAMADAS_INDICADOR.filter((c) => !c.camada) },
-]
+].filter((g) => g.camadas.length)
 
 const LIMITE_LISTA_ALERTA = 8
 
