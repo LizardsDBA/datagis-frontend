@@ -85,16 +85,19 @@ vi.mock('leaflet', () => {
         _eventos: {},
         _popup: null,
         _etiqueta: null,
+        _paineis: {},
         options: {},
         setMaxBounds: vi.fn(),
         fitBounds: vi.fn(),
         setMinZoom: vi.fn(),
         getZoom: () => 7,
+        // moldura visível da visão geral (o mapa fica preso nela)
+        getBounds: () => ({ moldura: true }),
         on: vi.fn((evento, fn) => { mapaFalso._eventos[evento] = fn }),
         openTooltip: vi.fn((t) => { mapaFalso._etiqueta = t }),
         closeTooltip: vi.fn(() => { mapaFalso._etiqueta = null }),
-        createPane: vi.fn(),
-        getPane: () => ({ style: {} }),
+        createPane: vi.fn((nome) => (mapaFalso._paineis[nome] = { style: {} })),
+        getPane: (nome) => mapaFalso._paineis[nome] ?? { style: {} },
         hasLayer: (l) => mapaFalso._camadas.has(l),
         removeLayer: vi.fn((l) => mapaFalso._camadas.delete(l)),
         remove: vi.fn(),
@@ -178,6 +181,12 @@ function avisoDa(indicadorCodigo) {
 
 async function selecionarMunicipio(cod) {
   await wrapper.get('#select-municipio').setValue(String(cod))
+  await flushPromises()
+}
+
+/** Marca na legenda a camada de alerta do indicador (todas abrem desligadas). */
+async function ligarCamada(indicadorCodigo) {
+  await wrapper.get(`[data-camada="${indicadorCodigo}"] input`).setValue(true)
   await flushPromises()
 }
 
@@ -278,11 +287,55 @@ describe('ConjuntosView — mapa de cobertura', () => {
 
   it('destaca no mapa só as camadas com dado, e mostra quantas feições cruzam', async () => {
     await abrir()
+    await ligarCamada('IAE')
     await selecionarImovel('PR-4119905-A')
     expect(buscarGeometriaDaSelecao).toHaveBeenCalledWith({ tipo: 'imovel', codigo: 'PR-4119905-A' })
     expect(buscarFeicoesQueCruzam).toHaveBeenCalledTimes(1)
     expect(buscarFeicoesQueCruzam).toHaveBeenCalledWith('datagis:vw_mapa_embargo', { tipo: 'imovel', codigo: 'PR-4119905-A' })
     expect(wrapper.get('[data-camada="IAE"] .camada-mapa').text()).toBe('2 feições destacadas no mapa')
+  })
+
+  it('abre só com os limites municipais ligados, para o mapa carregar rápido', async () => {
+    await abrir()
+    const ligadas = camadasWms().filter((c) => mapaFalso.hasLayer(c))
+    expect(ligadas).toHaveLength(1)
+    expect(ligadas[0].opcoes.layers).toBe('datagis:vw_mapa_municipio')
+    expect(ligadas[0].opcoes.styles).toBeUndefined()
+    const marcadas = wrapper.findAll('.camada-toggle input').filter((i) => i.element.checked)
+    expect(marcadas).toHaveLength(1)
+    expect(wrapper.get('.camada-toggle').text()).toContain('Limites municipais')
+  })
+
+  it('só busca o que cruza a seleção nas camadas ligadas; ligar uma depois busca na hora', async () => {
+    await abrir()
+    await selecionarImovel('PR-4119905-A')
+    expect(buscarFeicoesQueCruzam).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-camada="IAE"] .camada-mapa').text()).toBe('Ligue a camada para destacar o que cruza a seleção')
+
+    await ligarCamada('IAE')
+    expect(buscarFeicoesQueCruzam).toHaveBeenCalledWith('datagis:vw_mapa_embargo', { tipo: 'imovel', codigo: 'PR-4119905-A' })
+    expect(wrapper.get('[data-camada="IAE"] .camada-mapa').text()).toBe('2 feições destacadas no mapa')
+  })
+
+  it('na visão de imóveis a camada de imóveis liga, para dar o que clicar', async () => {
+    await abrir()
+    const imoveis = camadasWms().find((c) => c.opcoes.layers === 'datagis:vw_mapa_imovel')
+    expect(mapaFalso.hasLayer(imoveis)).toBe(false)
+    await wrapper.findAll('.chave')[1].trigger('click')
+    await flushPromises()
+    expect(mapaFalso.hasLayer(imoveis)).toBe(true)
+  })
+
+  it('município ou imóvel selecionado fica num painel acima das feições que cruzam', async () => {
+    await abrir()
+    await selecionarImovel('PR-4119905-A')
+    const opcoesDoDestaque = L.geoJSON.mock.calls.map(([, opcoes]) => opcoes).find((o) => o?.style?.color === '#facc15')
+    expect(opcoesDoDestaque.pane).toBe('selecao')
+    // overlayPane do Leaflet (onde ficam as feições que cruzam) é 400; etiqueta e balão, 650+
+    expect(mapaFalso._paineis.selecao.style.zIndex).toBeGreaterThan(400)
+    expect(mapaFalso._paineis.selecao.style.zIndex).toBeLessThan(650)
+    // não rouba o mouse da etiqueta das feições de baixo
+    expect(mapaFalso._paineis.selecao.style.pointerEvents).toBe('none')
   })
 
   it('com município em foco, o mapa desenha só os imóveis dele', async () => {
@@ -297,12 +350,16 @@ describe('ConjuntosView — mapa de cobertura', () => {
   it('mapa preso ao Paraná: contorno da Gold, sem arrastar nem afastar pra fora', async () => {
     await abrir()
     expect(buscarContornoParana).toHaveBeenCalled()
-    expect(mapaFalso.setMaxBounds).toHaveBeenCalled()
-    expect(mapaFalso.setMinZoom).toHaveBeenCalledWith(7)
+    expect(mapaFalso.setMinZoom).toHaveBeenLastCalledWith(7)
+    // o limite de arrastar é a própria moldura da visão geral: nela não há o que arrastar
+    expect(mapaFalso.setMaxBounds).toHaveBeenLastCalledWith({ moldura: true })
+    expect(mapaFalso.options.maxBoundsViscosity).toBe(1)
     // máscara: um polígono do mundo com o Paraná como furo
-    const [aneis] = L.polygon.mock.calls[0]
+    const [aneis, opcoes] = L.polygon.mock.calls[0]
     expect(aneis).toHaveLength(2)
     expect(aneis[1][0]).toEqual([-25, -50]) // [lat, lng]
+    // em volta do estado o mapa só esmaece: nada de faixa cinza chapada
+    expect(opcoes.fillOpacity).toBeLessThan(1)
   })
 
   it('OpenStreetMap fica num painel próprio, para o filtro do tema escuro não inverter as camadas do GeoServer', async () => {
@@ -318,15 +375,15 @@ describe('ConjuntosView — mapa de cobertura', () => {
     await abrir()
     const mascara = L.polygon.mock.results[0].value
     const contorno = L.geoJSON.mock.results[0].value
-    document.documentElement.style.setProperty('--cor-slate-100', '#1c2530')
+    document.documentElement.style.setProperty('--cor-branco', '#151c24')
     document.documentElement.style.setProperty('--cor-slate-900', '#f3f7fa')
 
     estadoTema.atual = 'escuro'
     await flushPromises()
 
-    expect(mascara.setStyle).toHaveBeenLastCalledWith({ fillColor: '#1c2530' })
+    expect(mascara.setStyle).toHaveBeenLastCalledWith({ fillColor: '#151c24' })
     expect(contorno.setStyle).toHaveBeenLastCalledWith({ color: '#f3f7fa' })
-    document.documentElement.style.removeProperty('--cor-slate-100')
+    document.documentElement.style.removeProperty('--cor-branco')
     document.documentElement.style.removeProperty('--cor-slate-900')
     estadoTema.atual = 'claro'
   })
@@ -355,13 +412,18 @@ describe('ConjuntosView — mapa de cobertura', () => {
     expect(L.map).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ zoomSnap: 0.25 }))
   })
 
-  it('destaca no mapa só os municípios com imóveis publicados', async () => {
+  it('destaca no mapa só os municípios com imóveis publicados, quando a camada é ligada', async () => {
     await abrir()
     const destaque = camadasWms().find((c) => c.opcoes.styles === 'vw_mapa_municipio_com_dados')
     expect(destaque.opcoes.layers).toBe('datagis:vw_mapa_municipio')
     expect(destaque.opcoes.CQL_FILTER).toBe("COD_NATURAL IN ('4106902','4119905')")
-    expect(mapaFalso.hasLayer(destaque)).toBe(true)
+    expect(mapaFalso.hasLayer(destaque)).toBe(false)
     expect(wrapper.text()).toContain('Municípios com imóveis publicados')
+
+    const caixa = wrapper.findAll('.camada-toggle').find((l) => l.text().includes('Municípios com imóveis publicados'))
+    await caixa.get('input').setValue(true)
+    await flushPromises()
+    expect(mapaFalso.hasLayer(destaque)).toBe(true)
   })
 
   it('preenchimento do destaque fica abaixo dos imóveis e o contorno acima deles', async () => {
@@ -375,11 +437,16 @@ describe('ConjuntosView — mapa de cobertura', () => {
     expect(zIndex('vw_mapa_municipio_com_dados_contorno')).toBeLessThan(embargo)
   })
 
-  it('o destaque dos municípios com dados pode ser desligado na legenda', async () => {
+  it('o destaque dos municípios com dados liga e desliga as duas camadas juntas na legenda', async () => {
     await abrir()
     const preenchimento = camadasWms().find((c) => c.opcoes.styles === 'vw_mapa_municipio_com_dados')
     const contorno = camadasWms().find((c) => c.opcoes.styles === 'vw_mapa_municipio_com_dados_contorno')
     const caixa = wrapper.findAll('.camada-toggle').find((l) => l.text().includes('Municípios com imóveis publicados'))
+    await caixa.get('input').setValue(true)
+    await flushPromises()
+    expect(mapaFalso.hasLayer(preenchimento)).toBe(true)
+    expect(mapaFalso.hasLayer(contorno)).toBe(true)
+
     await caixa.get('input').setValue(false)
     await flushPromises()
     expect(mapaFalso.hasLayer(preenchimento)).toBe(false)
