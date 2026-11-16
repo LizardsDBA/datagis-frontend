@@ -276,13 +276,21 @@ describe('ConjuntosView — mapa de cobertura', () => {
     expect(indicador('IAPP').text()).toContain('—')
   })
 
-  it('situação de cada camada no mapa: publicada, vazia ou ainda sem camada', async () => {
+  it('situação de cada camada no mapa: publicada ou vazia (LIZARDS-35: os 7 indicadores já têm camada)', async () => {
     await abrir()
     expect(wrapper.get('[data-camada="IAE"] .camada-mapa').text()).toBe('124 feições publicadas')
     expect(wrapper.get('[data-camada="ISAP"] .camada-mapa').text()).toBe('Sem feições publicadas na Gold')
-    expect(wrapper.get('[data-camada="IRL"] .camada-mapa').text()).toBe('Camada ainda não publicada no mapa')
+    expect(wrapper.get('[data-camada="IRL"] .camada-mapa').text()).toBe('Sem feições publicadas na Gold')
     // Camada sem dado não pode ser ligada.
     expect(wrapper.get('[data-camada="ISAP"] input').attributes('disabled')).toBeDefined()
+  })
+
+  it('camada publicada (LIZARDS-35) aparece com a contagem e pode ser ligada', async () => {
+    contarFeicoes.mockImplementation(async (camada) =>
+      camada === 'datagis:vw_mapa_reserva_legal' ? 2777 : camada === 'datagis:vw_mapa_embargo' ? 124 : 0)
+    await abrir()
+    expect(wrapper.get('[data-camada="IRL"] .camada-mapa').text()).toBe('2.777 feições publicadas')
+    expect(wrapper.get('[data-camada="IRL"] input').attributes('disabled')).toBeUndefined()
   })
 
   it('destaca no mapa só as camadas com dado, e mostra quantas feições cruzam', async () => {
