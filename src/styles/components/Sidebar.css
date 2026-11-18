@@ -28,16 +28,7 @@
   box-shadow: 1px 0 3px rgba(0, 0, 0, 0.02);
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s ease;
   z-index: 100;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.barra-lateral::-webkit-scrollbar {
-  width: 4px;
-}
-.barra-lateral::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+  overflow: hidden;
 }
 
 /* Estado Recolhido (LIZARDS-37) */
@@ -163,6 +154,37 @@
   flex-direction: column;
   gap: 1rem;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.2rem;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.menu::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.menu:hover {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.menu:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.barra-lateral--recolhida .menu {
+  padding-right: 0;
 }
 
 .menu-categoria {
@@ -427,31 +449,6 @@
   }
 }
 
-/* Barra de rolagem discreta (LIZARDS-38): invisível até passar o mouse na sidebar.
-   A rolagem continua funcionando; só some a faixa cinza do trilho. scrollbar-width/
-   scrollbar-color valem no Chrome, Edge e Firefox (e fazem o Chrome ignorar o
-   ::-webkit-scrollbar); o ::-webkit-scrollbar fica como reserva para o Safari. */
-.barra-lateral {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-.barra-lateral:hover {
-  scrollbar-color: #cbd5e1 transparent;
-}
-
-.barra-lateral::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.barra-lateral::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-
-.barra-lateral:hover::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
 /* Rodapé recolhido (LIZARDS-38): itens empilhados, para caber o botão de tema */
 .barra-lateral--recolhida .rodape {
   flex-direction: column;
@@ -467,11 +464,11 @@
   box-shadow: none;
 }
 
-:root[data-tema="escuro"] .barra-lateral:hover {
+:root[data-tema="escuro"] .menu:hover {
   scrollbar-color: var(--cor-borda-forte) transparent;
 }
 
-:root[data-tema="escuro"] .barra-lateral:hover::-webkit-scrollbar-thumb {
+:root[data-tema="escuro"] .menu:hover::-webkit-scrollbar-thumb {
   background: var(--cor-borda-forte);
 }
 
