@@ -1,0 +1,475 @@
+.pagina-conjunto-dados {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.topo-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.etiqueta {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #15803d;
+}
+
+.titulo {
+  font-size: 1.5rem;
+  color: #0f172a;
+  margin: 0;
+}
+
+.linha-titulo-comparar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topo-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.botao-comparar-lotes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.botao-comparar-lotes:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+
+.subtitulo {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+/* Painel de Filtros (LIZARDS-40) */
+.card-pesquisa {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.header-pesquisa {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-pesquisa h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.corpo-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: flex-end;
+}
+
+.grupo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grupo-campo label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.busca-id {
+  flex-basis: 180px;
+}
+
+.busca-ampla {
+  flex-grow: 1;
+}
+
+.input-texto {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.input-texto:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.btn-recolher, .btn-limpar {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-limpar:hover {
+  color: #dc2626;
+}
+
+.seletor-camadas {
+  display: inline-flex;
+  gap: 0.4rem;
+  background: #f1f5f9;
+  padding: 0.3rem;
+  border-radius: 10px;
+  width: fit-content;
+}
+
+.botao-camada {
+  padding: 0.5rem 1.1rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.botao-camada--ativo {
+  background: #ffffff;
+  color: #15803d;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.cartao {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.tabela-responsiva-wrapper {
+  overflow-x: auto;
+}
+
+.tabela-dados {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.tabela-dados th {
+  text-align: left;
+  padding: 0.7rem 0.85rem;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.tabela-dados td {
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+}
+
+.col-acoes-titulo {
+  text-align: right;
+}
+
+.celula-acoes {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.grupo-botoes-linha {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.botao-icone {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: #334155;
+  transition: all 0.12s ease;
+}
+
+.botao-icone--comparar {
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.botao-icone:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.controles-paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.controles-paginacao button {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.controles-paginacao button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.estado-carregando,
+.estado-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  color: #64748b;
+  gap: 0.6rem;
+  text-align: center;
+}
+
+.estado-vazio--erro {
+  color: #991b1b;
+}
+
+.spinner-grande {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #e2e8f0;
+  border-top-color: #15803d;
+  border-radius: 50%;
+  animation: girar 0.65s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.linha-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Linha superior do título com o botão de voltar */
+.topo-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Botão Voltar Verde (Padrão DataGis) */
+.btn-voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #16a34a;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-voltar:hover {
+  background: #dcfce7;
+  border-color: #15803d;
+  transform: translateX(-2px);
+}
+
+.icone-voltar {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+/* Adaptado para o Tema Escuro (LIZARDS-38) */
+:root[data-tema="escuro"] .btn-voltar {
+  background: var(--cor-primaria-tenue, rgba(34, 197, 94, 0.1));
+  border-color: var(--cor-primaria-borda, #16a34a);
+  color: var(--cor-link, #4ade80);
+}
+
+:root[data-tema="escuro"] .btn-voltar:hover {
+  background: var(--cor-primaria-borda, #16a34a);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .card-pesquisa {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .header-pesquisa h3 {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .grupo-campo label {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .input-texto {
+  border-color: var(--cor-borda-forte);
+  background-color: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .input-texto:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .btn-recolher,
+:root[data-tema="escuro"] .btn-limpar {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-limpar:hover {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .etiqueta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .botao-comparar-lotes {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria-borda);
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .botao-comparar-lotes:hover {
+  background: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .subtitulo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .seletor-camadas {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .botao-camada {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .botao-camada--ativo {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .cartao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados th {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-dados td {
+  border-bottom-color: var(--cor-borda-suave);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .botao-icone {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .botao-icone--comparar {
+  color: var(--cor-link);
+  border-color: var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .botao-icone:hover {
+  background: var(--cor-borda);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .controles-paginacao {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .controles-paginacao button {
+  border-color: var(--cor-borda);
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .estado-carregando,
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-vazio--erro {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .spinner-grande {
+  border-color: var(--cor-borda);
+  border-top-color: var(--cor-primaria);
+}

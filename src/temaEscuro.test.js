@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -12,9 +12,24 @@ const pastaSrc = dirname(fileURLToPath(import.meta.url))
 const pastaComponentes = join(pastaSrc, 'components')
 const estiloGlobal = readFileSync(join(pastaSrc, 'style.css'), 'utf8')
 
-const componentes = readdirSync(pastaComponentes)
-  .filter((arquivo) => arquivo.endsWith('.vue'))
-  .map((arquivo) => ({ arquivo, fonte: readFileSync(join(pastaComponentes, arquivo), 'utf8') }))
+function lerFonteCompleta(arquivo, pastaBase = pastaComponentes) {
+  const caminhoVue = join(pastaBase, arquivo)
+  let fonte = readFileSync(caminhoVue, 'utf8')
+  for (const match of fonte.matchAll(/<style\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/g)) {
+    const caminhoCss = join(pastaBase, match[1])
+    if (existsSync(caminhoCss)) {
+      fonte += '\n' + readFileSync(caminhoCss, 'utf8')
+    }
+  }
+  return { arquivo, fonte }
+}
+
+const componentes = [
+  ...readdirSync(pastaComponentes)
+    .filter((arquivo) => arquivo.endsWith('.vue'))
+    .map((arquivo) => lerFonteCompleta(arquivo, pastaComponentes)),
+  lerFonteCompleta('App.vue', pastaSrc),
+]
 
 const comTemaEscuro = componentes.filter(({ fonte }) => fonte.includes('data-tema="escuro"'))
 

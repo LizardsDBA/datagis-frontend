@@ -1,0 +1,302 @@
+.diagnostico-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card-secao {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.card-header:hover {
+  background: #f8fafc;
+}
+
+.header-titulos {
+  display: flex;
+  flex-direction: column;
+}
+
+.diagnostico-titulo {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.diagnostico-sub {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.acoes-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-toggle-acordeao {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  padding: 0;
+}
+
+.btn-toggle-acordeao:hover {
+  color: #0f172a;
+}
+
+.btn-toggle-acordeao svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  transition: transform 0.2s ease;
+}
+
+.icone-rotacionado {
+  transform: rotate(180deg);
+}
+
+.btn-exportar {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-exportar:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.btn-exportar svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.corpo-secao {
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+}
+
+.tabela-container {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.tabela-diagnostico {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+/* Bordas em todas as células para criar o formato de grid de dados */
+.tabela-diagnostico th,
+.tabela-diagnostico td {
+  border: 1px solid #e2e8f0;
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+}
+
+.tabela-diagnostico th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.tabela-diagnostico td {
+  color: #334155;
+}
+
+.col-categoria {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none !important; /* Remove a borda interna do flex container */
+}
+
+/* Restaura a borda externa da célula da categoria */
+.tabela-diagnostico td:first-child {
+  border: 1px solid #e2e8f0 !important;
+}
+
+.ponto-cor {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.rotulo-erro {
+  font-weight: 600;
+}
+
+.valor-negrito {
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.valor-percentual {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.estado-msg, .estado-vazio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 80px;
+  font-size: 0.82rem;
+  color: #64748b;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.alerta-erro {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  padding: 0.8rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.spinner-sm {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #cbd5e1;
+  border-top-color: #d97706;
+  border-radius: 50%;
+  animation: girar 0.65s linear infinite;
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — só acrescenta; o tema claro acima não muda
+   ========================================================================== */
+:root[data-tema="escuro"] .card-secao {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .card-header {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .card-header:hover {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .diagnostico-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .diagnostico-sub {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-toggle-acordeao {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-toggle-acordeao:hover {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .btn-exportar {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .btn-exportar:hover {
+  background: var(--cor-borda);
+  color: var(--cor-texto-titulo);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .corpo-secao {
+  border-top-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .tabela-container {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-diagnostico th,
+:root[data-tema="escuro"] .tabela-diagnostico td {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tabela-diagnostico th {
+  background: var(--cor-superficie-elevada);
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .tabela-diagnostico td {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .tabela-diagnostico td:first-child {
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .valor-percentual {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .estado-msg,
+:root[data-tema="escuro"] .estado-vazio {
+  color: var(--cor-texto-terciario);
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .alerta-erro {
+  background: var(--tenue-erro);
+  color: var(--cor-erro);
+  border-color: rgb(248 113 113 / 30%);
+}
+
+:root[data-tema="escuro"] .spinner-sm {
+  border-color: var(--cor-borda-forte);
+  border-top-color: var(--cor-alerta);
+}
