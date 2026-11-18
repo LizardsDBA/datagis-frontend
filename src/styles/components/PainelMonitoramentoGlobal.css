@@ -515,3 +515,261 @@
   opacity: 0;
   transform: translateY(10px) scale(0.97);
 }
+
+/* ==========================================================================
+   Tema escuro (LIZARDS-38) — Painel de Monitoramento de Processamentos
+   ========================================================================== */
+
+/* Pílula Minimizada Flutuante */
+:root[data-tema="escuro"] .pill-minimizada {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-tema="escuro"] .pill-minimizada:hover {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda-forte);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-tema="escuro"] .pill--ativa {
+  border-color: var(--cor-primaria-borda);
+  background: var(--cor-superficie);
+  box-shadow: 0 4px 14px var(--cor-primaria-tenue), 0 0 0 3px var(--cor-primaria-tenue);
+}
+
+:root[data-tema="escuro"] .pill--ativa:hover {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 8px 20px var(--cor-primaria-tenue), 0 0 0 3px var(--cor-primaria-borda);
+}
+
+:root[data-tema="escuro"] .pill-minimizada .icone-chevron {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .pill-minimizada:hover .icone-chevron {
+  color: var(--cor-texto-titulo);
+}
+
+/* Card Expandido */
+:root[data-tema="escuro"] .painel-card {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+  box-shadow: 0 20px 30px -5px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--cor-borda-suave);
+}
+
+/* Cabeçalho do Card */
+:root[data-tema="escuro"] .painel-header {
+  background: var(--cor-superficie-elevada);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .ponto-status-topo {
+  background: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .ponto-status-topo.ponto-ativo {
+  background: var(--cor-primaria);
+  box-shadow: 0 0 0 3px var(--cor-primaria-tenue);
+}
+
+:root[data-tema="escuro"] .painel-titulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .painel-subtitulo {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-icone-painel {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .btn-icone-painel:hover {
+  background: var(--cor-superficie);
+  color: var(--cor-texto-titulo);
+  border-color: var(--cor-borda);
+}
+
+/* Abas de Navegação */
+:root[data-tema="escuro"] .painel-abas {
+  background: var(--cor-superficie-elevada);
+  border-bottom-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .aba-btn {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .aba-btn:hover {
+  color: var(--cor-texto);
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .aba-btn--ativa {
+  background: var(--cor-superficie);
+  color: var(--cor-texto-titulo);
+  border-color: var(--cor-borda);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-tema="escuro"] .aba-badge {
+  background: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .aba-badge--bronze {
+  background: var(--tenue-alerta);
+  color: var(--cor-alerta);
+}
+
+:root[data-tema="escuro"] .aba-badge--silver {
+  background: var(--tenue-destaque);
+  color: var(--cor-destaque);
+}
+
+:root[data-tema="escuro"] .aba-badge--gold {
+  background: var(--tenue-sucesso);
+  color: var(--cor-sucesso);
+}
+
+/* Conteúdo e Scrollbar */
+:root[data-tema="escuro"] .painel-conteudo {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .painel-conteudo::-webkit-scrollbar-track {
+  background: var(--cor-superficie);
+}
+
+:root[data-tema="escuro"] .painel-conteudo::-webkit-scrollbar-thumb {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .painel-conteudo::-webkit-scrollbar-thumb:hover {
+  background: var(--cor-borda-forte);
+}
+
+/* Estado Vazio */
+:root[data-tema="escuro"] .icone-vazio {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .vazio-titulo {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .vazio-sub {
+  color: var(--cor-texto-terciario);
+}
+
+/* Divisores e Tags de Seção */
+:root[data-tema="escuro"] .tag--bronze {
+  background: var(--tenue-alerta);
+  color: var(--cor-alerta);
+  border-color: rgb(251 191 36 / 30%);
+}
+
+:root[data-tema="escuro"] .tag--silver {
+  background: var(--tenue-destaque);
+  color: var(--cor-destaque);
+  border-color: rgb(180 156 251 / 30%);
+}
+
+:root[data-tema="escuro"] .tag--gold {
+  background: var(--tenue-sucesso);
+  color: var(--cor-sucesso);
+  border-color: rgb(74 222 128 / 30%);
+}
+
+/* Cards de Tarefas */
+:root[data-tema="escuro"] .card-tarefa {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-tema="escuro"] .card-tarefa:hover {
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .card-tarefa--executando {
+  border-color: var(--cor-primaria-borda);
+  background: rgb(59 174 116 / 8%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-tema="escuro"] .tarefa-nome {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .tarefa-fase {
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .tarefa-percentual {
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .trilho-progresso {
+  background: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .tarefa-detalhe {
+  color: var(--cor-texto-terciario);
+}
+
+/* Botões de Atalho nos Cards */
+:root[data-tema="escuro"] .btn-atalho-tarefa {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+  color: var(--cor-link);
+}
+
+:root[data-tema="escuro"] .btn-atalho-tarefa:hover {
+  background: var(--cor-primaria-tenue);
+  border-color: var(--cor-primaria);
+  color: var(--cor-primaria-hover);
+}
+
+:root[data-tema="escuro"] .btn-atalho--alerta {
+  background: var(--tenue-erro);
+  border-color: rgb(248 113 113 / 30%);
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .btn-atalho--alerta:hover {
+  background: rgb(248 113 113 / 20%);
+  border-color: var(--cor-erro);
+  color: #fca5a5;
+}
+
+/* Grid de Camadas Gold */
+:root[data-tema="escuro"] .grid-camadas-gold {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+}
+
+:root[data-tema="escuro"] .camada-nome {
+  color: var(--cor-texto-secundario);
+}
+
+:root[data-tema="escuro"] .camada-badge {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-terciario);
+}
+
+:root[data-tema="escuro"] .camada-badge.badge--concluida {
+  background: var(--tenue-sucesso);
+  color: var(--cor-sucesso);
+  border-color: rgb(74 222 128 / 30%);
+}
+
+:root[data-tema="escuro"] .camada-badge.badge--andamento {
+  background: var(--tenue-alerta);
+  color: var(--cor-alerta);
+  border-color: rgb(251 191 36 / 30%);
+}
