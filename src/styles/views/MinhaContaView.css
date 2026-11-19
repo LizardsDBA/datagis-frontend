@@ -1,0 +1,144 @@
+@import "./controleAcesso.css";
+
+.titulo-card {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--cor-slate-900);
+}
+
+.grade-campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+  max-width: 48rem;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.rotulo {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--cor-slate-600);
+}
+
+.campo-texto {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--cor-slate-300);
+  border-radius: var(--raio-md);
+  font-size: 0.9rem;
+  background: var(--cor-branco);
+  color: var(--cor-slate-900);
+}
+
+.campo-texto:focus {
+  outline: none;
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px var(--cor-primaria-glow);
+}
+
+.valor-fixo {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--cor-slate-200);
+  border-radius: var(--raio-md);
+  font-size: 0.9rem;
+  background: var(--cor-slate-50);
+  color: var(--cor-slate-700);
+}
+
+.campo small {
+  font-size: 0.76rem;
+  color: var(--cor-slate-400);
+}
+
+.campo small.texto-erro {
+  color: var(--status-erro-texto);
+}
+
+.acoes {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-primario {
+  padding: 0.55rem 1.1rem;
+  border: none;
+  border-radius: var(--raio-md);
+  background: var(--cor-primaria);
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-primario:hover:not(:disabled) {
+  background: var(--cor-primaria-hover);
+}
+
+.btn-primario:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.alerta-sucesso {
+  padding: 0.85rem 1.15rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  background: var(--status-sucesso-bg);
+  color: var(--status-sucesso-texto);
+  border: 1px solid var(--status-sucesso-borda);
+}
+
+.cabecalho-token {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.selo-em-breve {
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--raio-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--status-info-bg);
+  color: var(--status-info-texto);
+  border: 1px solid var(--status-info-borda);
+}
+
+.linha-token {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.texto-token {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--cor-slate-700);
+}
+
+.ajuda {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--cor-slate-500);
+  max-width: 48rem;
+}
+
+@media (max-width: 720px) {
+  .grade-campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .campo--vazio {
+    display: none;
+  }
+}
+
+/* Escuro: o texto do botão verde segue o contraste da paleta */
+:root[data-tema="escuro"] .btn-primario {
+  color: var(--cor-primaria-contraste);
+}

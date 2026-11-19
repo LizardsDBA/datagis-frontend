@@ -1,0 +1,237 @@
+.seletor {
+  position: relative;
+  width: 100%;
+}
+
+.seletor-caixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0.35rem 2rem 0.35rem 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.seletor--aberto .seletor-caixa,
+.seletor-caixa:focus {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+  outline: none;
+}
+
+.seletor-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.seletor-remover {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  line-height: 1;
+}
+
+.seletor-placeholder {
+  color: #94a3b8;
+  font-size: 0.86rem;
+  padding-left: 0.3rem;
+}
+
+.seletor-nota {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.seletor-seta {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.seletor-lista {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 18rem;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.25);
+}
+
+.seletor-topo {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.seletor-busca {
+  flex: 1;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  outline: none;
+  color: #1e293b;
+  background: #ffffff;
+}
+
+.seletor-busca:focus {
+  border-color: #15803d;
+}
+
+.seletor-limpar {
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.seletor-vazio {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.seletor-opcao {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.seletor-opcao:hover {
+  background: #f8fafc;
+}
+
+.seletor-opcao input {
+  margin-top: 0.2rem;
+}
+
+.seletor-opcao--bloqueada {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.seletor-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.seletor-rotulo {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.seletor-nota-opcao {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.seletor-descricao {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+/* Tema escuro (LIZARDS-38) */
+:root[data-tema="escuro"] .seletor-caixa,
+:root[data-tema="escuro"] .seletor-lista {
+  background: var(--cor-superficie-elevada);
+  border-color: var(--cor-borda-forte);
+}
+
+:root[data-tema="escuro"] .seletor--aberto .seletor-caixa,
+:root[data-tema="escuro"] .seletor-caixa:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: none;
+}
+
+:root[data-tema="escuro"] .seletor-etiqueta {
+  background: var(--tenue-info);
+  color: var(--cor-info);
+  border-color: rgb(124 180 247 / 30%);
+}
+
+:root[data-tema="escuro"] .seletor-placeholder,
+:root[data-tema="escuro"] .seletor-seta {
+  color: var(--cor-texto-rotulo);
+}
+
+:root[data-tema="escuro"] .seletor-nota,
+:root[data-tema="escuro"] .seletor-nota-opcao {
+  color: var(--cor-info);
+}
+
+:root[data-tema="escuro"] .seletor-topo,
+:root[data-tema="escuro"] .seletor-busca {
+  background: var(--cor-superficie-elevada);
+}
+
+:root[data-tema="escuro"] .seletor-topo,
+:root[data-tema="escuro"] .seletor-opcao {
+  border-bottom-color: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .seletor-busca {
+  border-color: var(--cor-borda-forte);
+  color: var(--cor-texto);
+}
+
+:root[data-tema="escuro"] .seletor-busca:focus {
+  border-color: var(--cor-primaria);
+}
+
+:root[data-tema="escuro"] .seletor-limpar {
+  color: var(--cor-erro);
+}
+
+:root[data-tema="escuro"] .seletor-opcao:hover {
+  background: var(--cor-borda-suave);
+}
+
+:root[data-tema="escuro"] .seletor-rotulo {
+  color: var(--cor-texto-titulo);
+}
+
+:root[data-tema="escuro"] .seletor-descricao,
+:root[data-tema="escuro"] .seletor-vazio {
+  color: var(--cor-texto-terciario);
+}

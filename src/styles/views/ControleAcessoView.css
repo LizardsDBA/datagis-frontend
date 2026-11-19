@@ -1,0 +1,90 @@
+@import "./controleAcesso.css";
+
+.grade-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+  gap: 1.25rem;
+}
+
+.card-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  background: var(--cor-branco);
+  border: 1px solid var(--cor-slate-200);
+  box-shadow: var(--sombra-sm);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.card-area:hover,
+.card-area:focus-visible {
+  border-color: var(--cor-primaria);
+  box-shadow: var(--sombra-md);
+  outline: none;
+}
+
+.card-topo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--cor-slate-100);
+}
+
+.card-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 8px;
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria);
+}
+
+.card-icone svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.card-titulo {
+  flex: 1;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--cor-slate-900);
+}
+
+.card-abrir {
+  font-size: 1.2rem;
+  color: var(--cor-slate-400);
+}
+
+.card-area:hover .card-abrir {
+  color: var(--cor-primaria);
+}
+
+.card-descricao {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--cor-slate-600);
+}
+
+.card-resumo {
+  margin: auto 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--cor-slate-500);
+}
